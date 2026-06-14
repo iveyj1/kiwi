@@ -89,7 +89,11 @@ Implemented guarded live SND playback in `src/kiwi_client/live_play.py`. Added `
 
 Committed as `9c47013` (`Add guarded live SND playback`).
 
-Started Milestone 6 with `src/kiwi_client/client_app.py`, a scriptable control shell that keeps app state separate from protocol/transport/audio layers. It supports status, connect/disconnect state, receiver, tune, mode/filter, and dry-run plans for play/record/capture. `kiwi-client` project script added. No live receiver connection was made for this slice.
+Started Milestone 6 with `src/kiwi_client/client_app.py`, a scriptable control shell that keeps app state separate from protocol/transport/audio layers. It supports status, connect/disconnect state, receiver, tune, mode/filter, and dry-run plans for play/record/capture. `kiwi-client` project script added.
+
+Committed as `1c8f47e` (`Add basic scriptable client shell`).
+
+Extended the client shell with executable guarded `play`, `record`, and `capture` commands. These require explicit `--allow-live` and reuse the existing guarded live operation modules; tests inject fake operations so command behavior is covered without receiver/audio access. `play --null-sink`, `record --overwrite`, and `capture --overwrite` are supported.
 
 ## YYYY-MM-DD
 

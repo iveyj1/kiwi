@@ -20,8 +20,11 @@ status
 tune 5000
 mode am -5000 5000
 play-plan
+play --allow-live --null-sink
 record-plan recordings/client-5000-am.wav
+record recordings/client-5000-am.wav --allow-live --overwrite
 capture-plan tests/fixtures/kiwi/client-5000-am.jsonl
+capture tests/fixtures/kiwi/client-5000-am.jsonl --allow-live --overwrite
 quit
 EOF
 
@@ -39,21 +42,31 @@ Supported commands:
 - `mode <mode> [low_cut_hz high_cut_hz]`
 - `filter <low_cut_hz> <high_cut_hz>`
 - `play-plan`
+- `play --allow-live [--null-sink]`
 - `record-plan <output.wav>`
+- `record <output.wav> --allow-live [--overwrite]`
 - `capture-plan <output.jsonl>`
+- `capture <output.jsonl> --allow-live [--overwrite]`
 - `help`
 - `quit`
 
 Current limitations:
 
 - `connect` and `disconnect` only update client state for now.
-- Plans do not execute live operations from inside the shell yet.
+- Live operations from the shell require explicit `--allow-live`.
 - No live RSSI/sample-rate/status display yet.
 - No TUI yet.
 
+Example shell commands for guarded execution:
+
+```text
+play --allow-live --null-sink
+record recordings/client-5000-am.wav --allow-live --overwrite
+capture tests/fixtures/kiwi/client-5000-am.jsonl --allow-live --overwrite
+```
+
 Expected next operations:
 
-- Execute guarded playback/record/capture from the shell.
 - Add live status/error display.
 - Add persistent session lifecycle.
 

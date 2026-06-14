@@ -9,15 +9,17 @@ modules.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import shlex
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
-from kiwi_client.live_capture import LiveSndCaptureConfig
-from kiwi_client.live_play import LiveSndPlaybackConfig
-from kiwi_client.live_record import LiveSndWavRecordConfig
+from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
+from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
+from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
+from kiwi_client.playback import NullAudioSink, SoundDeviceSink
 
 
 DEFAULT_LOW_CUT_HZ = -5000
@@ -51,11 +53,43 @@ class ClientCommandError(ValueError):
     """Raised for invalid client shell commands."""
 
 
+class ClientOperations(Protocol):
+    """Executable operations used by the client controller."""
+
+    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool) -> dict[str, Any]: ...
+
+    def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]: ...
+
+    def capture(self, config: LiveSndCaptureConfig) -> dict[str, Any]: ...
+
+
+class LiveClientOperations:
+    """Default operations that call guarded live play/record/capture modules."""
+
+    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool) -> dict[str, Any]:
+        sink = NullAudioSink() if null_sink else SoundDeviceSink()
+        result = asyncio.run(play_live_snd(config, sink, allow_live=True, dry_run=null_sink))
+        data = asdict(result)
+        data["path"] = str(result.path)
+        return data
+
+    def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]:
+        result = asyncio.run(record_live_snd_wav(config, allow_live=True))
+        data = asdict(result)
+        data["path"] = str(result.path)
+        return data
+
+    def capture(self, config: LiveSndCaptureConfig) -> dict[str, Any]:
+        path = asyncio.run(capture_live_snd(config, allow_live=True))
+        return {"path": str(path)}
+
+
 class ClientController:
     """Apply simple user commands to client state and produce plans."""
 
-    def __init__(self, state: ClientState | None = None) -> None:
+    def __init__(self, state: ClientState | None = None, operations: ClientOperations | None = None) -> None:
         self.state = state or ClientState()
+        self.operations = operations or LiveClientOperations()
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -110,6 +144,27 @@ class ClientController:
         if command == "capture-plan":
             self._require_arg_count(args, 1, "capture-plan <output.jsonl>")
             return {"type": "capture-plan", "plan": self._capture_config(Path(args[0])).dry_run_plan()}
+        if command == "play":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--null-sink"})
+            self._require_arg_count(positional, 0, "play --allow-live [--null-sink]")
+            self._require_allow_live(flags, "play-plan")
+            return {"type": "play", "result": self.operations.play(self._playback_config(), null_sink="--null-sink" in flags)}
+        if command == "record":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
+            self._require_arg_count(positional, 1, "record <output.wav> --allow-live [--overwrite]")
+            self._require_allow_live(flags, "record-plan <output.wav>")
+            return {
+                "type": "record",
+                "result": self.operations.record(self._record_config(Path(positional[0]), overwrite="--overwrite" in flags)),
+            }
+        if command == "capture":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
+            self._require_arg_count(positional, 1, "capture <output.jsonl> --allow-live [--overwrite]")
+            self._require_allow_live(flags, "capture-plan <output.jsonl>")
+            return {
+                "type": "capture",
+                "result": self.operations.capture(self._capture_config(Path(positional[0]), overwrite="--overwrite" in flags)),
+            }
         raise ClientCommandError(f"unknown command: {command}")
 
     def _with_receiver(self, value: str) -> ClientState:
@@ -123,6 +178,24 @@ class ClientController:
         if len(args) != count:
             raise ClientCommandError(f"usage: {usage}")
 
+    @staticmethod
+    def _parse_flags(args: list[str], allowed: set[str]) -> tuple[list[str], set[str]]:
+        positional: list[str] = []
+        flags: set[str] = set()
+        for arg in args:
+            if arg.startswith("--"):
+                if arg not in allowed:
+                    raise ClientCommandError(f"unsupported flag: {arg}")
+                flags.add(arg)
+            else:
+                positional.append(arg)
+        return positional, flags
+
+    @staticmethod
+    def _require_allow_live(flags: set[str], plan_command: str) -> None:
+        if "--allow-live" not in flags:
+            raise ClientCommandError(f"refusing live operation without --allow-live; use `{plan_command}` first")
+
     def _playback_config(self) -> LiveSndPlaybackConfig:
         return LiveSndPlaybackConfig(
             host=self.state.host,
@@ -134,7 +207,7 @@ class ClientController:
             high_cut_hz=self.state.high_cut_hz,
         )
 
-    def _record_config(self, output: Path) -> LiveSndWavRecordConfig:
+    def _record_config(self, output: Path, *, overwrite: bool = False) -> LiveSndWavRecordConfig:
         return LiveSndWavRecordConfig(
             host=self.state.host,
             port=self.state.port,
@@ -144,9 +217,10 @@ class ClientController:
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
+            overwrite=overwrite,
         )
 
-    def _capture_config(self, output: Path) -> LiveSndCaptureConfig:
+    def _capture_config(self, output: Path, *, overwrite: bool = False) -> LiveSndCaptureConfig:
         return LiveSndCaptureConfig(
             host=self.state.host,
             port=self.state.port,
@@ -156,6 +230,7 @@ class ClientController:
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
+            overwrite=overwrite,
         )
 
 
@@ -169,8 +244,11 @@ def available_commands() -> list[str]:
         "mode <mode> [low_cut_hz high_cut_hz]",
         "filter <low_cut_hz> <high_cut_hz>",
         "play-plan",
+        "play --allow-live [--null-sink]",
         "record-plan <output.wav>",
+        "record <output.wav> --allow-live [--overwrite]",
         "capture-plan <output.jsonl>",
+        "capture <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
     ]

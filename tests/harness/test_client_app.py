@@ -6,6 +6,23 @@ import pytest
 from kiwi_client.client_app import ClientCommandError, ClientController, run_script, main
 
 
+class FakeOperations:
+    def __init__(self):
+        self.calls = []
+
+    def play(self, config, *, null_sink: bool):
+        self.calls.append(("play", config, null_sink))
+        return {"frames": 1024, "dry_run": null_sink}
+
+    def record(self, config):
+        self.calls.append(("record", config))
+        return {"path": str(config.output), "frames": 2048}
+
+    def capture(self, config):
+        self.calls.append(("capture", config))
+        return {"path": str(config.output)}
+
+
 def test_client_controller_status_and_state_changes():
     controller = ClientController()
 
@@ -56,6 +73,37 @@ def test_run_script_stops_at_quit():
     ])
 
     assert [response["type"] for response in responses] == ["status", "quit"]
+
+
+def test_client_executes_play_record_capture_with_injected_operations():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+    controller.execute("tune 5000")
+    controller.execute("mode am -5000 5000")
+
+    play = controller.execute("play --allow-live --null-sink")
+    record = controller.execute("record recordings/shell.wav --allow-live --overwrite")
+    capture = controller.execute("capture tests/fixtures/kiwi/shell.jsonl --allow-live --overwrite")
+
+    assert play == {"type": "play", "result": {"frames": 1024, "dry_run": True}}
+    assert record["result"]["path"] == "recordings/shell.wav"
+    assert capture["result"]["path"] == "tests/fixtures/kiwi/shell.jsonl"
+    assert operations.calls[0][0] == "play"
+    assert operations.calls[0][1].frequency_khz == 5000.0
+    assert operations.calls[0][1].low_cut_hz == -5000
+    assert operations.calls[1][1].overwrite is True
+    assert operations.calls[2][1].overwrite is True
+
+
+def test_client_refuses_live_operations_without_allow_live():
+    controller = ClientController(operations=FakeOperations())
+
+    with pytest.raises(ClientCommandError, match="without --allow-live"):
+        controller.execute("play --null-sink")
+    with pytest.raises(ClientCommandError, match="without --allow-live"):
+        controller.execute("record recordings/x.wav")
+    with pytest.raises(ClientCommandError, match="without --allow-live"):
+        controller.execute("capture tests/fixtures/kiwi/x.jsonl")
 
 
 def test_client_rejects_bad_command():

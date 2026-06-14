@@ -185,12 +185,13 @@ Current capabilities:
 - Scriptable CLI control surface exists as `python3 -m kiwi_client.client_app` / `kiwi-client`.
 - Client state is separate from protocol/transport/audio code.
 - Commands support status, connect/disconnect state, receiver selection, tune, mode/filter changes, and dry-run plans for playback, recording, and capture.
+- Executable `play`, `record`, and `capture` commands are available behind explicit `--allow-live` and reuse the guarded operation modules.
 - JSONL output is available for scripts/tests.
+- Operation execution is dependency-injected so shell behavior is harness-testable without receiver/audio access.
 
 Remaining capabilities needed:
 
 - Actual persistent connect/disconnect session lifecycle.
-- Execute play/record/capture commands from the client shell, not only plans.
 - Live status updates: sample rate, RSSI, sequence gaps, receiver errors.
 - TUI or richer interactive surface.
 

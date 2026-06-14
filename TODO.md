@@ -2,15 +2,15 @@
 
 ## Current slice
 
-Goal: Start Milestone 6 with a basic scriptable client control surface.
+Goal: Continue Milestone 6 by executing guarded play/record/capture functions from the scriptable client shell.
 
 Done criteria:
 
-- Add a small client controller/app state layer separate from protocol/transport/audio code.
-- Support status, connect/disconnect state, receiver, tune, mode, filter, play-plan, record-plan, and capture-plan commands.
-- Add a `kiwi-client` CLI that can run a command script and emit JSONL responses.
-- Cover state transitions and generated operation plans with pytest.
-- Keep live-radio testing deferred for this first Milestone 6 slice.
+- Add executable `play`, `record`, and `capture` commands to `kiwi-client`.
+- Require explicit `--allow-live` for executable live operations while preserving existing `*-plan` commands.
+- Support `play --null-sink`, `record --overwrite`, and `capture --overwrite` options.
+- Keep operation execution dependency-injected so tests use fake operations and avoid live radio/audio hardware.
+- Cover command execution and safety refusal with pytest.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
