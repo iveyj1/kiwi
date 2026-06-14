@@ -11,7 +11,7 @@ Status key:
 
 ## Current position
 
-The project has completed the first SND audio harness, local capture, offline recording, and short direct live-to-WAV milestone.
+The project has completed the first SND audio harness, local capture, offline recording, short direct live-to-WAV, and short live playback milestones.
 
 Current verified baseline:
 
@@ -19,6 +19,7 @@ Current verified baseline:
 - Local receiver fixture captured from `10.0.0.40:8073` at 5000 kHz AM, 10 kHz bandwidth.
 - Captured uncompressed mono SND fixture can be converted to a standard WAV file.
 - A short guarded direct live-to-WAV recording has been verified against the local receiver.
+- A short guarded live playback run has written real radio audio to the default `sounddevice` output.
 
 ## Milestone 1 — SND protocol and harness foundation
 
@@ -144,7 +145,7 @@ Risks/questions:
 
 ## Milestone 5 — Basic audio playback
 
-Status: **In progress**
+Status: **Done for short local uncompressed mono SND playback**
 
 Goal:
 
@@ -154,19 +155,20 @@ Current capabilities:
 
 - WAV playback scaffolding exists in `src/kiwi_client/playback.py`.
 - `NullAudioSink` supports dry-run playback and records chunk/byte stats without an audio device.
-- CLI exists as `python3 -m kiwi_client.playback` / `kiwi-play-wav`, currently requiring `--dry-run`.
+- `SoundDeviceSink` supports real 16-bit PCM playback using optional `sounddevice`.
+- WAV playback CLI exists as `python3 -m kiwi_client.playback` / `kiwi-play-wav`.
+- Guarded live SND playback CLI exists as `python3 -m kiwi_client.live_play` / `kiwi-snd-play`.
+- A short live run wrote 60 SND frames to the default audio output.
 
-Remaining done criteria:
+Remaining follow-ons:
 
-1. Choose/install an audio backend, likely `sounddevice`.
-2. Add real audio-device sink behind the existing `AudioSink` interface.
-3. Add fixture/WAV playback smoke test with the real backend when hardware is available.
-4. Add live short playback with guarded receiver connection.
-5. Add buffering and underflow/overflow diagnostics.
+- Better buffering and underflow/overflow diagnostics.
+- User-selectable audio device.
+- Longer attended playback tests.
+- Playback for compressed and stereo/IQ modes.
 
 Open decisions:
 
-- Audio backend final choice.
 - Buffer target latency.
 - How playback coexists with recording and detection consumers.
 

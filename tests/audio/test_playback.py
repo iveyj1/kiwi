@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from kiwi_client.playback import NullAudioSink, main, play_wav_file
+from kiwi_client.playback import NullAudioSink, SoundDeviceSink, main, play_wav_file, samples_to_pcm16le
 from kiwi_client.recorder import write_snd_fixture_wav
 
 
@@ -44,10 +44,10 @@ def test_playback_cli_dry_run_outputs_json(tmp_path: Path, capsys):
     assert '"chunks": 5' in out
 
 
-def test_playback_cli_refuses_real_output_until_backend_exists(tmp_path: Path):
-    path = _wav(tmp_path)
+def test_samples_to_pcm16le():
+    assert samples_to_pcm16le((-32768, -1, 0, 1, 32767)).hex() == "0080ffff00000100ff7f"
 
-    with pytest.raises(SystemExit) as exc:
-        main([str(path)])
 
-    assert exc.value.code == 2
+def test_sounddevice_sink_rejects_non_16_bit_before_importing_backend():
+    with pytest.raises(ValueError, match="16-bit"):
+        SoundDeviceSink().start(sample_rate_hz=12000, channels=1, sample_width_bytes=1)

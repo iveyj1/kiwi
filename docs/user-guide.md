@@ -131,11 +131,55 @@ PYTHONPATH=src python3 -m kiwi_client.playback \
   --json
 ```
 
+Live SND playback dry-run plan:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_play \
+  --dry-run \
+  --host 10.0.0.40 \
+  --frequency-khz 5000 \
+  --mode am \
+  --low-cut-hz -5000 \
+  --high-cut-hz 5000
+```
+
+Live SND playback with audio output, only when explicitly intended:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_play \
+  --allow-live \
+  --host 10.0.0.40 \
+  --frequency-khz 5000 \
+  --mode am \
+  --low-cut-hz -5000 \
+  --high-cut-hz 5000 \
+  --duration-seconds 5 \
+  --max-frames 60 \
+  --json
+```
+
+Live SND playback with receiver connection but no audio-device output:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_play \
+  --allow-live \
+  --null-sink \
+  --host 10.0.0.40 \
+  --frequency-khz 5000 \
+  --mode am \
+  --low-cut-hz -5000 \
+  --high-cut-hz 5000 \
+  --json
+```
+
 Current playback limitations:
 
-- no real audio-device output yet,
-- dry-run uses `NullAudioSink` and reports frames/chunks/bytes,
-- intended next backend is likely `sounddevice`, but not selected/finalized.
+- uncompressed mono SND only,
+- short guarded sessions only,
+- no compressed ADPCM,
+- no stereo/IQ,
+- no user-facing audio device selector yet,
+- buffering and underflow/overflow diagnostics are minimal.
 
 ## Beacon detection
 

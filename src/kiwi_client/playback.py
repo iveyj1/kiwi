@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -39,6 +40,39 @@ class PlaybackResult:
     dry_run: bool
 
 
+class SoundDeviceSink:
+    """Audio sink backed by the optional sounddevice package."""
+
+    def __init__(self) -> None:
+        self._stream = None
+
+    def start(self, *, sample_rate_hz: int, channels: int, sample_width_bytes: int) -> None:
+        if sample_width_bytes != 2:
+            raise ValueError("SoundDeviceSink currently supports 16-bit PCM only")
+        try:
+            import sounddevice as sd
+        except ImportError as exc:
+            raise RuntimeError("sounddevice is not installed; install optional playback dependency") from exc
+        self._stream = sd.RawOutputStream(
+            samplerate=sample_rate_hz,
+            channels=channels,
+            dtype="int16",
+            blocksize=0,
+        )
+        self._stream.start()
+
+    def write(self, pcm: bytes) -> None:
+        if self._stream is None:
+            raise RuntimeError("sink has not been started")
+        self._stream.write(pcm)
+
+    def stop(self) -> None:
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
+
+
 class NullAudioSink:
     """Audio sink that discards audio but records playback statistics."""
 
@@ -65,6 +99,11 @@ class NullAudioSink:
 
     def stop(self) -> None:
         self.stopped = True
+
+
+def samples_to_pcm16le(samples: tuple[int, ...]) -> bytes:
+    """Convert signed int16 samples to little-endian PCM bytes."""
+    return b"".join(struct.pack("<h", sample) for sample in samples)
 
 
 def play_wav_file(path: str | Path, sink: AudioSink, *, chunk_frames: int = 1024, dry_run: bool = True) -> PlaybackResult:
@@ -106,7 +145,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Playback/dry-run a WAV recording")
     parser.add_argument("wav", type=Path)
     parser.add_argument("--chunk-frames", type=int, default=1024)
-    parser.add_argument("--dry-run", action="store_true", help="use NullAudioSink; currently required")
+    parser.add_argument("--dry-run", action="store_true", help="use NullAudioSink instead of an audio device")
     parser.add_argument("--json", action="store_true", help="print playback summary as JSON")
     return parser
 
@@ -114,10 +153,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    if not args.dry_run:
-        parser.error("real audio output is not implemented yet; use --dry-run")
-        return 2
-    result = play_wav_file(args.wav, NullAudioSink(), chunk_frames=args.chunk_frames, dry_run=True)
+    sink: AudioSink = NullAudioSink() if args.dry_run else SoundDeviceSink()
+    result = play_wav_file(args.wav, sink, chunk_frames=args.chunk_frames, dry_run=args.dry_run)
     if args.json:
         data = asdict(result)
         data["path"] = str(result.path)

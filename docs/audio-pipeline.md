@@ -89,12 +89,14 @@ Fixture coverage:
 
 ## Playback scaffolding
 
-`src/kiwi_client/playback.py` starts Milestone 5:
+`src/kiwi_client/playback.py` and `src/kiwi_client/live_play.py` implement the first playback path:
 
 - WAV files are read in configurable frame chunks.
-- `AudioSink` defines the target interface for future device playback.
+- `AudioSink` defines the target interface for playback backends.
 - `NullAudioSink` supports dry-run/test playback with no audio device.
-- The CLI currently requires `--dry-run`; real audio output is not implemented yet.
+- `SoundDeviceSink` supports real 16-bit PCM output through optional `sounddevice`.
+- `live_play.py` provides guarded live SND playback using the same local receiver allowlist and explicit `--allow-live` pattern.
+- A short 5000 kHz AM live run wrote 60 SND frames to the default audio output.
 
 ## Questions to resolve
 

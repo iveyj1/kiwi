@@ -12,10 +12,14 @@ dev = [
 live = [
     "websockets>=12",
 ]
+playback = [
+    "sounddevice>=0.4",
+]
 
 [project.scripts]
 kiwi-snd-capture = "kiwi_client.live_capture:main"
 kiwi-snd-record = "kiwi_client.live_record:main"
+kiwi-snd-play = "kiwi_client.live_play:main"
 kiwi-fixture-to-wav = "kiwi_client.recorder:main"
 kiwi-play-wav = "kiwi_client.playback:main"
 

@@ -2,21 +2,22 @@
 
 ## Current slice
 
-Goal: Advance Milestone 4 direct live-to-WAV recording and Milestone 5 playback as far as practical.
+Goal: Get short guarded live SND playback working.
 
 Done criteria:
 
-- Add direct SND-to-WAV recording session logic that is covered by replay transport.
-- Add a guarded `kiwi_client.live_record` CLI with dry-run and `--allow-live` gating.
-- Add playback scaffolding with WAV chunking and a null audio sink for dry-run/test use.
-- Add CLI entrypoints for direct recording and playback dry-run.
-- Update roadmap and user docs with current milestone status and limitations.
+- Add optional `sounddevice` sink behind the existing playback `AudioSink` interface.
+- Add guarded live SND playback CLI with dry-run, null-sink, and explicit `--allow-live` modes.
+- Cover live playback command/session flow with replay transport and `NullAudioSink`.
+- Verify one short local null-sink live playback run.
+- Verify one short local real audio output run if an output device is available.
+- Update roadmap and user docs.
 
 Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
 
-Live-radio needed: optional; if run, short local receiver only after harness passes.
+Live-radio needed: yes, short local receiver only after harness passes.
 
-Docs to update: `docs/roadmap.md`, `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: `docs/roadmap.md`, `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/radio-lab.md`, `docs/dev-log.md`
 
 ## Next
 
