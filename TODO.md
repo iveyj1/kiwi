@@ -11,7 +11,7 @@ Done criteria:
 - Add commands for AGC on/off, hang, threshold, slope, decay, and manual gain.
 - Queue AGC command changes to active background playback sessions.
 - Cover AGC command behavior with harness tests.
-- Update docs to explain volume is currently local state only and AGC gain is the verified radio-side gain control.
+- Update docs to explain volume controls local system output and AGC gain is the verified Kiwi receiver-side gain control.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 

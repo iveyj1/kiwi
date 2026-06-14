@@ -211,7 +211,7 @@ Current limitations:
 - Live operations from the shell require explicit `--allow-live`.
 - TUI is an initial curses command/dashboard shell, not a full SDR interface yet.
 - RSSI/S-meter display is a simple latest-value readout from SND frames, not a calibrated meter widget.
-- `volume` / `volume-step` are currently local client state/display only. The local `kiwiclient` reference has verified `SET agc=...` receiver-side gain control, but no verified radio-side volume command.
+- `volume` / `volume-step` control local system output volume via common Linux mixer tools (`wpctl`, `pactl`, then `amixer`). The local `kiwiclient` reference has verified `SET agc=...` receiver-side gain control, but no verified Kiwi radio-side volume command.
 - `connect` is not a continuously open retunable WebSocket session yet.
 
 Example shell commands for persistent live settings and guarded execution:

@@ -24,6 +24,7 @@ from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
+from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
 
 DEFAULT_LOW_CUT_HZ = -5000
@@ -34,7 +35,7 @@ DEFAULT_HIGH_CUT_HZ = 5000
 class ClientState:
     """Interactive client state independent of transport/UI."""
 
-    host: str = "10.0.0.40"
+    host: str = "10.0.0.41"
     port: int = 8073
     frequency_khz: float = 5000.0
     mode: str = "am"
@@ -160,11 +161,13 @@ class ClientController:
         operations: ClientOperations | None = None,
         background: BackgroundOperation | None = None,
         allow_live_default: bool = False,
+        volume_control: VolumeControl | None = None,
     ) -> None:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
         self.background = background or BackgroundOperation()
         self.allow_live_default = allow_live_default
+        self.volume_control = volume_control or SystemVolumeControl()
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -217,12 +220,10 @@ class ClientController:
             return self._state_response()
         if command == "volume":
             self._require_arg_count(args, 1, "volume <percent>")
-            self.state = replace(self.state, volume_percent=self._clamp_volume(int(args[0])))
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._set_volume(self._clamp_volume(int(args[0])))
         if command == "volume-step":
             self._require_arg_count(args, 1, "volume-step <delta_percent>")
-            self.state = replace(self.state, volume_percent=self._clamp_volume(self.state.volume_percent + int(args[0])))
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._set_volume(self._clamp_volume(self.state.volume_percent + int(args[0])))
         if command == "agc":
             return self._handle_agc(args)
         if command == "duration":
@@ -350,6 +351,14 @@ class ClientController:
         response["active_command"] = command
         response["operation"] = status.as_dict()
         return response
+
+    def _set_volume(self, percent: int) -> dict[str, Any]:
+        self.state = replace(self.state, volume_percent=percent)
+        try:
+            volume_result = self.volume_control.set_percent(percent)
+        except RuntimeError as exc:
+            raise ClientCommandError(str(exc)) from exc
+        return {"type": "state", "state": self.state.as_dict(), "volume": volume_result}
 
     def _handle_agc(self, args: list[str]) -> dict[str, Any]:
         if not args:

@@ -67,6 +67,15 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Message: ok" in text
 
 
+class TuiFakeVolumeControl:
+    def __init__(self):
+        self.values = []
+
+    def set_percent(self, percent: int) -> dict:
+        self.values.append(percent)
+        return {"backend": "fake", "percent": percent}
+
+
 class TuiFakeOperations:
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         return {"frames": 1, "dry_run": null_sink}
@@ -130,7 +139,8 @@ step_percent = 5
         encoding="utf-8",
     )
     config = load_config(config_path)
-    controller = ClientController()
+    volume = TuiFakeVolumeControl()
+    controller = ClientController(volume_control=volume)
     state = TuiInputState()
 
     response, message = handle_tui_key(ord("l"), state, controller, config)
@@ -140,7 +150,9 @@ step_percent = 5
 
     response, message = handle_tui_key(ord("k"), state, controller, config)
     assert response["state"]["volume_percent"] == 105
+    assert response["volume"] == {"backend": "fake", "percent": 105}
     assert message == ""
+    assert volume.values == [105]
 
 
 def test_tui_expand_key_action_uses_configured_steps(tmp_path):
