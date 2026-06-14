@@ -11,13 +11,14 @@ Status key:
 
 ## Current position
 
-The project has completed the first SND audio harness, local capture, and offline recording milestone.
+The project has completed the first SND audio harness, local capture, offline recording, and short direct live-to-WAV milestone.
 
 Current verified baseline:
 
 - Offline tests pass: `python3 -m pytest`.
 - Local receiver fixture captured from `10.0.0.40:8073` at 5000 kHz AM, 10 kHz bandwidth.
 - Captured uncompressed mono SND fixture can be converted to a standard WAV file.
+- A short guarded direct live-to-WAV recording has been verified against the local receiver.
 
 ## Milestone 1 — SND protocol and harness foundation
 
@@ -109,19 +110,31 @@ Remaining follow-ons:
 
 ## Milestone 4 — Direct live-to-WAV recording
 
-Status: **Planned / recommended next**
+Status: **Done for short local uncompressed mono SND recordings**
 
 Goal:
 
 Capture a short local receiver session and write WAV directly, while optionally preserving JSONL fixture data.
 
-Done criteria:
+Current capabilities:
 
-- Harness coverage for live-recording pipeline using replay transport.
-- Guarded CLI mode for short live WAV recording.
-- No admin commands or reconnect loop.
-- Output WAV validates with Python `wave`.
-- Optional JSONL sidecar or fixture capture remains available for regression.
+- Direct SND-to-WAV session logic is covered with `ReplayTransport` using the local 5000 kHz fixture command/response flow.
+- Guarded CLI mode exists as `python3 -m kiwi_client.live_record` / `kiwi-snd-record`.
+- CLI supports dry-run plans and requires `--allow-live` before network access.
+- Output WAV validates with Python `wave` in replay tests.
+
+Evidence:
+
+- `src/kiwi_client/live_record.py`
+- `tests/harness/test_live_record.py`
+- Local generated artifact: `recordings/live-snd-5000-am-10khz.wav` (ignored by git)
+- `docs/radio-lab.md`
+
+Remaining follow-ons:
+
+- Decide whether live recording should also save a JSONL sidecar by default.
+- Add longer controlled recording mode after buffering/gap policy matures.
+- Add compressed and stereo/IQ recording paths later.
 
 Risks/questions:
 
@@ -131,21 +144,29 @@ Risks/questions:
 
 ## Milestone 5 — Basic audio playback
 
-Status: **Planned**
+Status: **In progress**
 
 Goal:
 
 Play decoded SND audio locally.
 
-Suggested order:
+Current capabilities:
 
-1. Fixture WAV playback or fixture buffer playback.
-2. Live short playback with guarded receiver connection.
-3. Buffering and underflow/overflow diagnostics.
+- WAV playback scaffolding exists in `src/kiwi_client/playback.py`.
+- `NullAudioSink` supports dry-run playback and records chunk/byte stats without an audio device.
+- CLI exists as `python3 -m kiwi_client.playback` / `kiwi-play-wav`, currently requiring `--dry-run`.
+
+Remaining done criteria:
+
+1. Choose/install an audio backend, likely `sounddevice`.
+2. Add real audio-device sink behind the existing `AudioSink` interface.
+3. Add fixture/WAV playback smoke test with the real backend when hardware is available.
+4. Add live short playback with guarded receiver connection.
+5. Add buffering and underflow/overflow diagnostics.
 
 Open decisions:
 
-- Audio backend: likely `sounddevice` first, but not chosen yet.
+- Audio backend final choice.
 - Buffer target latency.
 - How playback coexists with recording and detection consumers.
 

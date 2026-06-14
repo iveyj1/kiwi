@@ -2,21 +2,21 @@
 
 ## Current slice
 
-Goal: Add and maintain a high-level roadmap document.
+Goal: Advance Milestone 4 direct live-to-WAV recording and Milestone 5 playback as far as practical.
 
 Done criteria:
 
-- Create `docs/roadmap.md` with milestone statuses and next recommended capability.
-- Capture completed SND harness, guarded capture, and offline WAV recording milestones.
-- Capture planned direct live-to-WAV, playback, UI, waterfall, detector, and weak-signal milestones.
-- Link the roadmap from project documentation.
-- Establish that roadmap should be updated as capabilities change.
+- Add direct SND-to-WAV recording session logic that is covered by replay transport.
+- Add a guarded `kiwi_client.live_record` CLI with dry-run and `--allow-live` gating.
+- Add playback scaffolding with WAV chunking and a null audio sink for dry-run/test use.
+- Add CLI entrypoints for direct recording and playback dry-run.
+- Update roadmap and user docs with current milestone status and limitations.
 
-Test command: `python3 -m pytest`
+Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
 
-Live-radio needed: no
+Live-radio needed: optional; if run, short local receiver only after harness passes.
 
-Docs to update: `docs/roadmap.md`, `docs/project-brief.md`, `docs/dev-log.md`
+Docs to update: `docs/roadmap.md`, `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 

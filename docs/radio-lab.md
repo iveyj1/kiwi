@@ -68,6 +68,35 @@ Follow-up:
   Consider recording exact message ordering in protocol docs and preserving binary-MSG handling.
 ```
 
+### 2026-06-14 / 2026-06-13 local — direct WAV recording
+
+```text
+Date/time: 2026-06-14 after first fixture capture / 2026-06-13 local
+Receiver: 10.0.0.40:8073
+Frequency: 5000.000 kHz
+Mode: AM
+Filter: -5000..5000 Hz (10 kHz total)
+Stream type: SND
+Purpose: Verify guarded direct live-to-WAV recording path.
+Commands sent:
+  SET auth t=kiwi p=
+  SET AR OK in=12000 out=44100
+  SET squelch=0 max=0
+  SET genattn=0
+  SET gen=0 mix=-1
+  SET ident_user=kiwi-client
+  SET mod=am low_cut=-5000 high_cut=5000 freq=5000.000
+  SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50
+  SET compression=0
+  SET keepalive
+Observed behavior:
+  Direct WAV recording succeeded: mono, 16-bit PCM, 11999 Hz, 10240 frames, 20 SND frames, zero sequence gaps.
+  Duration was about 0.853 seconds of audio from 20 frames.
+Fixture captured: none; output was recordings/live-snd-5000-am-10khz.wav (ignored by git)
+Follow-up:
+  Consider adding optional JSONL sidecar for direct live recording.
+```
+
 ### YYYY-MM-DD
 
 ```text

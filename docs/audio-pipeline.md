@@ -78,6 +78,24 @@ Fixture coverage:
 
 - `tests/audio/test_wav_recorder.py` records `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl` to a temporary WAV and validates 1 channel, 16-bit samples, 11999 Hz, 20 SND frames, 10240 WAV frames, and zero sequence gaps.
 
+## Direct SND-to-WAV recording
+
+`src/kiwi_client/live_record.py` adds the Milestone 4 direct recording path:
+
+- `record_replay_snd_wav()` records through `ReplayTransport` with no network access.
+- The guarded live CLI is `PYTHONPATH=src python3 -m kiwi_client.live_record`.
+- Like live capture, actual network use requires `--allow-live`, local receiver allowlist, short duration, frame cap, and compression off.
+- Replay tests use `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl` to validate the same command/response flow observed from the radio.
+
+## Playback scaffolding
+
+`src/kiwi_client/playback.py` starts Milestone 5:
+
+- WAV files are read in configurable frame chunks.
+- `AudioSink` defines the target interface for future device playback.
+- `NullAudioSink` supports dry-run/test playback with no audio device.
+- The CLI currently requires `--dry-run`; real audio output is not implemented yet.
+
 ## Questions to resolve
 
 - Whether audio frames should directly carry a `sample_rate` snapshot or whether consumers should pair frames with receiver state.

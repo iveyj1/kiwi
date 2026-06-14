@@ -77,12 +77,41 @@ print(result)
 PY
 ```
 
+Direct guarded SND-to-WAV recording is available as a dry-run plan:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_record \
+  --dry-run \
+  --host 10.0.0.40 \
+  --frequency-khz 5000 \
+  --mode am \
+  --low-cut-hz -5000 \
+  --high-cut-hz 5000 \
+  --output recordings/live-5000-am.wav
+```
+
+Actual direct live recording, only when explicitly intended:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_record \
+  --allow-live \
+  --host 10.0.0.40 \
+  --frequency-khz 5000 \
+  --mode am \
+  --low-cut-hz -5000 \
+  --high-cut-hz 5000 \
+  --output recordings/live-5000-am.wav \
+  --json
+```
+
 Current recording limitations:
 
-- uncompressed mono SND fixtures only,
-- no live recording loop yet,
+- uncompressed mono SND only,
+- short guarded sessions only,
 - no compressed ADPCM,
-- sample rate is rounded to integer Hz for the WAV header.
+- no stereo/IQ,
+- sample rate is rounded to integer Hz for the WAV header,
+- direct live recording does not yet save a JSONL sidecar automatically.
 
 Expected later operations:
 
@@ -90,6 +119,23 @@ Expected later operations:
 - Stop recording
 - Select destination
 - View recording metadata
+
+## Playback
+
+Playback scaffolding is available in dry-run mode for WAV files:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.playback \
+  recordings/local-snd-5000-am-10khz.wav \
+  --dry-run \
+  --json
+```
+
+Current playback limitations:
+
+- no real audio-device output yet,
+- dry-run uses `NullAudioSink` and reports frames/chunks/bytes,
+- intended next backend is likely `sounddevice`, but not selected/finalized.
 
 ## Beacon detection
 

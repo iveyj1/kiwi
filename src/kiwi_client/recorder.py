@@ -28,49 +28,67 @@ class WavRecordingResult:
     sequence_gaps: int
 
 
+class SndWavRecorder:
+    """Accumulate uncompressed mono SND audio and write a WAV file."""
+
+    def __init__(self) -> None:
+        self.state = ReceiverState()
+        self.tracker = SndSequenceTracker()
+        self.pcm = bytearray()
+        self.snd_frames = 0
+        self.sequence_gaps = 0
+
+    def add_msg(self, text: str) -> None:
+        """Apply one Kiwi MSG event to the recording state."""
+        self.state = self.state.apply_msg_params(parse_msg(text).params)
+
+    def add_snd_payload(self, payload: bytes) -> None:
+        """Decode and append one uncompressed mono SND payload."""
+        frame = parse_snd_uncompressed_mono(payload)
+        status = self.tracker.observe(frame)
+        if status.missing_count:
+            self.sequence_gaps += status.missing_count
+        self.snd_frames += 1
+        for sample in frame.samples:
+            self.pcm.extend(struct.pack("<h", sample))
+
+    @property
+    def sample_rate_hz(self) -> int:
+        """Return rounded integer sample rate for a standard WAV header."""
+        if self.state.sample_rate is None:
+            raise ValueError("recording has no MSG sample_rate")
+        return int(round(self.state.sample_rate))
+
+    def write_wav(self, output_path: str | Path) -> WavRecordingResult:
+        """Write accumulated PCM to a standard mono 16-bit WAV file."""
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        sample_rate_hz = self.sample_rate_hz
+        with wave.open(str(output_path), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate_hz)
+            wav.writeframes(bytes(self.pcm))
+        return WavRecordingResult(
+            path=output_path,
+            sample_rate_hz=sample_rate_hz,
+            channels=1,
+            sample_width_bytes=2,
+            frames=len(self.pcm) // 2,
+            snd_frames=self.snd_frames,
+            sequence_gaps=self.sequence_gaps,
+        )
+
+
 def write_snd_fixture_wav(fixture_path: str | Path, output_path: str | Path) -> WavRecordingResult:
     """Decode uncompressed mono SND fixture audio into a standard PCM WAV file."""
-    fixture_path = Path(fixture_path)
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    state = ReceiverState()
-    tracker = SndSequenceTracker()
-    pcm = bytearray()
-    snd_frames = 0
-    sequence_gaps = 0
-
+    recorder = SndWavRecorder()
     for event in load_jsonl_events(fixture_path):
         if event.type == "msg":
-            state = state.apply_msg_params(parse_msg(event.raw["text"]).params)
+            recorder.add_msg(event.raw["text"])
         elif event.type == "binary":
-            frame = parse_snd_uncompressed_mono(event.binary_payload)
-            status = tracker.observe(frame)
-            if status.missing_count:
-                sequence_gaps += status.missing_count
-            snd_frames += 1
-            for sample in frame.samples:
-                pcm.extend(struct.pack("<h", sample))
-
-    if state.sample_rate is None:
-        raise ValueError(f"fixture has no MSG sample_rate: {fixture_path}")
-
-    sample_rate_hz = int(round(state.sample_rate))
-    with wave.open(str(output_path), "wb") as wav:
-        wav.setnchannels(1)
-        wav.setsampwidth(2)
-        wav.setframerate(sample_rate_hz)
-        wav.writeframes(bytes(pcm))
-
-    return WavRecordingResult(
-        path=output_path,
-        sample_rate_hz=sample_rate_hz,
-        channels=1,
-        sample_width_bytes=2,
-        frames=len(pcm) // 2,
-        snd_frames=snd_frames,
-        sequence_gaps=sequence_gaps,
-    )
+            recorder.add_snd_payload(event.binary_payload)
+    return recorder.write_wav(output_path)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
