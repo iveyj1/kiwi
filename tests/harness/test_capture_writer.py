@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from kiwi_client.capture import JsonlCaptureWriter, SndCaptureMetadata
-from kiwi_client.commands import encode_auth, encode_basic_snd_setup
+from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
@@ -26,7 +26,7 @@ def _metadata() -> SndCaptureMetadata:
 
 def test_capture_writer_round_trips_commands_msg_and_binary(tmp_path: Path):
     writer = JsonlCaptureWriter(_metadata())
-    for index, command in enumerate([encode_auth()] + encode_basic_snd_setup(user="kiwi-client", frequency_khz=4625.0)):
+    for index, command in enumerate([encode_auth(), encode_ar_ok(12000)] + encode_basic_snd_setup(user="kiwi-client", frequency_khz=4625.0)):
         writer.add_tx_cmd(index * 0.001, command)
     writer.add_rx_msg(0.100, "MSG sample_rate=12001.135 audio_rate=12000")
     writer.add_rx_binary(0.110, SND_PAYLOAD)
@@ -35,7 +35,7 @@ def test_capture_writer_round_trips_commands_msg_and_binary(tmp_path: Path):
     writer.write(path)
 
     events = load_jsonl_events(path)
-    assert [event.type for event in events[:6]] == ["cmd"] * 6
+    assert [event.type for event in events[:10]] == ["cmd"] * 10
     assert events[0].raw["text"] == "SET auth t=kiwi p="
 
     state = ReceiverState()

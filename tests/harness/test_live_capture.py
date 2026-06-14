@@ -40,8 +40,12 @@ def test_live_capture_dry_run_plan_has_local_uri_and_fixture_tested_commands(tmp
     plan = config.dry_run_plan()
 
     assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/SND"
-    assert plan["commands"] == [
-        "SET auth t=kiwi p=",
+    assert plan["initial_commands"] == ["SET auth t=kiwi p="]
+    assert plan["dynamic_commands"] == [
+        "SET AR OK in=<audio_rate> out=44100",
+        "SET squelch=0 max=0",
+        "SET genattn=0",
+        "SET gen=0 mix=-1",
         "SET ident_user=kiwi-client",
         "SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000",
         "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50",

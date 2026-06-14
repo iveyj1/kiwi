@@ -40,6 +40,21 @@ def encode_keepalive() -> str:
     return "SET keepalive"
 
 
+def encode_ar_ok(input_rate: int, output_rate: int = 44100) -> str:
+    """Acknowledge KiwiSDR audio rate setup."""
+    return f"SET AR OK in={input_rate:d} out={output_rate:d}"
+
+
+def encode_squelch(enabled: bool = False, threshold: int = 0) -> str:
+    """Encode basic squelch state."""
+    return f"SET squelch={int(enabled)} max={threshold:d}"
+
+
+def encode_gen(frequency: int = 0, attenuation: int = 0, mix: int = -1) -> list[str]:
+    """Encode signal generator/attenuator setup commands."""
+    return [f"SET genattn={attenuation:d}", f"SET gen={frequency:d} mix={mix:d}"]
+
+
 def encode_modulation(mod: str, low_cut: int, high_cut: int, freq_khz: float) -> str:
     """Encode the basic frequency/mode/passband command."""
     return f"SET mod={mod.lower()} low_cut={low_cut:d} high_cut={high_cut:d} freq={freq_khz:.3f}"
@@ -73,6 +88,8 @@ def encode_basic_snd_setup(
 ) -> list[str]:
     """Build the first fixture-tested non-admin SND setup command sequence."""
     return [
+        encode_squelch(False, 0),
+        *encode_gen(0, 0),
         encode_ident_user(user),
         encode_modulation(modulation, low_cut, high_cut, frequency_khz),
         encode_agc(agc),

@@ -36,8 +36,15 @@ Initial reference facts from `kiwiclient/kiwi/client.py` and `kiwiclient/test/ki
 Current fixture coverage:
 
 - `tests/fixtures/kiwi/snd-session-basic.jsonl` contains synthetic `MSG` events for `audio_rate`, `sample_rate`, version, and bandwidth followed by one synthetic uncompressed mono SND frame.
+- `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl` contains a short local live capture from `10.0.0.40:8073`. The receiver delivered `MSG` frames as binary WebSocket payloads beginning with ASCII `MSG`; the capture tool records these as JSONL `msg` events after tag inspection.
 
-Still to record after a fixture-backed live capture exists:
+Live local capture observations:
+
+- On `10.0.0.40:8073`, `MSG sample_rate` arrived before `MSG audio_init=1 audio_rate=12000` during the tested session.
+- After `audio_rate=12000`, sending `SET AR OK in=12000 out=44100` was needed before the remaining SND setup sequence.
+- The first successful uncompressed AM capture used: `SET squelch=0 max=0`, `SET genattn=0`, `SET gen=0 mix=-1`, identity, modulation, AGC, `SET compression=0`, and keepalive.
+
+Still to record after more fixture-backed live captures exist:
 
 - WebSocket endpoint paths
 - Initial handshake/control command order
@@ -75,6 +82,7 @@ First fixture coverage:
 Additional fixture coverage:
 
 - `tests/fixtures/kiwi/snd-sequence-gap.jsonl` contains synthetic uncompressed mono frames with sequence numbers `1, 3, 4`, covering a missing frame at expected sequence `2`.
+- `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl` contains 20 live uncompressed mono SND frames at 5000 kHz AM, sequences `1..20`, 512 samples per frame, no gaps.
 - `src/kiwi_client/audio.py` treats SND sequence numbers as uint32 values and accepts wraparound from `0xffffffff` to `0`.
 - ADC overflow is exposed via flag `0x02`; fixture-backed parser code preserves flags for audio-layer handling.
 

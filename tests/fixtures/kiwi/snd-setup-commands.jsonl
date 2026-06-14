@@ -1,7 +1,11 @@
-{"t":0.000,"dir":"meta","stream":"snd","type":"note","source":"synthetic based on kiwiclient command encoders","description":"Expected non-admin SND setup command sequence for an uncompressed mono fixture/capture."}
+{"t":0.000,"dir":"meta","stream":"snd","type":"note","source":"synthetic based on kiwiclient command encoders","description":"Expected non-admin SND setup command sequence for an uncompressed mono fixture/capture after audio-rate acknowledgement."}
 {"t":0.000,"dir":"tx","stream":"snd","type":"cmd","text":"SET auth t=kiwi p="}
-{"t":0.001,"dir":"tx","stream":"snd","type":"cmd","text":"SET ident_user=kiwi-client"}
-{"t":0.002,"dir":"tx","stream":"snd","type":"cmd","text":"SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000"}
-{"t":0.003,"dir":"tx","stream":"snd","type":"cmd","text":"SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"}
-{"t":0.004,"dir":"tx","stream":"snd","type":"cmd","text":"SET compression=0"}
-{"t":0.005,"dir":"tx","stream":"snd","type":"cmd","text":"SET keepalive"}
+{"t":0.001,"dir":"tx","stream":"snd","type":"cmd","text":"SET AR OK in=12000 out=44100"}
+{"t":0.002,"dir":"tx","stream":"snd","type":"cmd","text":"SET squelch=0 max=0"}
+{"t":0.003,"dir":"tx","stream":"snd","type":"cmd","text":"SET genattn=0"}
+{"t":0.004,"dir":"tx","stream":"snd","type":"cmd","text":"SET gen=0 mix=-1"}
+{"t":0.005,"dir":"tx","stream":"snd","type":"cmd","text":"SET ident_user=kiwi-client"}
+{"t":0.006,"dir":"tx","stream":"snd","type":"cmd","text":"SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000"}
+{"t":0.007,"dir":"tx","stream":"snd","type":"cmd","text":"SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"}
+{"t":0.008,"dir":"tx","stream":"snd","type":"cmd","text":"SET compression=0"}
+{"t":0.009,"dir":"tx","stream":"snd","type":"cmd","text":"SET keepalive"}

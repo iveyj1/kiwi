@@ -18,7 +18,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from kiwi_client.capture import JsonlCaptureWriter, SndCaptureMetadata
-from kiwi_client.commands import encode_auth, encode_basic_snd_setup
+from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
+from kiwi_client.protocol import parse_msg
+from kiwi_client.receiver_model import ReceiverState
 
 LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
 MAX_DURATION_SECONDS = 5.0
@@ -70,8 +72,8 @@ class LiveSndCaptureConfig:
         return f"ws://{self.host}:{self.port}/{timestamp}/SND"
 
     def setup_commands(self) -> list[str]:
-        """Return the fixture-tested setup command sequence."""
-        return [encode_auth()] + encode_basic_snd_setup(
+        """Return setup commands after audio-rate acknowledgement."""
+        return encode_basic_snd_setup(
             user=self.user,
             frequency_khz=self.frequency_khz,
             modulation=self.mode,
@@ -93,7 +95,8 @@ class LiveSndCaptureConfig:
             "duration_seconds": self.duration_seconds,
             "max_frames": self.max_frames,
             "compression": self.compression,
-            "commands": self.setup_commands(),
+            "initial_commands": [encode_auth()],
+            "dynamic_commands": ["SET AR OK in=<audio_rate> out=44100", *self.setup_commands()],
         }
 
 
@@ -138,12 +141,13 @@ async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = F
     frames = 0
 
     async with websockets.connect(config.websocket_uri(), max_queue=0) as websocket:
-        for index, command in enumerate(config.setup_commands()):
-            t = time.monotonic() - start
-            writer.add_tx_cmd(t, command)
-            await websocket.send(command)
-            if index == 0:
-                await asyncio.sleep(0)
+        auth_command = encode_auth()
+        writer.add_tx_cmd(time.monotonic() - start, auth_command)
+        await websocket.send(auth_command)
+
+        state = ReceiverState()
+        sent_ar_ok = False
+        sent_setup = False
 
         while frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
             remaining = config.duration_seconds - (time.monotonic() - start)
@@ -154,12 +158,33 @@ async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = F
             except asyncio.TimeoutError:
                 break
             t = time.monotonic() - start
+
             if isinstance(message, str):
-                writer.add_rx_msg(t, message)
+                text = message
+                writer.add_rx_msg(t, text)
             else:
-                writer.add_rx_binary(t, bytes(message))
-                if bytes(message).startswith(b"SND"):
-                    frames += 1
+                payload = bytes(message)
+                if payload.startswith(b"MSG"):
+                    text = payload.decode("utf-8", errors="replace")
+                    writer.add_rx_msg(t, text)
+                else:
+                    writer.add_rx_binary(t, payload)
+                    if payload.startswith(b"SND"):
+                        frames += 1
+                    continue
+
+            params = parse_msg(text).params
+            state = state.apply_msg_params(params)
+            if state.audio_rate is not None and not sent_ar_ok:
+                command = encode_ar_ok(state.audio_rate)
+                writer.add_tx_cmd(time.monotonic() - start, command)
+                await websocket.send(command)
+                sent_ar_ok = True
+            if state.sample_rate is not None and sent_ar_ok and not sent_setup:
+                for command in config.setup_commands():
+                    writer.add_tx_cmd(time.monotonic() - start, command)
+                    await websocket.send(command)
+                sent_setup = True
 
     writer.write(config.output)
     return config.output

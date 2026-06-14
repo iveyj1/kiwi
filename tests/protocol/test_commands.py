@@ -1,12 +1,15 @@
 from kiwi_client.commands import (
     AgcSettings,
     encode_agc,
+    encode_ar_ok,
     encode_auth,
     encode_basic_snd_setup,
     encode_compression,
+    encode_gen,
     encode_ident_user,
     encode_keepalive,
     encode_modulation,
+    encode_squelch,
 )
 
 
@@ -19,6 +22,9 @@ def test_encode_auth_with_tlimit_password_uses_hash_placeholder():
 
 
 def test_encode_identity_mode_agc_compression_keepalive():
+    assert encode_ar_ok(12000) == "SET AR OK in=12000 out=44100"
+    assert encode_squelch(False, 0) == "SET squelch=0 max=0"
+    assert encode_gen(0, 0) == ["SET genattn=0", "SET gen=0 mix=-1"]
     assert encode_ident_user("kiwi-client") == "SET ident_user=kiwi-client"
     assert encode_modulation("AM", -4900, 4900, 4625.0) == "SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000"
     assert encode_agc() == "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"
@@ -30,6 +36,9 @@ def test_encode_identity_mode_agc_compression_keepalive():
 
 def test_encode_basic_snd_setup_sequence():
     assert encode_basic_snd_setup(user="kiwi-client", frequency_khz=4625.0) == [
+        "SET squelch=0 max=0",
+        "SET genattn=0",
+        "SET gen=0 mix=-1",
         "SET ident_user=kiwi-client",
         "SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000",
         "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50",
