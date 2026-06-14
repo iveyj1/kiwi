@@ -155,6 +155,7 @@ Supported commands:
 - `tune-step <+/-hz|small|medium|large>`
 - `volume <percent>`
 - `volume-step <delta_percent>`
+- `agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]`
 - `duration <seconds>`
 - `frames <max_snd_frames>`
 - `dashboard`
@@ -189,12 +190,28 @@ Command aliases:
 - `he` -> `help`
 - `q` / `qu` -> `quit`
 
+AGC commands use the locally verified KiwiSDR command shape `SET agc=<0|1> hang=<0|1> thresh=<n> slope=<n> decay=<ms> manGain=<n>`. Examples:
+
+```text
+agc on
+agc off
+agc hang on
+agc threshold -95
+agc slope 5
+agc decay 750
+agc gain 40
+agc set on=true hang=false thresh=-100 slope=6 decay=1000 gain=50
+```
+
+During active background playback, AGC changes are queued to the active SND WebSocket.
+
 Current limitations:
 
 - `connect` and `disconnect` only update client state for now.
 - Live operations from the shell require explicit `--allow-live`.
 - TUI is an initial curses command/dashboard shell, not a full SDR interface yet.
 - RSSI/S-meter display is a simple latest-value readout from SND frames, not a calibrated meter widget.
+- `volume` / `volume-step` are currently local client state/display only. The local `kiwiclient` reference has verified `SET agc=...` receiver-side gain control, but no verified radio-side volume command.
 - `connect` is not a continuously open retunable WebSocket session yet.
 
 Example shell commands for persistent live settings and guarded execution:

@@ -119,6 +119,31 @@ def test_client_controller_connect_disconnect_state_only():
     assert controller.execute("disconnect")["state"]["connected"] is False
 
 
+def test_client_agc_commands_update_state_and_encode_command():
+    controller = ClientController()
+
+    assert controller.execute("agc off")["agc_command"] == "SET agc=0 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"
+    assert controller.execute("agc hang on")["agc_command"] == "SET agc=0 hang=1 thresh=-100 slope=6 decay=1000 manGain=50"
+    assert controller.execute("agc threshold -90")["agc_command"] == "SET agc=0 hang=1 thresh=-90 slope=6 decay=1000 manGain=50"
+    assert controller.execute("agc slope 4")["agc_command"] == "SET agc=0 hang=1 thresh=-90 slope=4 decay=1000 manGain=50"
+    assert controller.execute("agc decay 500")["agc_command"] == "SET agc=0 hang=1 thresh=-90 slope=4 decay=500 manGain=50"
+    assert controller.execute("agc gain 42")["agc_command"] == "SET agc=0 hang=1 thresh=-90 slope=4 decay=500 manGain=42"
+
+    response = controller.execute("agc set on=true hang=false thresh=-95 slope=5 decay=750 gain=33")
+    assert response["agc_command"] == "SET agc=1 hang=0 thresh=-95 slope=5 decay=750 manGain=33"
+    assert response["state"]["agc_on"] is True
+    assert response["state"]["agc_gain"] == 33
+
+
+def test_client_agc_alias_and_query():
+    controller = ClientController()
+
+    response = controller.execute("ag")
+
+    assert response["type"] == "state"
+    assert response["agc_command"] == "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"
+
+
 def test_client_tune_step_and_volume_commands():
     controller = ClientController()
 
@@ -233,6 +258,19 @@ def test_tune_mode_filter_queue_commands_to_active_background_playback():
         "SET mod=usb low_cut=300 high_cut=2700 freq=7000.000",
         "SET mod=usb low_cut=100 high_cut=2400 freq=7000.000",
     ]
+
+
+def test_agc_commands_queue_to_active_background_playback():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("play-bg --allow-live --null-sink")
+    response = controller.execute("agc gain 35")
+    controller.execute("stop")
+    final = controller.background.join(timeout=2.0)
+
+    assert response["active_command"] == "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=35"
+    assert final.result["commands"] == ["SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=35"]
 
 
 def test_client_record_bg_and_capture_bg_stop_with_metrics():

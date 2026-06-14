@@ -18,7 +18,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any, Iterable, Protocol
 
-from kiwi_client.commands import encode_modulation
+from kiwi_client.commands import AgcSettings, encode_agc, encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
@@ -44,6 +44,12 @@ class ClientState:
     duration_seconds: float = 60.0
     max_frames: int = 1500
     volume_percent: int = 100
+    agc_on: bool = True
+    agc_hang: bool = False
+    agc_threshold: int = -100
+    agc_slope: int = 6
+    agc_decay_ms: int = 1000
+    agc_gain: int = 50
     receivers_restricted: bool = True
     allowed_receivers: tuple[str, ...] = ("10.0.0.40:8073", "10.0.0.41:8073")
     connected: bool = False
@@ -217,6 +223,8 @@ class ClientController:
             self._require_arg_count(args, 1, "volume-step <delta_percent>")
             self.state = replace(self.state, volume_percent=self._clamp_volume(self.state.volume_percent + int(args[0])))
             return {"type": "state", "state": self.state.as_dict()}
+        if command == "agc":
+            return self._handle_agc(args)
         if command == "duration":
             self._require_arg_count(args, 1, "duration <seconds>")
             self.state = replace(self.state, duration_seconds=float(args[0]))
@@ -322,13 +330,16 @@ class ClientController:
         return replace(self.state, host=value)
 
     def _state_response(self) -> dict[str, Any]:
-        response: dict[str, Any] = {"type": "state", "state": self.state.as_dict()}
         command = encode_modulation(
             self.state.mode,
             self.state.low_cut_hz,
             self.state.high_cut_hz,
             self.state.frequency_khz,
         )
+        return self._state_response_with_active_command(command)
+
+    def _state_response_with_active_command(self, command: str) -> dict[str, Any]:
+        response: dict[str, Any] = {"type": "state", "state": self.state.as_dict()}
         current_status = self.background.status()
         if not current_status.running or current_status.name != "play":
             return response
@@ -339,6 +350,93 @@ class ClientController:
         response["active_command"] = command
         response["operation"] = status.as_dict()
         return response
+
+    def _handle_agc(self, args: list[str]) -> dict[str, Any]:
+        if not args:
+            return {"type": "state", "state": self.state.as_dict(), "agc_command": self._agc_command()}
+        subcommand = args[0].lower()
+        if subcommand in {"on", "off"}:
+            self._require_arg_count(args, 1, "agc on|off")
+            self.state = replace(self.state, agc_on=subcommand == "on")
+        elif subcommand == "hang":
+            self._require_arg_count(args, 2, "agc hang on|off")
+            self.state = replace(self.state, agc_hang=self._parse_on_off(args[1]))
+        elif subcommand in {"threshold", "thresh"}:
+            self._require_arg_count(args, 2, "agc threshold <value>")
+            self.state = replace(self.state, agc_threshold=int(args[1]))
+        elif subcommand == "slope":
+            self._require_arg_count(args, 2, "agc slope <value>")
+            self.state = replace(self.state, agc_slope=int(args[1]))
+        elif subcommand in {"decay", "decay-ms"}:
+            self._require_arg_count(args, 2, "agc decay <ms>")
+            self.state = replace(self.state, agc_decay_ms=int(args[1]))
+        elif subcommand in {"gain", "manual-gain", "mangain"}:
+            self._require_arg_count(args, 2, "agc gain <value>")
+            self.state = replace(self.state, agc_gain=int(args[1]))
+        elif subcommand == "set":
+            self.state = self._apply_agc_key_values(args[1:])
+        else:
+            raise ClientCommandError(
+                "usage: agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]"
+            )
+        agc_command = self._agc_command()
+        response = self._state_response_with_active_command(agc_command)
+        response["agc_command"] = agc_command
+        return response
+
+    def _agc_settings(self) -> AgcSettings:
+        return AgcSettings(
+            on=self.state.agc_on,
+            hang=self.state.agc_hang,
+            thresh=self.state.agc_threshold,
+            slope=self.state.agc_slope,
+            decay=self.state.agc_decay_ms,
+            gain=self.state.agc_gain,
+        )
+
+    def _agc_command(self) -> str:
+        return encode_agc(self._agc_settings())
+
+    def _apply_agc_key_values(self, pairs: list[str]) -> ClientState:
+        state = self.state
+        if not pairs:
+            raise ClientCommandError("usage: agc set key=value ...")
+        for pair in pairs:
+            if "=" not in pair:
+                raise ClientCommandError("usage: agc set key=value ...")
+            key, value = pair.split("=", 1)
+            key = key.lower().replace("_", "-")
+            if key == "on":
+                state = replace(state, agc_on=self._parse_bool(value))
+            elif key == "hang":
+                state = replace(state, agc_hang=self._parse_bool(value))
+            elif key in {"threshold", "thresh"}:
+                state = replace(state, agc_threshold=int(value))
+            elif key == "slope":
+                state = replace(state, agc_slope=int(value))
+            elif key in {"decay", "decay-ms"}:
+                state = replace(state, agc_decay_ms=int(value))
+            elif key in {"gain", "manual-gain", "mangain"}:
+                state = replace(state, agc_gain=int(value))
+            else:
+                raise ClientCommandError(f"unknown AGC setting: {key}")
+        return state
+
+    @staticmethod
+    def _parse_on_off(value: str) -> bool:
+        if value.lower() == "on":
+            return True
+        if value.lower() == "off":
+            return False
+        raise ClientCommandError("expected on or off")
+
+    @staticmethod
+    def _parse_bool(value: str) -> bool:
+        if value.lower() in {"1", "true", "yes", "on"}:
+            return True
+        if value.lower() in {"0", "false", "no", "off"}:
+            return False
+        raise ClientCommandError("expected boolean value")
 
     @staticmethod
     def _parse_tune_step_hz(value: str) -> int:
@@ -440,6 +538,7 @@ def command_aliases() -> dict[str, str]:
         "tu": "tune",
         "mo": "mode",
         "fi": "filter",
+        "ag": "agc",
         "du": "duration",
         "fr": "frames",
         "pb": "play-bg",
@@ -464,6 +563,7 @@ def available_commands() -> list[str]:
         "tune-step <+/-hz|small|medium|large>",
         "volume <percent>",
         "volume-step <delta_percent>",
+        "agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]",
         "duration <seconds>",
         "frames <max_snd_frames>",
         "dashboard",
@@ -481,7 +581,7 @@ def available_commands() -> list[str]:
         "capture-bg <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
-        "aliases: ?=status, re=receiver, tu=tune, mo=mode, fi=filter, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
+        "aliases: ?=status, re=receiver, tu=tune, mo=mode, fi=filter, ag=agc, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
     ]
 
 

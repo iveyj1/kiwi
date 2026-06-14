@@ -2,21 +2,20 @@
 
 ## Current slice
 
-Goal: Harden modified-key handling and add config-driven live limits and receiver policy.
+Goal: Add interactive AGC controls and clarify volume behavior.
 
 Done criteria:
 
-- Shift-right/shift-left are recognized where curses reports them as distinct keys.
-- Unknown modified-key/escape-sequence inputs are ignored safely in keymap mode.
-- TOML config supports live `duration_seconds` and `max_frames`, where `0` means unlimited.
-- TOML config supports receiver restrictions, defaulting to local receivers and allowing explicit unrestricted receiver use.
-- TUI-created client state applies configured live limits and receiver policy.
-- Live play/record/capture validation and loops support configured limits and receiver policy.
-- Cover key handling, config parsing, controller wiring, and validation with pytest.
+- Confirm local reference support for `SET agc=...`; do not invent unverified radio-side volume command.
+- Add AGC state to the client model.
+- Add commands for AGC on/off, hang, threshold, slope, decay, and manual gain.
+- Queue AGC command changes to active background playback sessions.
+- Cover AGC command behavior with harness tests.
+- Update docs to explain volume is currently local state only and AGC gain is the verified radio-side gain control.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no; harness-first UI/config work.
+Live-radio needed: no; harness-first command/control work.
 
 Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 

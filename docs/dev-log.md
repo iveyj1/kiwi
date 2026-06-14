@@ -135,6 +135,8 @@ Hardened TUI key handling for modified arrow escape sequences. Known curses shif
 
 Added periodic live SND keepalives for playback, recording, and capture loops. The initial setup still sends `SET keepalive`, and long-running sessions now send another keepalive after the configured interval once setup has completed. This addresses receiver-side disconnects around the one-minute mark when client duration/frame limits are unlimited.
 
+Added interactive AGC controls backed by locally verified `SET agc=...` behavior from `kiwiclient/kiwi/client.py`. Commands cover AGC on/off, hang, threshold, slope, decay, manual gain, and key=value batch updates. AGC changes queue to active background playback. No verified radio-side volume command was found in local reference code, so `volume` remains local state/display only for now.
+
 ## YYYY-MM-DD
 
 ### Finding
