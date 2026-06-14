@@ -22,9 +22,15 @@ Added minimal `MSG` parsing and receiver state context. `tests/fixtures/kiwi/snd
 
 `python3 -m pytest` passed: 10 tests.
 
+Added fixture-tested command encoders for the first non-admin SND setup path: auth, identity, mode/frequency/passband, AGC, compression off, and keepalive. `tests/fixtures/kiwi/snd-setup-commands.jsonl` records the expected command sequence.
+
+Documented the first short SND live-to-fixture capture plan in `docs/harness.md`, but did not run it.
+
+`python3 -m pytest tests/harness tests/protocol` passed: 15 tests.
+
 ### Follow-up
 
-Next useful slice: define the first short local capture fixture plan and/or add command encoder tests for the SND setup commands (`SET auth`, `SET ident_user`, `SET mod`, `SET agc`, `SET compression=0`). Live receiver access remains deferred until the intended capture command sequence is fixture-tested.
+Next useful slice: implement an offline capture-writer shape or fake transport replay for the planned short SND capture. Live receiver access remains deferred until the capture tool can write the documented JSONL metadata/events.
 
 ## YYYY-MM-DD
 

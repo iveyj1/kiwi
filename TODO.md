@@ -2,21 +2,21 @@
 
 ## Current slice
 
-Goal: Add minimal MSG parsing and receiver/audio state context for fixture-based SND tests without live receiver access.
+Goal: Add fixture-tested SND setup command encoders before any live receiver capture.
 
 Done criteria:
 
-- Add a synthetic SND session fixture with `MSG` state events followed by an SND frame.
-- Parse `MSG` name/value parameters including flag-only and percent-escaped values.
-- Track minimal receiver state: `sample_rate`, `audio_rate`, version, and bandwidth.
-- Add harness coverage proving MSG state is applied before audio frame parsing.
+- Add command encoder helpers for non-admin SND setup commands.
+- Add a synthetic expected command sequence fixture.
+- Cover auth, identity, mode/frequency, AGC, compression, and keepalive commands with pytest.
+- Match the command fixture from generated encoder output.
 - Keep live-radio testing deferred.
 
 Test command: `python3 -m pytest tests/harness tests/protocol`
 
 Live-radio needed: no
 
-Docs to update: `docs/kiwi-protocol.md`, `docs/audio-pipeline.md`, `docs/dev-log.md`
+Docs to update: `docs/kiwi-protocol.md`, `docs/harness.md`, `docs/dev-log.md`
 
 ## Next
 

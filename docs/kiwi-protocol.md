@@ -95,9 +95,65 @@ Record:
 
 ## Commands
 
-TBD.
+Initial fixture-tested non-admin SND setup command encoders:
 
-Record each command as:
+```text
+Command: SET auth t=kiwi p=
+Direction: client -> server
+Purpose: Authenticate as a normal Kiwi client with no password.
+Fields: client type `t`, password `p`.
+Example: SET auth t=kiwi p=
+Evidence: `kiwiclient/kiwi/client.py` `_set_auth()`.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: TBD after live/local fixture capture.
+
+Command: SET ident_user=<name>
+Direction: client -> server
+Purpose: Set displayed/listed user identity.
+Fields: identity string.
+Example: SET ident_user=kiwi-client
+Evidence: `kiwiclient/kiwi/client.py` `set_name()`.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: TBD.
+
+Command: SET mod=<mode> low_cut=<Hz> high_cut=<Hz> freq=<kHz>
+Direction: client -> server
+Purpose: Set demodulation mode, passband, and tuned frequency.
+Fields: mode, low/high passband cuts in Hz, frequency in kHz with 3 decimal places.
+Example: SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000
+Evidence: `kiwiclient/kiwi/client.py` `set_mod()`.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: TBD.
+
+Command: SET agc=<0|1> hang=<0|1> thresh=<dB-ish> slope=<n> decay=<ms-ish> manGain=<n>
+Direction: client -> server
+Purpose: Configure AGC.
+Fields: AGC enable, hang enable, threshold, slope, decay, manual gain.
+Example: SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50
+Evidence: `kiwiclient/kiwi/client.py` `set_agc()`.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: TBD.
+
+Command: SET compression=<0|1>
+Direction: client -> server
+Purpose: Request SND audio compression on/off; first fixtures use `0` for uncompressed PCM.
+Fields: compression enable.
+Example: SET compression=0
+Evidence: `kiwiclient/kiwi/client.py` `_set_snd_comp()`.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: TBD.
+
+Command: SET keepalive
+Direction: client -> server
+Purpose: Keep SND session alive.
+Fields: none.
+Example: SET keepalive
+Evidence: `kiwiclient/kiwi/client.py` `_set_keepalive()` and SND receive loop.
+Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
+Failure behavior: timeout behavior TBD.
+```
+
+Record each future command as:
 
 ```text
 Command:
