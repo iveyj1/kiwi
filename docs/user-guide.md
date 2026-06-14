@@ -63,6 +63,7 @@ Supported commands:
 - `play --allow-live [--null-sink]`
 - `play-bg --allow-live [--null-sink]`
 - `stop`
+- `wait [seconds]`
 - `operation-status`
 - `record-plan <output.wav>`
 - `record <output.wav> --allow-live [--overwrite]`
@@ -93,12 +94,22 @@ Example background playback from the shell/TUI:
 
 ```text
 play-bg --allow-live --null-sink
+tune 7000
 operation-status
 stop
+wait 2
 operation-status
 ```
 
-Parameter changes during background playback update desired client state and the dashboard. Applying retune/mode/filter changes to the active WebSocket stream is not implemented yet.
+During background playback, these parameter changes queue `SET mod=...` to the active playback WebSocket after the initial Kiwi SND setup has completed:
+
+```text
+tune 7000
+mode usb 300 2700
+filter 100 2400
+```
+
+The dashboard response includes `Applied to active stream: ...` when a control command is queued.
 
 Expected next operations:
 

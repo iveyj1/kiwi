@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import queue
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -157,6 +158,7 @@ async def play_live_snd(
     allow_live: bool = False,
     dry_run: bool = False,
     stop_event: Event | None = None,
+    command_queue: queue.Queue[str] | None = None,
 ) -> PlaybackResult:
     """Run one guarded live SND playback session."""
     config.validate()
@@ -189,6 +191,12 @@ async def play_live_snd(
                 remaining = config.duration_seconds - (time.monotonic() - start)
                 if remaining <= 0:
                     break
+                if command_queue is not None and sent_setup:
+                    while True:
+                        try:
+                            await websocket.send(command_queue.get_nowait())
+                        except queue.Empty:
+                            break
                 try:
                     message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
                 except asyncio.TimeoutError:

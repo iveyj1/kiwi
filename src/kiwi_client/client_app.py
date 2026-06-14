@@ -11,12 +11,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import queue
 import shlex
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event
 from typing import Any, Iterable, Protocol
 
+from kiwi_client.commands import encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
@@ -60,7 +62,14 @@ class ClientCommandError(ValueError):
 class ClientOperations(Protocol):
     """Executable operations used by the client controller."""
 
-    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool, stop_event: Event | None = None) -> dict[str, Any]: ...
+    def play(
+        self,
+        config: LiveSndPlaybackConfig,
+        *,
+        null_sink: bool,
+        stop_event: Event | None = None,
+        command_queue: queue.Queue[str] | None = None,
+    ) -> dict[str, Any]: ...
 
     def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]: ...
 
@@ -70,9 +79,25 @@ class ClientOperations(Protocol):
 class LiveClientOperations:
     """Default operations that call guarded live play/record/capture modules."""
 
-    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool, stop_event: Event | None = None) -> dict[str, Any]:
+    def play(
+        self,
+        config: LiveSndPlaybackConfig,
+        *,
+        null_sink: bool,
+        stop_event: Event | None = None,
+        command_queue: queue.Queue[str] | None = None,
+    ) -> dict[str, Any]:
         sink = NullAudioSink() if null_sink else SoundDeviceSink()
-        result = asyncio.run(play_live_snd(config, sink, allow_live=True, dry_run=null_sink, stop_event=stop_event))
+        result = asyncio.run(
+            play_live_snd(
+                config,
+                sink,
+                allow_live=True,
+                dry_run=null_sink,
+                stop_event=stop_event,
+                command_queue=command_queue,
+            )
+        )
         data = asdict(result)
         data["path"] = str(result.path)
         return data
@@ -131,7 +156,7 @@ class ClientController:
         if command == "tune":
             self._require_arg_count(args, 1, "tune <frequency_khz>")
             self.state = replace(self.state, frequency_khz=float(args[0]))
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._state_response()
         if command == "mode":
             if len(args) not in {1, 3}:
                 raise ClientCommandError("usage: mode <mode> [low_cut_hz high_cut_hz]")
@@ -140,11 +165,11 @@ class ClientController:
                 self.state = replace(self.state, mode=mode, low_cut_hz=int(args[1]), high_cut_hz=int(args[2]))
             else:
                 self.state = replace(self.state, mode=mode)
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._state_response()
         if command == "filter":
             self._require_arg_count(args, 2, "filter <low_cut_hz> <high_cut_hz>")
             self.state = replace(self.state, low_cut_hz=int(args[0]), high_cut_hz=int(args[1]))
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._state_response()
         if command == "duration":
             self._require_arg_count(args, 1, "duration <seconds>")
             self.state = replace(self.state, duration_seconds=float(args[0]))
@@ -179,11 +204,21 @@ class ClientController:
             null_sink = "--null-sink" in flags
             status = self.background.start(
                 "play",
-                lambda stop_event: self.operations.play(config, null_sink=null_sink, stop_event=stop_event),
+                lambda stop_event, command_queue: self.operations.play(
+                    config,
+                    null_sink=null_sink,
+                    stop_event=stop_event,
+                    command_queue=command_queue,
+                ),
             )
             return {"type": "operation-status", "operation": status.as_dict()}
         if command == "stop":
             return {"type": "operation-status", "operation": self.background.stop().as_dict()}
+        if command == "wait":
+            if len(args) > 1:
+                raise ClientCommandError("usage: wait [seconds]")
+            timeout = float(args[0]) if args else None
+            return {"type": "operation-status", "operation": self.background.join(timeout=timeout).as_dict()}
         if command == "operation-status":
             return {"type": "operation-status", "operation": self.background.status().as_dict()}
         if command == "record":
@@ -209,6 +244,22 @@ class ClientController:
             host, port = value.rsplit(":", 1)
             return replace(self.state, host=host, port=int(port))
         return replace(self.state, host=value)
+
+    def _state_response(self) -> dict[str, Any]:
+        response: dict[str, Any] = {"type": "state", "state": self.state.as_dict()}
+        command = encode_modulation(
+            self.state.mode,
+            self.state.low_cut_hz,
+            self.state.high_cut_hz,
+            self.state.frequency_khz,
+        )
+        try:
+            status = self.background.send_command(command)
+        except RuntimeError:
+            return response
+        response["active_command"] = command
+        response["operation"] = status.as_dict()
+        return response
 
     @staticmethod
     def _require_arg_count(args: list[str], count: int, usage: str) -> None:
@@ -293,6 +344,7 @@ def available_commands() -> list[str]:
         "play --allow-live [--null-sink]",
         "play-bg --allow-live [--null-sink]",
         "stop",
+        "wait [seconds]",
         "operation-status",
         "record-plan <output.wav>",
         "record <output.wav> --allow-live [--overwrite]",

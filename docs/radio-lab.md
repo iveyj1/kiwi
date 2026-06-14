@@ -126,6 +126,35 @@ Follow-up:
   Add user-selectable audio device and buffering/underflow diagnostics.
 ```
 
+### 2026-06-14 / 2026-06-13 local — background playback retune queue
+
+```text
+Date/time: 2026-06-14 after TUI background worker work / 2026-06-13 local
+Receiver: 10.0.0.40:8073
+Frequency: start 5000.000 kHz, queued tune to 7000.000 kHz
+Mode: AM
+Filter: -5000..5000 Hz (10 kHz total)
+Stream type: SND
+Purpose: Verify client/TUI background playback command queue with a short null-sink live run.
+Commands/script:
+  duration 5
+  frames 120
+  play-bg --allow-live --null-sink
+  tune 7000
+  wait 1
+  operation-status
+  stop
+  wait 2
+  operation-status
+Observed behavior:
+  The client queued `SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000` while background playback was running.
+  Null-sink playback continued and stopped cleanly after cooperative stop.
+  Final result: 18 SND frames, 9216 audio frames, 18432 bytes, sample_rate=11999, no error.
+Fixture captured: none
+Follow-up:
+  Add explicit control-command sent counters/status if we need stronger visibility than queued-command response.
+```
+
 ### YYYY-MM-DD
 
 ```text

@@ -192,11 +192,12 @@ Current capabilities:
 - A testable text dashboard renderer and thin curses TUI runner are available via `--tui` or `kiwi-tui`.
 - Background playback can be started with `play-bg --allow-live [--null-sink]`; `stop` requests cooperative shutdown and `operation-status` reports progress/result/error state.
 - TUI dashboard shows current background operation status.
+- `tune`, `mode`, and `filter` changes during active background playback queue `SET mod=...` commands to the live playback WebSocket after initial setup.
 
 Remaining capabilities needed:
 
-- Actual continuously open retunable WebSocket session lifecycle.
-- Applying tune/mode/filter changes to an already-running stream.
+- Fuller persistent session lifecycle beyond background playback.
+- Confirm/document live retune behavior with a short receiver test.
 - Live status updates: sample rate, RSSI, sequence gaps, receiver errors.
 - Richer TUI controls and status panes.
 

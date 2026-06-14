@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import queue
 import threading
 import time
 from dataclasses import dataclass
@@ -47,18 +48,20 @@ class BackgroundOperation:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._command_queue: queue.Queue[str] = queue.Queue()
         self._name: str | None = None
         self._started_at: float | None = None
         self._finished_at: float | None = None
         self._result: dict | None = None
         self._error: str | None = None
 
-    def start(self, name: str, target: Callable[[threading.Event], dict]) -> OperationStatus:
+    def start(self, name: str, target: Callable[[threading.Event, queue.Queue[str]], dict]) -> OperationStatus:
         """Start an operation in the background."""
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 raise RuntimeError("background operation already running")
             self._stop_event = threading.Event()
+            self._command_queue = queue.Queue()
             self._name = name
             self._started_at = time.monotonic()
             self._finished_at = None
@@ -71,6 +74,14 @@ class BackgroundOperation:
     def stop(self) -> OperationStatus:
         """Request cooperative stop."""
         self._stop_event.set()
+        return self.status()
+
+    def send_command(self, command: str) -> OperationStatus:
+        """Queue a command for the active background operation."""
+        status = self.status()
+        if not status.running:
+            raise RuntimeError("no background operation running")
+        self._command_queue.put(command)
         return self.status()
 
     def status(self) -> OperationStatus:
@@ -94,9 +105,9 @@ class BackgroundOperation:
             thread.join(timeout)
         return self.status()
 
-    def _run(self, target: Callable[[threading.Event], dict]) -> None:
+    def _run(self, target: Callable[[threading.Event, queue.Queue[str]], dict]) -> None:
         try:
-            result = target(self._stop_event)
+            result = target(self._stop_event, self._command_queue)
             with self._lock:
                 self._result = result
         except Exception as exc:  # pragma: no cover - defensive status path

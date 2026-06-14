@@ -19,7 +19,7 @@ def test_render_dashboard_includes_persistent_live_state():
 
     text = render_dashboard(
         state,
-        {"type": "play", "result": {"frames": 1024}},
+        {"type": "state", "active_command": "SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000"},
         message="ok",
         operation={"name": "play", "running": True, "stop_requested": False, "elapsed_seconds": 1.25},
     )
@@ -32,7 +32,8 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Operation: play" in text
     assert "Running: yes" in text
-    assert "Last response: play" in text
+    assert "Last response: state" in text
+    assert "Applied to active stream: SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000" in text
     assert "Message: ok" in text
 
 

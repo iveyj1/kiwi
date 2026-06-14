@@ -11,13 +11,21 @@ class FakeOperations:
     def __init__(self):
         self.calls = []
 
-    def play(self, config, *, null_sink: bool, stop_event=None):
-        self.calls.append(("play", config, null_sink, stop_event))
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None):
+        self.calls.append(("play", config, null_sink, stop_event, command_queue))
+        commands = []
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
-            while not stop_event.is_set() and time.monotonic() < deadline:
+            while time.monotonic() < deadline:
+                if command_queue is not None:
+                    try:
+                        commands.append(command_queue.get(timeout=0.02))
+                    except Exception:
+                        pass
+                if stop_event.is_set() and (command_queue is None or command_queue.empty()):
+                    break
                 time.sleep(0.01)
-        return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set())}
+        return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set()), "commands": commands}
 
     def record(self, config):
         self.calls.append(("record", config))
@@ -94,7 +102,7 @@ def test_client_executes_play_record_capture_with_injected_operations():
     record = controller.execute("record recordings/shell.wav --allow-live --overwrite")
     capture = controller.execute("capture tests/fixtures/kiwi/shell.jsonl --allow-live --overwrite")
 
-    assert play == {"type": "play", "result": {"frames": 1024, "dry_run": True, "stopped": False}}
+    assert play == {"type": "play", "result": {"frames": 1024, "dry_run": True, "stopped": False, "commands": []}}
     assert record["result"]["path"] == "recordings/shell.wav"
     assert capture["result"]["path"] == "tests/fixtures/kiwi/shell.jsonl"
     assert operations.calls[0][0] == "play"
@@ -120,6 +128,39 @@ def test_client_play_bg_and_stop_with_injected_operations():
     assert final.running is False
     assert final.result["stopped"] is True
     assert controller.execute("operation-status")["operation"]["running"] is False
+
+
+def test_client_wait_joins_background_operation():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("play-bg --allow-live --null-sink")
+    controller.execute("stop")
+    waited = controller.execute("wait 2")
+
+    assert waited["operation"]["running"] is False
+    assert waited["operation"]["result"]["stopped"] is True
+
+
+def test_tune_mode_filter_queue_commands_to_active_background_playback():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("play-bg --allow-live --null-sink")
+    tuned = controller.execute("tune 7000")
+    mode = controller.execute("mode usb 300 2700")
+    filt = controller.execute("filter 100 2400")
+    controller.execute("stop")
+    final = controller.background.join(timeout=2.0)
+
+    assert tuned["active_command"] == "SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000"
+    assert mode["active_command"] == "SET mod=usb low_cut=300 high_cut=2700 freq=7000.000"
+    assert filt["active_command"] == "SET mod=usb low_cut=100 high_cut=2400 freq=7000.000"
+    assert final.result["commands"] == [
+        "SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000",
+        "SET mod=usb low_cut=300 high_cut=2700 freq=7000.000",
+        "SET mod=usb low_cut=100 high_cut=2400 freq=7000.000",
+    ]
 
 
 def test_client_refuses_live_operations_without_allow_live():

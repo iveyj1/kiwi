@@ -109,7 +109,13 @@ Started persistent live-mode settings and TUI work for Milestone 6. `ClientState
 
 Committed as `94f69b4` (`Add TUI dashboard and persistent live settings`). Follow-up fix `115350a` added the missing `python -m kiwi_client.tui` entrypoint.
 
-Added `src/kiwi_client/live_worker.py`, a framework-neutral background operation worker. Client shell now supports `play-bg --allow-live [--null-sink]`, `stop`, and `operation-status`. Live playback accepts a cooperative `stop_event`, and the TUI dashboard displays background operation state. Retune/mode/filter changes during playback currently update desired state only; applying them to the active WebSocket stream remains future work.
+Added `src/kiwi_client/live_worker.py`, a framework-neutral background operation worker. Client shell now supports `play-bg --allow-live [--null-sink]`, `stop`, and `operation-status`. Live playback accepts a cooperative `stop_event`, and the TUI dashboard displays background operation state.
+
+Committed as `b660770` (`Add background playback worker for TUI`).
+
+Added a command queue to background operations and wired live playback to drain queued control commands after initial SND setup. `tune`, `mode`, and `filter` now queue `SET mod=...` to active background playback and include `active_command` in the response/dashboard. Harness tests cover command queuing without receiver access.
+
+Added `wait [seconds]` to the client shell for scripts/TUI to wait for background operation completion/status. A short local null-sink script verified the background playback queue path: start at 5000 kHz AM, queue `tune 7000`, wait, stop, and wait for completion. The operation processed 18 SND frames and stopped cleanly.
 
 ## YYYY-MM-DD
 

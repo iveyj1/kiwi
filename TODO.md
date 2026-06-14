@@ -2,20 +2,19 @@
 
 ## Current slice
 
-Goal: Add background live playback worker and interactive stop/status support for the current TUI/client shell.
+Goal: Deliver tune/mode/filter changes to active background playback sessions.
 
 Done criteria:
 
-- Add a framework-neutral background operation worker.
-- Add cooperative stop support to live SND playback.
-- Add `play-bg --allow-live [--null-sink]`, `stop`, and `operation-status` commands.
-- Show background operation state in the TUI dashboard.
-- Cover worker behavior, command behavior, and dashboard rendering with pytest.
-- Keep retuning during active playback as desired-state-only for now.
+- Add a command queue to the background operation worker.
+- Wire live playback to drain queued control commands after initial SND setup.
+- Queue `SET mod=...` when `tune`, `mode`, or `filter` changes while background playback is active.
+- Show the queued/applied active command in the TUI dashboard response.
+- Cover command queue behavior and active retune/mode/filter command generation with pytest.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no
+Live-radio needed: optional follow-up; harness first in this slice.
 
 Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 

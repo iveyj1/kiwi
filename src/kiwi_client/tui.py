@@ -55,6 +55,8 @@ def render_dashboard(
             lines.append(f"Operation error: {operation['error']}")
     if last_response is not None:
         lines.extend(["", f"Last response: {last_response.get('type', 'unknown')}"])
+        if "active_command" in last_response:
+            lines.append(f"Applied to active stream: {last_response['active_command']}")
         if "result" in last_response:
             lines.append(f"Result: {last_response['result']}")
         if "plan" in last_response:
