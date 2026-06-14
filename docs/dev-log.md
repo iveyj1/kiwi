@@ -139,6 +139,8 @@ Added interactive AGC controls backed by locally verified `SET agc=...` behavior
 
 Changed `volume` / `volume-step` to control local system output volume via an injectable backend. The default backend tries `wpctl`, then `pactl`, then `amixer`; harness tests use a fake backend and do not touch the system mixer.
 
+Fixed TUI quit behavior while background playback is active. Keymap `q` and command-mode `quit`/`q`/`qu`/`exit` now request cooperative background stop and wait briefly before ending curses. If the worker does not stop quickly, the TUI stays open and reports that shutdown is in progress.
+
 ## YYYY-MM-DD
 
 ### Finding

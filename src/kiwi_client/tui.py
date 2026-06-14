@@ -151,6 +151,20 @@ def expand_key_action(action: str, controller: ClientController, config: KiwiCli
     return action
 
 
+def request_tui_quit(controller: ClientController, *, join_timeout: float = 2.0) -> tuple[dict[str, Any] | None, str]:
+    """Safely quit the TUI, stopping any active background operation first."""
+    status = controller.background.status()
+    if status.running:
+        controller.background.stop()
+        final = controller.background.join(timeout=join_timeout)
+        if final.running:
+            return {"type": "operation-status", "operation": final.as_dict()}, "Stopping background operation before quit..."
+        controller.running = False
+        return {"type": "operation-status", "operation": final.as_dict()}, "Stopped background operation and quitting."
+    controller.running = False
+    return {"type": "quit"}, ""
+
+
 def handle_tui_key(
     ch: int,
     input_state: TuiInputState,
@@ -168,6 +182,8 @@ def handle_tui_key(
             input_state.history_index = None
             return None, ""
         if action:
+            if action == "quit":
+                return request_tui_quit(controller)
             try:
                 return controller.execute(expand_key_action(action, controller, config)), ""
             except ClientCommandError as exc:
@@ -210,6 +226,8 @@ def handle_tui_key(
         input_state.history.append(command)
         if command == "help":
             return {"type": "help", "commands": available_commands()}, ""
+        if command.lower() in {"quit", "exit", "q", "qu"}:
+            return request_tui_quit(controller)
         try:
             return controller.execute(command), ""
         except ClientCommandError as exc:

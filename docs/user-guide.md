@@ -31,6 +31,7 @@ TUI input has two modes:
 - In command mode, `Enter` executes the command and returns to keymap mode.
 - In command mode, `Esc` clears the command and returns to keymap mode.
 - In command mode, up/down arrows browse command history; the selected command is placed in the prompt for editing.
+- In keymap mode, `q` requests cooperative stop of any background operation before exiting the TUI.
 
 Default TUI keymap/step configuration shape:
 

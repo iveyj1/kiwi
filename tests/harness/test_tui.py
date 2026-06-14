@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import curses
+import time
 
 from kiwi_client.client_app import ClientController, ClientState
 from kiwi_client.config import load_config
@@ -11,6 +12,7 @@ from kiwi_client.tui import (
     handle_tui_key,
     normalize_key_name,
     render_dashboard,
+    request_tui_quit,
     state_from_config,
 )
 
@@ -182,6 +184,58 @@ def test_tui_modified_and_unknown_keys_are_safe_in_keymap_mode():
     assert response is None
     assert message is None
     assert controller.running is True
+
+
+def test_tui_keymap_quit_stops_background_operation_before_exit():
+    controller = ClientController()
+
+    def target(stop_event, command_queue, status_callback):
+        while not stop_event.is_set():
+            time.sleep(0.01)
+        return {"stopped": True}
+
+    controller.background.start("play", target)
+    response, message = handle_tui_key(ord("q"), TuiInputState(), controller, load_config())
+
+    assert controller.running is False
+    assert response["operation"]["running"] is False
+    assert response["operation"]["result"] == {"stopped": True}
+    assert message == "Stopped background operation and quitting."
+
+
+def test_tui_command_mode_quit_stops_background_operation_before_exit():
+    controller = ClientController()
+
+    def target(stop_event, command_queue, status_callback):
+        while not stop_event.is_set():
+            time.sleep(0.01)
+        return {"stopped": True}
+
+    controller.background.start("play", target)
+    state = TuiInputState(mode=InputMode.COMMAND, command="q")
+    response, message = handle_tui_key(10, state, controller, load_config())
+
+    assert controller.running is False
+    assert response["operation"]["running"] is False
+    assert response["operation"]["result"] == {"stopped": True}
+    assert message == "Stopped background operation and quitting."
+
+
+def test_tui_safe_quit_keeps_running_when_operation_does_not_stop_quickly():
+    controller = ClientController()
+
+    def target(stop_event, command_queue, status_callback):
+        time.sleep(0.2)
+        return {"stopped": stop_event.is_set()}
+
+    controller.background.start("play", target)
+    response, message = request_tui_quit(controller, join_timeout=0.01)
+
+    assert controller.running is True
+    assert response["operation"]["running"] is True
+    assert message == "Stopping background operation before quit..."
+    controller.background.stop()
+    controller.background.join(timeout=1.0)
 
 
 def test_tui_command_mode_executes_and_exits_to_keymap():

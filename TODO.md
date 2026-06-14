@@ -2,22 +2,21 @@
 
 ## Current slice
 
-Goal: Add interactive AGC controls and clarify volume behavior.
+Goal: Fix TUI keymap quit while live playback is active.
 
 Done criteria:
 
-- Confirm local reference support for `SET agc=...`; do not invent unverified radio-side volume command.
-- Add AGC state to the client model.
-- Add commands for AGC on/off, hang, threshold, slope, decay, and manual gain.
-- Queue AGC command changes to active background playback sessions.
-- Cover AGC command behavior with harness tests.
-- Update docs to explain volume controls local system output and AGC gain is the verified Kiwi receiver-side gain control.
+- Keymap `q` / configured `quit` action requests cooperative background stop before ending the TUI.
+- Command-mode `quit`, `q`, `qu`, and `exit` use the same safe TUI quit path.
+- If the background operation does not stop quickly, keep TUI running and report that stop is still in progress.
+- Cover safe quit behavior with harness tests.
+- Update the example root config and docs/dev-log.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no; harness-first command/control work.
+Live-radio needed: no; harness-first TUI shutdown work.
 
-Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: root `config.toml`, `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 
