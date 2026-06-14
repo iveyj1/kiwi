@@ -2,21 +2,21 @@
 
 ## Current slice
 
-Goal: Add fixture-based SND sequence/dropout and ADC overflow handling before live capture.
+Goal: Build a guarded SND live capture CLI/tool without executing live receiver access.
 
 Done criteria:
 
-- Add a synthetic multi-frame SND fixture with a sequence gap.
-- Add an audio-layer SND sequence tracker with uint32 wraparound handling.
-- Detect missing frames and out-of-order frames.
-- Expose ADC overflow flag status from decoded SND frames.
-- Keep live-radio testing deferred.
+- Add a CLI entrypoint/module for short local SND capture.
+- Enforce local receiver allowlist, short duration, frame cap, output overwrite guard, and explicit `--allow-live` requirement.
+- Support `--dry-run` to print the planned URI and fixture-tested command sequence without connecting.
+- Write live captures using the existing JSONL capture writer when explicitly run later.
+- Keep live-radio testing deferred in this slice.
 
-Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
+Test command: `python3 -m pytest tests/harness tests/protocol tests/audio`
 
 Live-radio needed: no
 
-Docs to update: `docs/audio-pipeline.md`, `docs/kiwi-protocol.md`, `docs/dev-log.md`
+Docs to update: `docs/harness.md`, `docs/dev-log.md`, `docs/user-guide.md`
 
 ## Next
 

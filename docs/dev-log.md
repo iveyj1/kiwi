@@ -48,6 +48,14 @@ Added audio-layer SND sequence/dropout handling. `SndSequenceTracker` detects mi
 
 `python3 -m pytest` passed: 22 tests.
 
+Committed as `1491c70` (`Add SND sequence gap tracking`).
+
+Added guarded SND live capture module/CLI in `src/kiwi_client/live_capture.py`. It supports dry-run without network, validates the local receiver allowlist, caps duration/frame count, refuses overwrites by default, requires `--allow-live` for actual network use, and writes JSONL via the existing capture writer. Actual live execution was not run.
+
+Dry-run command verified with no network: `PYTHONPATH=src python3 -m kiwi_client.live_capture --dry-run --host 10.0.0.40 --output /tmp/kiwi-dry-run.jsonl --timestamp 123456`.
+
+`python3 -m pytest` passed: 28 tests.
+
 ## YYYY-MM-DD
 
 ### Finding

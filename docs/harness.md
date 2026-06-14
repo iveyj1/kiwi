@@ -98,9 +98,34 @@ The future live capture path should use the same JSONL event shape as the tests.
 
 Use this before live testing to validate that setup commands and expected responses are in the intended order.
 
+## Guarded SND capture CLI
+
+`src/kiwi_client/live_capture.py` provides the guarded capture tool for the first future local receiver fixture.
+
+Dry-run only, no network:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_capture \
+  --dry-run \
+  --host 10.0.0.40 \
+  --output tests/fixtures/kiwi/local-snd-capture.jsonl
+```
+
+Live execution is intentionally gated:
+
+- receiver must be one of `10.0.0.40:8073` or `10.0.0.41:8073`,
+- duration must be at most 5 seconds,
+- frame cap must be at most 100,
+- output file must not already exist unless `--overwrite` is supplied,
+- compression is fixed off for the first capture path,
+- `--allow-live` is required for any network connection,
+- optional dependency `websockets` is required for actual live use (`pip install '.[live]'`).
+
+This implementation has only been tested in dry-run/guardrail mode so far.
+
 ## First SND capture plan, after harness gate passes
 
-Do not run this until command encoding and parser fixture tests pass.
+Do not run this until command encoding, parser fixture tests, and dry-run capture guard tests pass.
 
 Planned purpose: capture a short local SND session fixture that validates the synthetic command/session assumptions against a local receiver.
 

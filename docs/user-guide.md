@@ -25,11 +25,37 @@ Expected operations:
 - Tune by cursor or control input
 - Adjust span/zoom if supported
 
-## Recording
+## Recording / fixture capture
 
-TBD.
+The first user-visible capture tool is guarded and intended for short local fixture captures, not unattended recording.
 
-Expected operations:
+Dry-run, no network:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_capture \
+  --dry-run \
+  --host 10.0.0.40 \
+  --output tests/fixtures/kiwi/local-snd-capture.jsonl
+```
+
+Actual live capture, only when explicitly intended:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_capture \
+  --allow-live \
+  --host 10.0.0.40 \
+  --output tests/fixtures/kiwi/local-snd-capture.jsonl
+```
+
+Guardrails:
+
+- local receivers only,
+- short capture only,
+- no admin commands,
+- compression off for first SND PCM fixture path,
+- no output overwrite unless requested.
+
+Expected later operations:
 
 - Start manual recording
 - Stop recording
