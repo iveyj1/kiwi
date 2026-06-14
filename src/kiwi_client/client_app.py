@@ -37,6 +37,8 @@ class ClientState:
     low_cut_hz: int = DEFAULT_LOW_CUT_HZ
     high_cut_hz: int = DEFAULT_HIGH_CUT_HZ
     user: str = "kiwi-client"
+    duration_seconds: float = 60.0
+    max_frames: int = 1500
     connected: bool = False
 
     @property
@@ -135,6 +137,18 @@ class ClientController:
             self._require_arg_count(args, 2, "filter <low_cut_hz> <high_cut_hz>")
             self.state = replace(self.state, low_cut_hz=int(args[0]), high_cut_hz=int(args[1]))
             return {"type": "state", "state": self.state.as_dict()}
+        if command == "duration":
+            self._require_arg_count(args, 1, "duration <seconds>")
+            self.state = replace(self.state, duration_seconds=float(args[0]))
+            return {"type": "state", "state": self.state.as_dict()}
+        if command == "frames":
+            self._require_arg_count(args, 1, "frames <max_snd_frames>")
+            self.state = replace(self.state, max_frames=int(args[0]))
+            return {"type": "state", "state": self.state.as_dict()}
+        if command == "dashboard":
+            from kiwi_client.tui import render_dashboard
+
+            return {"type": "dashboard", "text": render_dashboard(self.state)}
         if command == "play-plan":
             self._require_arg_count(args, 0, "play-plan")
             return {"type": "play-plan", "plan": self._playback_config().dry_run_plan()}
@@ -205,6 +219,8 @@ class ClientController:
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
+            duration_seconds=self.state.duration_seconds,
+            max_frames=self.state.max_frames,
         )
 
     def _record_config(self, output: Path, *, overwrite: bool = False) -> LiveSndWavRecordConfig:
@@ -217,6 +233,8 @@ class ClientController:
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
+            duration_seconds=self.state.duration_seconds,
+            max_frames=self.state.max_frames,
             overwrite=overwrite,
         )
 
@@ -230,6 +248,8 @@ class ClientController:
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
+            duration_seconds=self.state.duration_seconds,
+            max_frames=self.state.max_frames,
             overwrite=overwrite,
         )
 
@@ -243,6 +263,9 @@ def available_commands() -> list[str]:
         "tune <frequency_khz>",
         "mode <mode> [low_cut_hz high_cut_hz]",
         "filter <low_cut_hz> <high_cut_hz>",
+        "duration <seconds>",
+        "frames <max_snd_frames>",
+        "dashboard",
         "play-plan",
         "play --allow-live [--null-sink]",
         "record-plan <output.wav>",
@@ -271,6 +294,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Basic KiwiSDR client control shell")
     parser.add_argument("--script", type=Path, help="read commands from a script file instead of stdin")
     parser.add_argument("--json", action="store_true", help="emit JSONL responses")
+    parser.add_argument("--tui", action="store_true", help="run the curses TUI")
     return parser
 
 
@@ -286,6 +310,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     controller = ClientController()
     try:
+        if args.tui:
+            from kiwi_client.tui import run_tui
+
+            run_tui(controller)
+            return 0
         if args.script:
             lines = args.script.read_text(encoding="utf-8").splitlines()
             for response in run_script(lines, controller):

@@ -50,6 +50,8 @@ def test_client_plans_reuse_current_state():
     controller = ClientController()
     controller.execute("tune 5000")
     controller.execute("mode am -5000 5000")
+    controller.execute("duration 45")
+    controller.execute("frames 1200")
 
     play = controller.execute("play-plan")["plan"]
     record = controller.execute("record-plan recordings/test.wav")["plan"]
@@ -60,6 +62,8 @@ def test_client_plans_reuse_current_state():
         assert plan["mode"] == "am"
         assert plan["low_cut_hz"] == -5000
         assert plan["high_cut_hz"] == 5000
+        assert plan["duration_seconds"] == 45.0
+        assert plan["max_frames"] == 1200
         assert "SET mod=am low_cut=-5000 high_cut=5000 freq=5000.000" in plan["dynamic_commands"]
     assert record["output"] == "recordings/test.wav"
     assert capture["output"] == "tests/fixtures/kiwi/test.jsonl"
@@ -91,6 +95,8 @@ def test_client_executes_play_record_capture_with_injected_operations():
     assert operations.calls[0][0] == "play"
     assert operations.calls[0][1].frequency_khz == 5000.0
     assert operations.calls[0][1].low_cut_hz == -5000
+    assert operations.calls[0][1].duration_seconds == 60.0
+    assert operations.calls[0][1].max_frames == 1500
     assert operations.calls[1][1].overwrite is True
     assert operations.calls[2][1].overwrite is True
 

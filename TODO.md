@@ -2,15 +2,16 @@
 
 ## Current slice
 
-Goal: Push live play/record/capture toward usable live mode by allowing explicit sessions up to about 60 seconds.
+Goal: Start persistent live-mode settings and TUI for Milestone 6.
 
 Done criteria:
 
-- Increase guarded live duration cap from 5 seconds to 60 seconds.
-- Increase guarded live SND frame cap from 100 to 1500 frames.
-- Keep default operations short unless the user explicitly requests longer values.
-- Cover the new guardrail limits for capture, record, and playback with pytest.
-- Update user docs and roadmap.
+- Add persistent client-state fields for live duration and max SND frames.
+- Add `duration`, `frames`, and `dashboard` commands to the scriptable client shell.
+- Ensure play/record/capture plans and executable commands reuse persistent live settings.
+- Add a testable text dashboard renderer and a thin curses TUI runner.
+- Add `--tui` and `kiwi-tui` entry points.
+- Cover persistent settings and dashboard rendering with pytest.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 

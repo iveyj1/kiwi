@@ -6,10 +6,22 @@ This file should describe user-visible behavior as the application develops.
 
 The first basic client is a scriptable command shell. It manages client state and can produce dry-run plans for guarded live operations without connecting.
 
-Run interactively:
+Run interactively as a command shell:
 
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.client_app --json
+```
+
+Run the curses TUI:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.tui
+```
+
+or, after installing the package scripts:
+
+```bash
+kiwi-tui
 ```
 
 Run a script:
@@ -19,6 +31,9 @@ cat > /tmp/kiwi-client-script.txt <<'EOF'
 status
 tune 5000
 mode am -5000 5000
+duration 60
+frames 1500
+dashboard
 play-plan
 play --allow-live --null-sink
 record-plan recordings/client-5000-am.wav
@@ -41,6 +56,9 @@ Supported commands:
 - `tune <frequency_khz>`
 - `mode <mode> [low_cut_hz high_cut_hz]`
 - `filter <low_cut_hz> <high_cut_hz>`
+- `duration <seconds>`
+- `frames <max_snd_frames>`
+- `dashboard`
 - `play-plan`
 - `play --allow-live [--null-sink]`
 - `record-plan <output.wav>`
@@ -54,12 +72,15 @@ Current limitations:
 
 - `connect` and `disconnect` only update client state for now.
 - Live operations from the shell require explicit `--allow-live`.
-- No live RSSI/sample-rate/status display yet.
-- No TUI yet.
+- TUI is an initial curses command/dashboard shell, not a full SDR interface yet.
+- No live RSSI/sample-rate/status stream yet.
+- `connect` is not a continuously open retunable WebSocket session yet.
 
-Example shell commands for guarded execution:
+Example shell commands for persistent live settings and guarded execution:
 
 ```text
+duration 60
+frames 1500
 play --allow-live --null-sink
 record recordings/client-5000-am.wav --allow-live --overwrite
 capture tests/fixtures/kiwi/client-5000-am.jsonl --allow-live --overwrite

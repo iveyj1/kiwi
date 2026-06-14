@@ -18,6 +18,7 @@ playback = [
 
 [project.scripts]
 kiwi-client = "kiwi_client.client_app:main"
+kiwi-tui = "kiwi_client.tui:main"
 kiwi-snd-capture = "kiwi_client.live_capture:main"
 kiwi-snd-record = "kiwi_client.live_record:main"
 kiwi-snd-play = "kiwi_client.live_play:main"
