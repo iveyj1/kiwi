@@ -64,15 +64,6 @@ allowed = ["example.com:8073"]
     assert config.keys["x"] == "stop"
 
 
-def test_load_config_accepts_timeout_seconds_alias(tmp_path: Path):
-    path = tmp_path / "config.toml"
-    path.write_text("[live]\ntimeout_seconds = 12\n", encoding="utf-8")
-
-    config = load_config(path)
-
-    assert config.live.duration_seconds == 12.0
-
-
 def test_tui_parser_accepts_config_path(tmp_path: Path):
     path = tmp_path / "config.toml"
 

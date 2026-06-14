@@ -129,7 +129,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         live = replace(
             live,
             allow_live=bool(live_data.get("allow_live", live.allow_live)),
-            duration_seconds=float(live_data.get("duration_seconds", live_data.get("timeout_seconds", live.duration_seconds))),
+            duration_seconds=float(live_data.get("duration_seconds", live.duration_seconds)),
             max_frames=int(live_data.get("max_frames", live.max_frames)),
         )
     if isinstance(data.get("receivers"), dict):
