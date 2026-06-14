@@ -74,6 +74,22 @@ Supported commands:
 - `help`
 - `quit`
 
+Command aliases:
+
+- `?` -> `status`
+- `re` -> `receiver`
+- `tu` -> `tune`
+- `mo` -> `mode`
+- `fi` -> `filter`
+- `du` -> `duration`
+- `fr` -> `frames`
+- `pb` -> `play-bg`
+- `rb` -> `record-bg`
+- `cb` -> `capture-bg`
+- `sp` -> `stop`
+- `he` -> `help`
+- `q` / `qu` -> `quit`
+
 Current limitations:
 
 - `connect` and `disconnect` only update client state for now.

@@ -162,7 +162,7 @@ class ClientController:
         if not stripped or stripped.startswith("#"):
             return None
         parts = shlex.split(stripped)
-        command = parts[0].lower()
+        command = command_aliases().get(parts[0].lower(), parts[0].lower())
         args = parts[1:]
 
         if command in {"quit", "exit"}:
@@ -389,6 +389,26 @@ class ClientController:
         )
 
 
+def command_aliases() -> dict[str, str]:
+    """Return short command aliases for interactive use."""
+    return {
+        "?": "status",
+        "re": "receiver",
+        "tu": "tune",
+        "mo": "mode",
+        "fi": "filter",
+        "du": "duration",
+        "fr": "frames",
+        "pb": "play-bg",
+        "rb": "record-bg",
+        "cb": "capture-bg",
+        "sp": "stop",
+        "he": "help",
+        "q": "quit",
+        "qu": "quit",
+    }
+
+
 def available_commands() -> list[str]:
     return [
         "status",
@@ -415,6 +435,7 @@ def available_commands() -> list[str]:
         "capture-bg <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
+        "aliases: ?=status, re=receiver, tu=tune, mo=mode, fi=filter, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
     ]
 
 

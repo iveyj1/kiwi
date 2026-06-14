@@ -2,18 +2,18 @@
 
 ## Current slice
 
-Goal: Add richer live status metrics and make the TUI refresh status periodically without requiring keypresses.
+Goal: Add interactive command aliases, then build keymap/command-mode TUI support, configurable keymaps, and tune/volume step actions.
 
 Done criteria:
 
-- Publish sample rate, sequence gap count, ADC overflow, SND frame count, and latest RSSI/S-meter metrics from live playback/record/capture paths where available.
-- Show sample rate, sequence gaps, ADC overflow, RSSI/S-meter, SND frames, operation result, and operation error in the TUI dashboard.
-- Make the curses TUI redraw periodically so RSSI/status/error changes appear without keyboard input.
-- Cover status metrics and dashboard rendering with pytest.
+- Slice 1: add command aliases (`?` for status, `re`, `tu`, `mo`, `fi`, `du`, `fr`, `pb`, `rb`, `cb`, `sp`, `he`, `q`, `qu`) with tests.
+- Slice 2: add two-mode TUI input: keymap mode by default, `:` command mode, enter/escape behavior, and command history up/down.
+- Slice 3: add TOML configuration defaults for keymaps and step sizes.
+- Slice 4: add tune-step and volume/volume-step actions wired to keymaps.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: optional follow-up; harness first in this slice.
+Live-radio needed: no; harness-first UI/controller work.
 
 Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 

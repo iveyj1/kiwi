@@ -66,6 +66,52 @@ def test_client_controller_status_and_state_changes():
     assert state["high_cut_hz"] == 2700
 
 
+def test_client_command_aliases_update_state_and_status():
+    controller = ClientController()
+
+    controller.execute("re 10.0.0.41:8073")
+    controller.execute("tu 10000")
+    controller.execute("mo usb 300 2700")
+    controller.execute("fi 100 2400")
+    controller.execute("du 45")
+    controller.execute("fr 1200")
+    response = controller.execute("?")
+
+    state = response["state"]
+    assert response["type"] == "status"
+    assert state["receiver"] == "10.0.0.41:8073"
+    assert state["frequency_khz"] == 10000.0
+    assert state["mode"] == "usb"
+    assert state["low_cut_hz"] == 100
+    assert state["high_cut_hz"] == 2400
+    assert state["duration_seconds"] == 45.0
+    assert state["max_frames"] == 1200
+
+
+def test_client_operation_aliases_with_injected_operations():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    started = controller.execute("pb --allow-live --null-sink")
+    assert started["operation"]["running"] is True
+    stopped = controller.execute("sp")
+    assert stopped["operation"]["stop_requested"] is True
+    controller.execute("wait 2")
+
+    record_started = controller.execute("rb recordings/alias.wav --allow-live --overwrite")
+    assert record_started["operation"]["running"] is True
+    controller.execute("sp")
+    controller.execute("wait 2")
+
+    capture_started = controller.execute("cb tests/fixtures/kiwi/alias.jsonl --allow-live --overwrite")
+    assert capture_started["operation"]["running"] is True
+    controller.execute("sp")
+    controller.execute("wait 2")
+
+    assert controller.execute("he")["type"] == "help"
+    assert controller.execute("qu")["type"] == "quit"
+
+
 def test_client_controller_connect_disconnect_state_only():
     controller = ClientController()
 
