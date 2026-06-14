@@ -56,3 +56,7 @@ Adds:
 Harness first, live radio second.
 
 No live-radio test should be the only test for important behavior.
+
+## Roadmap
+
+Track high-level milestones in `docs/roadmap.md` and update it as capabilities are completed, reordered, or split.

@@ -2,21 +2,21 @@
 
 ## Current slice
 
-Goal: Make fixture-to-WAV recording user-facing with a CLI.
+Goal: Add and maintain a high-level roadmap document.
 
 Done criteria:
 
-- Add a `kiwi_client.recorder` CLI entrypoint for converting an SND fixture to WAV.
-- Add a project script entry for fixture-to-WAV conversion.
-- Support JSON summary output for recording metadata.
-- Cover the CLI with pytest using the live-captured 5000 kHz fixture.
-- Produce/refresh the local WAV artifact via the CLI.
+- Create `docs/roadmap.md` with milestone statuses and next recommended capability.
+- Capture completed SND harness, guarded capture, and offline WAV recording milestones.
+- Capture planned direct live-to-WAV, playback, UI, waterfall, detector, and weak-signal milestones.
+- Link the roadmap from project documentation.
+- Establish that roadmap should be updated as capabilities change.
 
-Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
+Test command: `python3 -m pytest`
 
 Live-radio needed: no
 
-Docs to update: `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: `docs/roadmap.md`, `docs/project-brief.md`, `docs/dev-log.md`
 
 ## Next
 
