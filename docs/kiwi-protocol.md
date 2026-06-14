@@ -72,10 +72,16 @@ First fixture coverage:
 
 - `tests/fixtures/kiwi/snd-basic.jsonl` contains one synthetic uncompressed mono SND WebSocket payload with `flags=0`, `seq=1`, `smeter=850` (`rssi=-42.0`), and samples `[-32768, -1, 0, 1, 32767]`.
 
+Additional fixture coverage:
+
+- `tests/fixtures/kiwi/snd-sequence-gap.jsonl` contains synthetic uncompressed mono frames with sequence numbers `1, 3, 4`, covering a missing frame at expected sequence `2`.
+- `src/kiwi_client/audio.py` treats SND sequence numbers as uint32 values and accepts wraparound from `0xffffffff` to `0`.
+- ADC overflow is exposed via flag `0x02`; fixture-backed parser code preserves flags for audio-layer handling.
+
 Remaining SND questions:
 
 - Exact ADPCM codec state/reset expectations for compressed mono fixtures.
-- Dropout behavior and sequence wrap handling.
+- Real receiver dropout behavior under network loss or load.
 - Whether local receivers report `sample_rate` exactly 12000 or drifted values in normal sessions.
 - Live capture metadata and command sequence to preserve once harness tests exist.
 

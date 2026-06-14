@@ -50,6 +50,21 @@ The first stateful harness path uses `tests/fixtures/kiwi/snd-session-basic.json
 
 This keeps protocol parsing, receiver state, and audio sample conversion separate while allowing later audio buffers to carry sample-rate context.
 
+## Sequence/dropout handling
+
+`src/kiwi_client/audio.py` adds an audio-layer `SndSequenceTracker`:
+
+- First observed frame establishes the next expected sequence.
+- Normal continuity expects `seq == previous_seq + 1` modulo `2^32`.
+- Gaps report `missing_count` so later buffering/recording can log dropouts.
+- Very large reverse deltas are treated as out-of-order frames.
+- Wraparound from `0xffffffff` to `0` is accepted.
+
+Fixture coverage:
+
+- `tests/fixtures/kiwi/snd-sequence-gap.jsonl` contains frames `1, 3, 4`; the tracker reports one missing frame at expected sequence `2`.
+- `tests/audio/test_snd_sequence.py` covers gap detection, wraparound, out-of-order detection, and ADC overflow flag exposure.
+
 ## Questions to resolve
 
 - Whether audio frames should directly carry a `sample_rate` snapshot or whether consumers should pair frames with receiver state.
@@ -57,7 +72,6 @@ This keeps protocol parsing, receiver state, and audio sample conversion separat
 - Mono/stereo handling beyond the first mono fixture.
 - Audio codec/compression fixture strategy.
 - Buffer target latency.
-- Dropout behavior.
 - Recording format.
 - Detector handoff format.
 

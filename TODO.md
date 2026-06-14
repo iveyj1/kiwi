@@ -2,21 +2,21 @@
 
 ## Current slice
 
-Goal: Add a strict offline replay transport for command/response fixture scripts.
+Goal: Add fixture-based SND sequence/dropout and ADC overflow handling before live capture.
 
 Done criteria:
 
-- Add a replay transport that consumes fixture events in order.
-- Validate transmitted command text against `tx`/`cmd` fixture events.
-- Return received MSG and binary payload events without network access.
-- Cover successful SND setup/session replay and command mismatch failure with pytest.
+- Add a synthetic multi-frame SND fixture with a sequence gap.
+- Add an audio-layer SND sequence tracker with uint32 wraparound handling.
+- Detect missing frames and out-of-order frames.
+- Expose ADC overflow flag status from decoded SND frames.
 - Keep live-radio testing deferred.
 
-Test command: `python3 -m pytest tests/harness tests/protocol`
+Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
 
 Live-radio needed: no
 
-Docs to update: `docs/harness.md`, `docs/dev-log.md`
+Docs to update: `docs/audio-pipeline.md`, `docs/kiwi-protocol.md`, `docs/dev-log.md`
 
 ## Next
 

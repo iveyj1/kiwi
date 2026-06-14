@@ -1,0 +1,4 @@
+{"t":0.000,"dir":"meta","stream":"snd","type":"note","source":"synthetic","description":"Three uncompressed mono SND frames with a sequence gap: received seq 1, 3, 4 so seq 2 is missing."}
+{"t":0.000,"dir":"rx","stream":"snd","type":"binary","encoding":"base64","data":"U05EAAEAAAADUgBk"}
+{"t":0.001,"dir":"rx","stream":"snd","type":"binary","encoding":"base64","data":"U05EAAMAAAADUgEs"}
+{"t":0.002,"dir":"rx","stream":"snd","type":"binary","encoding":"base64","data":"U05EAAQAAAADUgGQ"}

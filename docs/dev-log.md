@@ -44,6 +44,10 @@ Added strict offline `ReplayTransport` in `src/kiwi_client/transport.py`. It con
 
 Next useful slice: add the first guarded live capture command-line tool while leaving actual execution for a separate explicit live-radio-test step, or add more parser coverage for sequence/dropout handling before live capture.
 
+Added audio-layer SND sequence/dropout handling. `SndSequenceTracker` detects missing frames, out-of-order frames, and uint32 wraparound. `tests/fixtures/kiwi/snd-sequence-gap.jsonl` covers frames `1, 3, 4` with one missing frame at expected sequence `2`. ADC overflow flag exposure is covered in audio tests.
+
+`python3 -m pytest` passed: 22 tests.
+
 ## YYYY-MM-DD
 
 ### Finding
