@@ -273,10 +273,23 @@ def test_tune_does_not_report_active_command_during_background_record():
     assert "active_command" not in tuned
 
 
+def test_client_allow_live_default_allows_background_alias_without_flag():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+
+    started = controller.execute("pb --null-sink")
+    assert started["operation"]["running"] is True
+    controller.execute("sp")
+    final = controller.execute("wait 2")
+
+    assert final["operation"]["running"] is False
+    assert operations.calls[0][0] == "play"
+
+
 def test_client_refuses_live_operations_without_allow_live():
     controller = ClientController(operations=FakeOperations())
 
-    with pytest.raises(ClientCommandError, match="without --allow-live"):
+    with pytest.raises(ClientCommandError, match="allow_live = true"):
         controller.execute("play --null-sink")
     with pytest.raises(ClientCommandError, match="without --allow-live"):
         controller.execute("record recordings/x.wav")

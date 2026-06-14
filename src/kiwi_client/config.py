@@ -17,6 +17,9 @@ large_hz = 5000
 [volume]
 step_percent = 10
 
+[live]
+allow_live = false
+
 [keys]
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
@@ -55,11 +58,19 @@ class VolumeConfig:
 
 
 @dataclass(frozen=True)
+class LiveConfig:
+    """Live-operation guard settings."""
+
+    allow_live: bool = False
+
+
+@dataclass(frozen=True)
 class KiwiClientConfig:
     """Loaded client configuration."""
 
     steps: StepConfig = field(default_factory=StepConfig)
     volume: VolumeConfig = field(default_factory=VolumeConfig)
+    live: LiveConfig = field(default_factory=LiveConfig)
     keys: dict[str, str] = field(default_factory=dict)
 
 
@@ -80,6 +91,7 @@ def load_config(path: str | Path | None = None) -> KiwiClientConfig:
 def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientConfig:
     steps = config.steps
     volume = config.volume
+    live = config.live
     keys = dict(config.keys)
 
     if isinstance(data.get("steps"), dict):
@@ -93,10 +105,13 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     if isinstance(data.get("volume"), dict):
         volume_data = data["volume"]
         volume = replace(volume, step_percent=int(volume_data.get("step_percent", volume.step_percent)))
+    if isinstance(data.get("live"), dict):
+        live_data = data["live"]
+        live = replace(live, allow_live=bool(live_data.get("allow_live", live.allow_live)))
     if isinstance(data.get("keys"), dict):
         keys.update({str(key): str(value) for key, value in data["keys"].items()})
 
-    return KiwiClientConfig(steps=steps, volume=volume, keys=keys)
+    return KiwiClientConfig(steps=steps, volume=volume, live=live, keys=keys)
 
 
 def _config_from_dict(data: dict[str, Any]) -> KiwiClientConfig:

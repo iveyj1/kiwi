@@ -43,6 +43,10 @@ large_hz = 5000
 [volume]
 step_percent = 10
 
+[live]
+# Default is false. Set true only for trusted local interactive use.
+allow_live = false
+
 [keys]
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
@@ -65,6 +69,15 @@ In keymap mode, the default bindings are:
 - down arrow or `j`: decrease volume by the configured volume step.
 
 Terminal support for modified arrow keys varies; letter bindings are the portable fallback.
+
+If you want TUI command aliases like `:pb` to start live operations without typing `--allow-live` every time, explicitly opt in via your TUI config:
+
+```toml
+[live]
+allow_live = true
+```
+
+With that setting, `:pb --null-sink` is accepted as `play-bg --null-sink` using the configured live opt-in. Without it, live operations still require `--allow-live` on each command.
 
 or, after installing the package scripts:
 

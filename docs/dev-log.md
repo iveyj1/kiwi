@@ -129,6 +129,8 @@ Added TOML configuration loading in `src/kiwi_client/config.py`. Defaults includ
 
 Added controller commands `tune-step`, `volume`, and `volume-step`. TUI keymap mode now executes configured key actions, expanding named frequency steps using the loaded TOML step sizes. Volume is currently client state/display only; applying gain to live PCM remains future work.
 
+Added `[live] allow_live = false` to the TOML config schema. When a TUI config explicitly sets `allow_live = true`, controller live-operation guard checks accept commands like `:pb --null-sink` without requiring `--allow-live` each time. The default remains guarded.
+
 ## YYYY-MM-DD
 
 ### Finding

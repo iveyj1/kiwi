@@ -221,8 +221,11 @@ def handle_tui_key(
 
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
-    controller = controller or ClientController()
-    curses.wrapper(_run_curses, controller, config or load_config())
+    config = config or load_config()
+    controller = controller or ClientController(allow_live_default=config.live.allow_live)
+    if controller is not None:
+        controller.allow_live_default = config.live.allow_live
+    curses.wrapper(_run_curses, controller, config)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -236,7 +239,8 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for the curses TUI."""
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    run_tui(ClientController(), config=load_config(args.config))
+    config = load_config(args.config)
+    run_tui(ClientController(allow_live_default=config.live.allow_live), config=config)
     return 0
 
 

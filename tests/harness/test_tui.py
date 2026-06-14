@@ -59,6 +59,34 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Message: ok" in text
 
 
+class TuiFakeOperations:
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
+        return {"frames": 1, "dry_run": null_sink}
+
+    def record(self, config, *, stop_event=None, status_callback=None):
+        return {"path": str(config.output)}
+
+    def capture(self, config, *, stop_event=None, status_callback=None):
+        return {"path": str(config.output)}
+
+
+def test_tui_command_mode_pb_uses_configured_allow_live(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text("[live]\nallow_live = true\n", encoding="utf-8")
+    config = load_config(config_path)
+    controller = ClientController(operations=TuiFakeOperations(), allow_live_default=config.live.allow_live)
+    state = TuiInputState(mode=InputMode.COMMAND)
+
+    for ch in "pb --null-sink":
+        handle_tui_key(ord(ch), state, controller, config)
+    response, message = handle_tui_key(10, state, controller, config)
+
+    assert response["operation"]["name"] == "play"
+    assert message == ""
+    assert state.mode == InputMode.KEYMAP
+    controller.execute("wait 1")
+
+
 def test_tui_keymap_mode_executes_configured_tune_and_volume_actions(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(

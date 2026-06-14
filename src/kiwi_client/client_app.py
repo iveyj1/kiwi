@@ -151,10 +151,12 @@ class ClientController:
         state: ClientState | None = None,
         operations: ClientOperations | None = None,
         background: BackgroundOperation | None = None,
+        allow_live_default: bool = False,
     ) -> None:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
         self.background = background or BackgroundOperation()
+        self.allow_live_default = allow_live_default
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -371,10 +373,12 @@ class ClientController:
                 positional.append(arg)
         return positional, flags
 
-    @staticmethod
-    def _require_allow_live(flags: set[str], plan_command: str) -> None:
-        if "--allow-live" not in flags:
-            raise ClientCommandError(f"refusing live operation without --allow-live; use `{plan_command}` first")
+    def _require_allow_live(self, flags: set[str], plan_command: str) -> None:
+        if "--allow-live" not in flags and not self.allow_live_default:
+            raise ClientCommandError(
+                "refusing live operation without --allow-live; "
+                f"inspect with `{plan_command}` first, or set [live] allow_live = true in the TUI config"
+            )
 
     def _playback_config(self) -> LiveSndPlaybackConfig:
         return LiveSndPlaybackConfig(
