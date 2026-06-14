@@ -2,20 +2,21 @@
 
 ## Current slice
 
-Goal: Try recording offline by converting the captured SND fixture into a standard mono PCM WAV file.
+Goal: Make fixture-to-WAV recording user-facing with a CLI.
 
 Done criteria:
 
-- Add a recording helper for uncompressed mono SND fixture audio.
-- Use `MSG sample_rate` as WAV sample-rate source, rounded to integer Hz for the WAV header.
-- Validate WAV channel count, sample width, frame rate, frame count, SND frame count, and sequence gaps with pytest.
-- Produce a local WAV artifact from `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl`.
+- Add a `kiwi_client.recorder` CLI entrypoint for converting an SND fixture to WAV.
+- Add a project script entry for fixture-to-WAV conversion.
+- Support JSON summary output for recording metadata.
+- Cover the CLI with pytest using the live-captured 5000 kHz fixture.
+- Produce/refresh the local WAV artifact via the CLI.
 
 Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
 
 Live-radio needed: no
 
-Docs to update: `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 

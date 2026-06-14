@@ -55,7 +55,16 @@ Guardrails:
 - compression off for first SND PCM fixture path,
 - no output overwrite unless requested.
 
-Offline fixture-to-WAV recording is available from Python:
+Offline fixture-to-WAV recording is available from the CLI:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.recorder \
+  tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl \
+  recordings/local-snd-5000-am-10khz.wav \
+  --json
+```
+
+Or from Python:
 
 ```bash
 PYTHONPATH=src python3 - <<'PY'

@@ -1,7 +1,7 @@
 from pathlib import Path
 import wave
 
-from kiwi_client.recorder import write_snd_fixture_wav
+from kiwi_client.recorder import main, write_snd_fixture_wav
 
 
 FIXTURE = Path("tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl")
@@ -26,3 +26,15 @@ def test_write_snd_fixture_wav_from_local_capture(tmp_path: Path):
         assert wav.getframerate() == 11999
         assert wav.getnframes() == 20 * 512
         assert len(wav.readframes(wav.getnframes())) == 20 * 512 * 2
+
+
+def test_fixture_to_wav_cli_writes_summary_json(tmp_path: Path, capsys):
+    output = tmp_path / "cli.wav"
+
+    code = main([str(FIXTURE), str(output), "--json"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert '"sample_rate_hz": 11999' in captured.out
+    assert '"frames": 10240' in captured.out
+    assert output.exists()

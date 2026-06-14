@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import struct
 import wave
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from kiwi_client.audio import SndSequenceTracker
@@ -69,3 +71,35 @@ def write_snd_fixture_wav(fixture_path: str | Path, output_path: str | Path) -> 
         snd_frames=snd_frames,
         sequence_gaps=sequence_gaps,
     )
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the fixture-to-WAV recorder CLI parser."""
+    parser = argparse.ArgumentParser(description="Convert an uncompressed mono SND JSONL fixture to WAV")
+    parser.add_argument("fixture", type=Path, help="input KiwiSDR JSONL fixture")
+    parser.add_argument("output", type=Path, help="output WAV path")
+    parser.add_argument("--json", action="store_true", help="print recording summary as JSON")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for fixture-to-WAV recording."""
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    try:
+        result = write_snd_fixture_wav(args.fixture, args.output)
+    except Exception as exc:
+        parser.error(str(exc))
+        return 2
+
+    if args.json:
+        data = asdict(result)
+        data["path"] = str(result.path)
+        print(json.dumps(data, indent=2, sort_keys=True))
+    else:
+        print(result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
