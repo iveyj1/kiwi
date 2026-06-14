@@ -123,6 +123,8 @@ Extended SND status metrics to include rounded sample rate, sequence gap count, 
 
 Added client command aliases for interactive use: `?` for status, `re`, `tu`, `mo`, `fi`, `du`, `fr`, `pb`, `rb`, `cb`, `sp`, `he`, `q`, and `qu`.
 
+Added a two-mode TUI input model. The TUI starts in keymap mode, `:` enters command mode, `Enter` executes and exits command mode, `Esc` clears/exits command mode, and up/down in command mode browse command history for editing.
+
 ## YYYY-MM-DD
 
 ### Finding

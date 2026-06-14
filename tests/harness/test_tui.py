@@ -1,7 +1,9 @@
 from pathlib import Path
 
-from kiwi_client.client_app import ClientState
-from kiwi_client.tui import render_dashboard
+import curses
+
+from kiwi_client.client_app import ClientController, ClientState
+from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_dashboard
 
 
 def test_render_dashboard_includes_persistent_live_state():
@@ -53,6 +55,55 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Last response: state" in text
     assert "Applied to active stream: SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000" in text
     assert "Message: ok" in text
+
+
+def test_tui_command_mode_executes_and_exits_to_keymap():
+    controller = ClientController()
+    state = TuiInputState()
+
+    response, message = handle_tui_key(ord(":"), state, controller)
+    assert response is None
+    assert message == ""
+    assert state.mode == InputMode.COMMAND
+
+    for ch in "tune 7000":
+        handle_tui_key(ord(ch), state, controller)
+    response, message = handle_tui_key(10, state, controller)
+
+    assert response["state"]["frequency_khz"] == 7000.0
+    assert message == ""
+    assert state.mode == InputMode.KEYMAP
+    assert state.command == ""
+    assert state.history == ["tune 7000"]
+
+
+def test_tui_command_mode_escape_clears_command_without_quitting():
+    controller = ClientController()
+    state = TuiInputState(mode=InputMode.COMMAND, command="tune 7000")
+
+    response, message = handle_tui_key(27, state, controller)
+
+    assert response is None
+    assert message == ""
+    assert state.mode == InputMode.KEYMAP
+    assert state.command == ""
+    assert controller.running is True
+
+
+def test_tui_command_history_up_down_selects_command_for_editing():
+    controller = ClientController()
+    state = TuiInputState(mode=InputMode.COMMAND, history=["tune 5000", "mode am -5000 5000"])
+
+    handle_tui_key(curses.KEY_UP, state, controller)
+    assert state.command == "mode am -5000 5000"
+    handle_tui_key(curses.KEY_UP, state, controller)
+    assert state.command == "tune 5000"
+    handle_tui_key(curses.KEY_DOWN, state, controller)
+    assert state.command == "mode am -5000 5000"
+
+    handle_tui_key(ord(" "), state, controller)
+    handle_tui_key(ord("#"), state, controller)
+    assert state.command == "mode am -5000 5000 #"
 
 
 def test_tui_module_has_python_m_entrypoint():

@@ -18,6 +18,14 @@ Run the curses TUI:
 PYTHONPATH=src python3 -m kiwi_client.tui
 ```
 
+TUI input has two modes:
+
+- Keymap mode is the default.
+- `:` enters command mode.
+- In command mode, `Enter` executes the command and returns to keymap mode.
+- In command mode, `Esc` clears the command and returns to keymap mode.
+- In command mode, up/down arrows browse command history; the selected command is placed in the prompt for editing.
+
 or, after installing the package scripts:
 
 ```bash

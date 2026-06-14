@@ -7,10 +7,28 @@ ClientController commands so it does not duplicate protocol/audio behavior.
 from __future__ import annotations
 
 import curses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, available_commands
+
+
+class InputMode(Enum):
+    """TUI input modes."""
+
+    KEYMAP = "keymap"
+    COMMAND = "command"
+
+
+@dataclass
+class TuiInputState:
+    """Mutable command/keymap input state for the curses runner."""
+
+    mode: InputMode = InputMode.KEYMAP
+    command: str = ""
+    history: list[str] = field(default_factory=list)
+    history_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +102,69 @@ def render_dashboard(
     return "\n".join(lines)
 
 
+def handle_tui_key(
+    ch: int,
+    input_state: TuiInputState,
+    controller: ClientController,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Handle one curses key and return an optional response/message."""
+    if input_state.mode == InputMode.KEYMAP:
+        if ch == ord(":"):
+            input_state.mode = InputMode.COMMAND
+            input_state.command = ""
+            input_state.history_index = None
+            return None, ""
+        if ch in (27,):
+            controller.running = False
+            return None, ""
+        return None, None
+
+    if ch in (27,):
+        input_state.mode = InputMode.KEYMAP
+        input_state.command = ""
+        input_state.history_index = None
+        return None, ""
+    if ch in (curses.KEY_BACKSPACE, 127, 8):
+        input_state.command = input_state.command[:-1]
+        input_state.history_index = None
+        return None, None
+    if ch == curses.KEY_UP:
+        if input_state.history:
+            if input_state.history_index is None:
+                input_state.history_index = len(input_state.history) - 1
+            else:
+                input_state.history_index = max(0, input_state.history_index - 1)
+            input_state.command = input_state.history[input_state.history_index]
+        return None, None
+    if ch == curses.KEY_DOWN:
+        if input_state.history and input_state.history_index is not None:
+            if input_state.history_index >= len(input_state.history) - 1:
+                input_state.history_index = None
+                input_state.command = ""
+            else:
+                input_state.history_index += 1
+                input_state.command = input_state.history[input_state.history_index]
+        return None, None
+    if ch in (10, 13):
+        command = input_state.command.strip()
+        input_state.command = ""
+        input_state.history_index = None
+        input_state.mode = InputMode.KEYMAP
+        if not command:
+            return None, ""
+        input_state.history.append(command)
+        if command == "help":
+            return {"type": "help", "commands": available_commands()}, ""
+        try:
+            return controller.execute(command), ""
+        except ClientCommandError as exc:
+            return None, f"error: {exc}"
+    if 0 <= ch < 256:
+        input_state.command += chr(ch)
+        input_state.history_index = None
+    return None, None
+
+
 def run_tui(controller: ClientController | None = None) -> None:
     """Run a small curses command UI."""
     controller = controller or ClientController()
@@ -100,8 +181,8 @@ def _run_curses(stdscr, controller: ClientController) -> None:
     curses.curs_set(1)
     stdscr.timeout(250)
     last_response: dict[str, Any] | None = None
-    message = "Type 'help' for commands. Use explicit --allow-live for live operations."
-    command = ""
+    message = "Keymap mode. Press ':' for commands. Use explicit --allow-live for live operations."
+    input_state = TuiInputState()
 
     while controller.running:
         stdscr.erase()
@@ -114,29 +195,18 @@ def _run_curses(stdscr, controller: ClientController) -> None:
         height, width = stdscr.getmaxyx()
         for row, line in enumerate(dashboard.splitlines()[: max(0, height - 3)]):
             stdscr.addnstr(row, 0, line, max(0, width - 1))
-        prompt = "kiwi> "
-        stdscr.addnstr(height - 2, 0, prompt + command, max(0, width - 1))
+        prompt = ":" if input_state.mode == InputMode.COMMAND else "keymap (: command)> "
+        stdscr.addnstr(height - 2, 0, prompt + input_state.command, max(0, width - 1))
         stdscr.refresh()
 
         ch = stdscr.getch()
         if ch == -1:
             continue
-        if ch in (10, 13):
-            try:
-                if command.strip() == "help":
-                    last_response = {"type": "help", "commands": available_commands()}
-                else:
-                    last_response = controller.execute(command)
-                message = ""
-            except ClientCommandError as exc:
-                message = f"error: {exc}"
-            command = ""
-        elif ch in (27,):  # ESC
-            controller.running = False
-        elif ch in (curses.KEY_BACKSPACE, 127, 8):
-            command = command[:-1]
-        elif 0 <= ch < 256:
-            command += chr(ch)
+        response, new_message = handle_tui_key(ch, input_state, controller)
+        if response is not None:
+            last_response = response
+        if new_message is not None:
+            message = new_message
 
 
 if __name__ == "__main__":
