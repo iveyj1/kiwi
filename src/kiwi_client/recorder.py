@@ -9,7 +9,7 @@ import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from kiwi_client.audio import SndSequenceTracker
+from kiwi_client.audio import SndSequenceTracker, has_adc_overflow
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
@@ -37,6 +37,10 @@ class SndWavRecorder:
         self.pcm = bytearray()
         self.snd_frames = 0
         self.sequence_gaps = 0
+        self.adc_overflows = 0
+        self.last_smeter: int | None = None
+        self.last_rssi_db: float | None = None
+        self.last_snd_seq: int | None = None
 
     def add_msg(self, text: str) -> None:
         """Apply one Kiwi MSG event to the recording state."""
@@ -48,9 +52,28 @@ class SndWavRecorder:
         status = self.tracker.observe(frame)
         if status.missing_count:
             self.sequence_gaps += status.missing_count
+        if has_adc_overflow(frame):
+            self.adc_overflows += 1
         self.snd_frames += 1
+        self.last_smeter = frame.smeter
+        self.last_rssi_db = frame.rssi_db
+        self.last_snd_seq = frame.seq
         for sample in frame.samples:
             self.pcm.extend(struct.pack("<h", sample))
+
+    def status_metrics(self) -> dict:
+        """Return latest JSON-serializable SND status metrics for a live recording."""
+        metrics = {
+            "smeter": self.last_smeter,
+            "rssi_db": self.last_rssi_db,
+            "snd_seq": self.last_snd_seq,
+            "snd_frames": self.snd_frames,
+            "sequence_gaps": self.sequence_gaps,
+            "adc_overflows": self.adc_overflows,
+        }
+        if self.state.sample_rate is not None:
+            metrics["sample_rate_hz"] = int(round(self.state.sample_rate))
+        return {key: value for key, value in metrics.items() if value is not None}
 
     @property
     def sample_rate_hz(self) -> int:

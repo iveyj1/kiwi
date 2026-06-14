@@ -14,12 +14,14 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from threading import Event
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
+from kiwi_client.audio import SndMetricsTracker
 from kiwi_client.capture import JsonlCaptureWriter, SndCaptureMetadata
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
-from kiwi_client.protocol import parse_msg
+from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
 
 LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
@@ -122,7 +124,13 @@ def _capture_metadata(config: LiveSndCaptureConfig) -> SndCaptureMetadata:
     )
 
 
-async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = False) -> Path:
+async def capture_live_snd(
+    config: LiveSndCaptureConfig,
+    *,
+    allow_live: bool = False,
+    stop_event: Event | None = None,
+    status_callback: Callable[[dict], None] | None = None,
+) -> Path:
     """Run one guarded live SND capture and write a JSONL fixture.
 
     This function performs network I/O only when `allow_live=True` and all
@@ -151,10 +159,13 @@ async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = F
         await websocket.send(auth_command)
 
         state = ReceiverState()
+        metrics_tracker = SndMetricsTracker()
         sent_ar_ok = False
         sent_setup = False
 
         while frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+            if stop_event is not None and stop_event.is_set():
+                break
             remaining = config.duration_seconds - (time.monotonic() - start)
             if remaining <= 0:
                 break
@@ -176,6 +187,9 @@ async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = F
                     writer.add_rx_binary(t, payload)
                     if payload.startswith(b"SND"):
                         frames += 1
+                        if status_callback is not None:
+                            frame = parse_snd_uncompressed_mono(payload)
+                            status_callback(metrics_tracker.observe(frame, sample_rate=state.sample_rate))
                     continue
 
             params = parse_msg(text).params

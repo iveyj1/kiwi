@@ -39,7 +39,7 @@ def render_dashboard(
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
-        "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, stop, record, capture, help, quit",
+        "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, record-bg, capture-bg, stop, help, quit",
     ]
     if operation is not None:
         lines.extend([
@@ -49,6 +49,24 @@ def render_dashboard(
             f"Stop requested: {'yes' if operation.get('stop_requested') else 'no'}",
             f"Elapsed: {operation.get('elapsed_seconds', 0.0):.1f}s",
         ])
+        metrics = operation.get("metrics") or {}
+        if metrics:
+            rssi = metrics.get("rssi_db")
+            smeter = metrics.get("smeter")
+            frames = metrics.get("snd_frames")
+            if rssi is not None and smeter is not None:
+                lines.append(f"RSSI/S-meter: {rssi:.1f} dB / {smeter}")
+            if frames is not None:
+                lines.append(f"SND frames: {frames}")
+            sample_rate = metrics.get("sample_rate_hz")
+            if sample_rate is not None:
+                lines.append(f"Sample rate: {sample_rate} Hz")
+            sequence_gaps = metrics.get("sequence_gaps")
+            if sequence_gaps is not None:
+                lines.append(f"Sequence gaps: {sequence_gaps}")
+            adc_overflows = metrics.get("adc_overflows")
+            if adc_overflows is not None:
+                lines.append(f"ADC overflows: {adc_overflows}")
         if operation.get("result"):
             lines.append(f"Operation result: {operation['result']}")
         if operation.get("error"):
@@ -80,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run_curses(stdscr, controller: ClientController) -> None:
     curses.curs_set(1)
+    stdscr.timeout(250)
     last_response: dict[str, Any] | None = None
     message = "Type 'help' for commands. Use explicit --allow-live for live operations."
     command = ""
@@ -100,6 +119,8 @@ def _run_curses(stdscr, controller: ClientController) -> None:
         stdscr.refresh()
 
         ch = stdscr.getch()
+        if ch == -1:
+            continue
         if ch in (10, 13):
             try:
                 if command.strip() == "help":

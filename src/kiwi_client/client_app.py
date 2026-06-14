@@ -22,7 +22,7 @@ from kiwi_client.commands import encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
-from kiwi_client.live_worker import BackgroundOperation
+from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
 
 
@@ -69,11 +69,24 @@ class ClientOperations(Protocol):
         null_sink: bool,
         stop_event: Event | None = None,
         command_queue: queue.Queue[str] | None = None,
+        status_callback: StatusCallback | None = None,
     ) -> dict[str, Any]: ...
 
-    def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]: ...
+    def record(
+        self,
+        config: LiveSndWavRecordConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]: ...
 
-    def capture(self, config: LiveSndCaptureConfig) -> dict[str, Any]: ...
+    def capture(
+        self,
+        config: LiveSndCaptureConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class LiveClientOperations:
@@ -86,6 +99,7 @@ class LiveClientOperations:
         null_sink: bool,
         stop_event: Event | None = None,
         command_queue: queue.Queue[str] | None = None,
+        status_callback: StatusCallback | None = None,
     ) -> dict[str, Any]:
         sink = NullAudioSink() if null_sink else SoundDeviceSink()
         result = asyncio.run(
@@ -96,20 +110,35 @@ class LiveClientOperations:
                 dry_run=null_sink,
                 stop_event=stop_event,
                 command_queue=command_queue,
+                status_callback=status_callback,
             )
         )
         data = asdict(result)
         data["path"] = str(result.path)
         return data
 
-    def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]:
-        result = asyncio.run(record_live_snd_wav(config, allow_live=True))
+    def record(
+        self,
+        config: LiveSndWavRecordConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]:
+        result = asyncio.run(
+            record_live_snd_wav(config, allow_live=True, stop_event=stop_event, status_callback=status_callback)
+        )
         data = asdict(result)
         data["path"] = str(result.path)
         return data
 
-    def capture(self, config: LiveSndCaptureConfig) -> dict[str, Any]:
-        path = asyncio.run(capture_live_snd(config, allow_live=True))
+    def capture(
+        self,
+        config: LiveSndCaptureConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]:
+        path = asyncio.run(capture_live_snd(config, allow_live=True, stop_event=stop_event, status_callback=status_callback))
         return {"path": str(path)}
 
 
@@ -204,11 +233,12 @@ class ClientController:
             null_sink = "--null-sink" in flags
             status = self.background.start(
                 "play",
-                lambda stop_event, command_queue: self.operations.play(
+                lambda stop_event, command_queue, status_callback: self.operations.play(
                     config,
                     null_sink=null_sink,
                     stop_event=stop_event,
                     command_queue=command_queue,
+                    status_callback=status_callback,
                 ),
             )
             return {"type": "operation-status", "operation": status.as_dict()}
@@ -229,6 +259,20 @@ class ClientController:
                 "type": "record",
                 "result": self.operations.record(self._record_config(Path(positional[0]), overwrite="--overwrite" in flags)),
             }
+        if command == "record-bg":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
+            self._require_arg_count(positional, 1, "record-bg <output.wav> --allow-live [--overwrite]")
+            self._require_allow_live(flags, "record-plan <output.wav>")
+            config = self._record_config(Path(positional[0]), overwrite="--overwrite" in flags)
+            status = self.background.start(
+                "record",
+                lambda stop_event, command_queue, status_callback: self.operations.record(
+                    config,
+                    stop_event=stop_event,
+                    status_callback=status_callback,
+                ),
+            )
+            return {"type": "operation-status", "operation": status.as_dict()}
         if command == "capture":
             positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
             self._require_arg_count(positional, 1, "capture <output.jsonl> --allow-live [--overwrite]")
@@ -237,6 +281,20 @@ class ClientController:
                 "type": "capture",
                 "result": self.operations.capture(self._capture_config(Path(positional[0]), overwrite="--overwrite" in flags)),
             }
+        if command == "capture-bg":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
+            self._require_arg_count(positional, 1, "capture-bg <output.jsonl> --allow-live [--overwrite]")
+            self._require_allow_live(flags, "capture-plan <output.jsonl>")
+            config = self._capture_config(Path(positional[0]), overwrite="--overwrite" in flags)
+            status = self.background.start(
+                "capture",
+                lambda stop_event, command_queue, status_callback: self.operations.capture(
+                    config,
+                    stop_event=stop_event,
+                    status_callback=status_callback,
+                ),
+            )
+            return {"type": "operation-status", "operation": status.as_dict()}
         raise ClientCommandError(f"unknown command: {command}")
 
     def _with_receiver(self, value: str) -> ClientState:
@@ -253,6 +311,9 @@ class ClientController:
             self.state.high_cut_hz,
             self.state.frequency_khz,
         )
+        current_status = self.background.status()
+        if not current_status.running or current_status.name != "play":
+            return response
         try:
             status = self.background.send_command(command)
         except RuntimeError:
@@ -348,8 +409,10 @@ def available_commands() -> list[str]:
         "operation-status",
         "record-plan <output.wav>",
         "record <output.wav> --allow-live [--overwrite]",
+        "record-bg <output.wav> --allow-live [--overwrite]",
         "capture-plan <output.jsonl>",
         "capture <output.jsonl> --allow-live [--overwrite]",
+        "capture-bg <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
     ]

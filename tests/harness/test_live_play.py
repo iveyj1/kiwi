@@ -26,8 +26,9 @@ def _config() -> LiveSndPlaybackConfig:
 def test_play_replay_snd_feeds_null_sink_from_live_fixture():
     transport = ReplayTransport(load_jsonl_events(FIXTURE))
     sink = NullAudioSink()
+    metrics = []
 
-    result = play_replay_snd(transport, sink, config=_config())
+    result = play_replay_snd(transport, sink, config=_config(), status_callback=metrics.append)
 
     assert transport.done
     assert result.sample_rate_hz == 11999
@@ -38,6 +39,14 @@ def test_play_replay_snd_feeds_null_sink_from_live_fixture():
     assert sink.started
     assert sink.stopped
     assert sink.chunks == 20
+    assert len(metrics) == 20
+    assert metrics[-1]["snd_seq"] == 20
+    assert metrics[-1]["snd_frames"] == 20
+    assert metrics[-1]["sample_rate_hz"] == 11999
+    assert metrics[-1]["sequence_gaps"] == 0
+    assert metrics[-1]["adc_overflows"] == 0
+    assert "rssi_db" in metrics[-1]
+    assert "smeter" in metrics[-1]
 
 
 def test_live_play_allows_about_one_minute():

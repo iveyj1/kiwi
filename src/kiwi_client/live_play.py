@@ -14,8 +14,9 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event
-from typing import Any
+from typing import Any, Callable
 
+from kiwi_client.audio import SndMetricsTracker
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
 from kiwi_client.live_capture import (
     LOCAL_RECEIVERS,
@@ -102,7 +103,15 @@ def _commands_after_msg(state: ReceiverState, sent_ar_ok: bool, sent_setup: bool
     return commands, sent_ar_ok, sent_setup
 
 
-def _write_snd_to_sink(payload: bytes, sink: AudioSink, state: ReceiverState, sink_started: bool) -> tuple[bool, int, int]:
+def _write_snd_to_sink(
+    payload: bytes,
+    sink: AudioSink,
+    state: ReceiverState,
+    sink_started: bool,
+    *,
+    status_callback: Callable[[dict], None] | None = None,
+    metrics_tracker: SndMetricsTracker | None = None,
+) -> tuple[bool, int, int]:
     frame = parse_snd_uncompressed_mono(payload)
     if state.sample_rate is None:
         raise LiveCaptureError("received SND before MSG sample_rate")
@@ -111,10 +120,22 @@ def _write_snd_to_sink(payload: bytes, sink: AudioSink, state: ReceiverState, si
         sink_started = True
     pcm = samples_to_pcm16le(frame.samples)
     sink.write(pcm)
+    if status_callback is not None:
+        if metrics_tracker is None:
+            status_callback({"smeter": frame.smeter, "rssi_db": frame.rssi_db, "snd_seq": frame.seq})
+        else:
+            status_callback(metrics_tracker.observe(frame, sample_rate=state.sample_rate))
     return sink_started, len(frame.samples), len(pcm)
 
 
-def play_replay_snd(transport: ReplayTransport, sink: AudioSink, *, config: LiveSndPlaybackConfig, dry_run: bool = True) -> PlaybackResult:
+def play_replay_snd(
+    transport: ReplayTransport,
+    sink: AudioSink,
+    *,
+    config: LiveSndPlaybackConfig,
+    dry_run: bool = True,
+    status_callback: Callable[[dict], None] | None = None,
+) -> PlaybackResult:
     """Play a strict replayed SND fixture through an AudioSink."""
     state = ReceiverState()
     sink_started = False
@@ -123,6 +144,7 @@ def play_replay_snd(transport: ReplayTransport, sink: AudioSink, *, config: Live
     snd_frames = 0
     total_frames = 0
     bytes_written = 0
+    metrics_tracker = SndMetricsTracker()
 
     transport.send(encode_auth())
     while not transport.done and snd_frames < config.max_frames:
@@ -133,7 +155,14 @@ def play_replay_snd(transport: ReplayTransport, sink: AudioSink, *, config: Live
             for command in commands:
                 transport.send(command)
         elif event.type == "binary" and event.payload is not None:
-            sink_started, frames, byte_count = _write_snd_to_sink(event.payload, sink, state, sink_started)
+            sink_started, frames, byte_count = _write_snd_to_sink(
+                event.payload,
+                sink,
+                state,
+                sink_started,
+                status_callback=status_callback,
+                metrics_tracker=metrics_tracker,
+            )
             snd_frames += 1
             total_frames += frames
             bytes_written += byte_count
@@ -159,6 +188,7 @@ async def play_live_snd(
     dry_run: bool = False,
     stop_event: Event | None = None,
     command_queue: queue.Queue[str] | None = None,
+    status_callback: Callable[[dict], None] | None = None,
 ) -> PlaybackResult:
     """Run one guarded live SND playback session."""
     config.validate()
@@ -176,6 +206,7 @@ async def play_live_snd(
     snd_frames = 0
     total_frames = 0
     bytes_written = 0
+    metrics_tracker = SndMetricsTracker()
     start = time.monotonic()
 
     async with websockets.connect(
@@ -208,7 +239,14 @@ async def play_live_snd(
                     if payload.startswith(b"MSG"):
                         state = state.apply_msg_params(parse_msg(payload).params)
                     else:
-                        sink_started, frames, byte_count = _write_snd_to_sink(payload, sink, state, sink_started)
+                        sink_started, frames, byte_count = _write_snd_to_sink(
+                            payload,
+                            sink,
+                            state,
+                            sink_started,
+                            status_callback=status_callback,
+                            metrics_tracker=metrics_tracker,
+                        )
                         snd_frames += 1
                         total_frames += frames
                         bytes_written += byte_count

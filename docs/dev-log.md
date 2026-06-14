@@ -117,6 +117,10 @@ Added a command queue to background operations and wired live playback to drain 
 
 Added `wait [seconds]` to the client shell for scripts/TUI to wait for background operation completion/status. A short local null-sink script verified the background playback queue path: start at 5000 kHz AM, queue `tune 7000`, wait, stop, and wait for completion. The operation processed 18 SND frames and stopped cleanly.
 
+Added live operation metrics to `BackgroundOperation` status and wired playback/record/capture SND frame paths to publish latest `rssi_db`, raw `smeter`, `snd_seq`, and frame count where available. Added `record-bg <output.wav> --allow-live [--overwrite]` and `capture-bg <output.jsonl> --allow-live [--overwrite]`, both using cooperative stop. The TUI dashboard now displays a simple latest RSSI/S-meter and SND frame count when metrics are present. Harness coverage validates background record/capture commands and dashboard rendering without receiver access.
+
+Extended SND status metrics to include rounded sample rate, sequence gap count, and ADC overflow count. Playback uses `SndMetricsTracker`; recording exposes `SndWavRecorder.status_metrics()`; capture uses the same metrics tracker. The curses TUI now sets a 250 ms input timeout and redraws on timeout, so RSSI/status/error updates appear without keyboard input. Harness tests cover metric fields and the periodic timeout behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

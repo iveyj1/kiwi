@@ -12,7 +12,8 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from threading import Event
+from typing import Any, Callable
 
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
 from kiwi_client.live_capture import (
@@ -125,7 +126,13 @@ def record_replay_snd_wav(transport: ReplayTransport, output: str | Path, *, con
     return recorder.write_wav(output)
 
 
-async def record_live_snd_wav(config: LiveSndWavRecordConfig, *, allow_live: bool = False) -> WavRecordingResult:
+async def record_live_snd_wav(
+    config: LiveSndWavRecordConfig,
+    *,
+    allow_live: bool = False,
+    stop_event: Event | None = None,
+    status_callback: Callable[[dict], None] | None = None,
+) -> WavRecordingResult:
     """Run one guarded live SND-to-WAV recording."""
     config.validate()
     if not allow_live:
@@ -148,6 +155,8 @@ async def record_live_snd_wav(config: LiveSndWavRecordConfig, *, allow_live: boo
     ) as websocket:
         await websocket.send(encode_auth())
         while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+            if stop_event is not None and stop_event.is_set():
+                break
             remaining = config.duration_seconds - (time.monotonic() - start)
             if remaining <= 0:
                 break
@@ -167,6 +176,8 @@ async def record_live_snd_wav(config: LiveSndWavRecordConfig, *, allow_live: boo
                     recorder.add_snd_payload(payload)
                     if payload.startswith(b"SND"):
                         snd_frames += 1
+                        if status_callback is not None:
+                            status_callback(recorder.status_metrics())
                     continue
 
             commands, sent_ar_ok, should_send_setup = _session_command_state(recorder, sent_ar_ok, sent_setup)

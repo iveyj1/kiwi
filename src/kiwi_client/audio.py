@@ -50,3 +50,34 @@ class SndSequenceTracker:
 def has_adc_overflow(frame: SndAudioFrame) -> bool:
     """Return true when the SND frame flags report ADC overflow."""
     return bool(frame.flags & SND_FLAG_ADC_OVFL)
+
+
+class SndMetricsTracker:
+    """Track latest SND status metrics for user-facing operation status."""
+
+    def __init__(self) -> None:
+        self.sequence = SndSequenceTracker()
+        self.snd_frames = 0
+        self.sequence_gaps = 0
+        self.adc_overflows = 0
+
+    def observe(self, frame: SndAudioFrame, *, sample_rate: float | None = None) -> dict:
+        """Observe one SND frame and return a JSON-serializable metrics snapshot."""
+        status = self.sequence.observe(frame)
+        self.snd_frames += 1
+        if status.missing_count:
+            self.sequence_gaps += status.missing_count
+        if has_adc_overflow(frame):
+            self.adc_overflows += 1
+
+        metrics = {
+            "smeter": frame.smeter,
+            "rssi_db": frame.rssi_db,
+            "snd_seq": frame.seq,
+            "snd_frames": self.snd_frames,
+            "sequence_gaps": self.sequence_gaps,
+            "adc_overflows": self.adc_overflows,
+        }
+        if sample_rate is not None:
+            metrics["sample_rate_hz"] = int(round(sample_rate))
+        return metrics

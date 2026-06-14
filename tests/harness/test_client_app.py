@@ -11,8 +11,8 @@ class FakeOperations:
     def __init__(self):
         self.calls = []
 
-    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None):
-        self.calls.append(("play", config, null_sink, stop_event, command_queue))
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
+        self.calls.append(("play", config, null_sink, stop_event, command_queue, status_callback))
         commands = []
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
@@ -25,15 +25,29 @@ class FakeOperations:
                 if stop_event.is_set() and (command_queue is None or command_queue.empty()):
                     break
                 time.sleep(0.01)
+        if status_callback is not None:
+            status_callback({"smeter": 850, "rssi_db": -42.0, "snd_frames": 1})
         return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set()), "commands": commands}
 
-    def record(self, config):
-        self.calls.append(("record", config))
-        return {"path": str(config.output), "frames": 2048}
+    def record(self, config, *, stop_event=None, status_callback=None):
+        self.calls.append(("record", config, stop_event, status_callback))
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        if status_callback is not None:
+            status_callback({"smeter": 760, "rssi_db": -51.0, "snd_frames": 2})
+        return {"path": str(config.output), "frames": 2048, "stopped": bool(stop_event and stop_event.is_set())}
 
-    def capture(self, config):
-        self.calls.append(("capture", config))
-        return {"path": str(config.output)}
+    def capture(self, config, *, stop_event=None, status_callback=None):
+        self.calls.append(("capture", config, stop_event, status_callback))
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        if status_callback is not None:
+            status_callback({"smeter": 770, "rssi_db": -50.0, "snd_frames": 3})
+        return {"path": str(config.output), "stopped": bool(stop_event and stop_event.is_set())}
 
 
 def test_client_controller_status_and_state_changes():
@@ -163,6 +177,44 @@ def test_tune_mode_filter_queue_commands_to_active_background_playback():
     ]
 
 
+def test_client_record_bg_and_capture_bg_stop_with_metrics():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    record_started = controller.execute("record-bg recordings/bg.wav --allow-live --overwrite")
+    assert record_started["operation"]["running"] is True
+    controller.execute("stop")
+    record_final = controller.execute("wait 2")["operation"]
+
+    assert record_final["running"] is False
+    assert record_final["result"]["path"] == "recordings/bg.wav"
+    assert record_final["result"]["stopped"] is True
+    assert record_final["metrics"] == {"smeter": 760, "rssi_db": -51.0, "snd_frames": 2}
+
+    capture_started = controller.execute("capture-bg tests/fixtures/kiwi/bg.jsonl --allow-live --overwrite")
+    assert capture_started["operation"]["running"] is True
+    controller.execute("stop")
+    capture_final = controller.execute("wait 2")["operation"]
+
+    assert capture_final["running"] is False
+    assert capture_final["result"]["path"] == "tests/fixtures/kiwi/bg.jsonl"
+    assert capture_final["result"]["stopped"] is True
+    assert capture_final["metrics"] == {"smeter": 770, "rssi_db": -50.0, "snd_frames": 3}
+
+
+def test_tune_does_not_report_active_command_during_background_record():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("record-bg recordings/bg.wav --allow-live --overwrite")
+    tuned = controller.execute("tune 7000")
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert tuned["type"] == "state"
+    assert "active_command" not in tuned
+
+
 def test_client_refuses_live_operations_without_allow_live():
     controller = ClientController(operations=FakeOperations())
 
@@ -172,6 +224,10 @@ def test_client_refuses_live_operations_without_allow_live():
         controller.execute("record recordings/x.wav")
     with pytest.raises(ClientCommandError, match="without --allow-live"):
         controller.execute("capture tests/fixtures/kiwi/x.jsonl")
+    with pytest.raises(ClientCommandError, match="without --allow-live"):
+        controller.execute("record-bg recordings/x.wav")
+    with pytest.raises(ClientCommandError, match="without --allow-live"):
+        controller.execute("capture-bg tests/fixtures/kiwi/x.jsonl")
 
 
 def test_client_rejects_bad_command():

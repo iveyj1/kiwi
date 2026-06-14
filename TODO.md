@@ -2,15 +2,14 @@
 
 ## Current slice
 
-Goal: Deliver tune/mode/filter changes to active background playback sessions.
+Goal: Add richer live status metrics and make the TUI refresh status periodically without requiring keypresses.
 
 Done criteria:
 
-- Add a command queue to the background operation worker.
-- Wire live playback to drain queued control commands after initial SND setup.
-- Queue `SET mod=...` when `tune`, `mode`, or `filter` changes while background playback is active.
-- Show the queued/applied active command in the TUI dashboard response.
-- Cover command queue behavior and active retune/mode/filter command generation with pytest.
+- Publish sample rate, sequence gap count, ADC overflow, SND frame count, and latest RSSI/S-meter metrics from live playback/record/capture paths where available.
+- Show sample rate, sequence gaps, ADC overflow, RSSI/S-meter, SND frames, operation result, and operation error in the TUI dashboard.
+- Make the curses TUI redraw periodically so RSSI/status/error changes appear without keyboard input.
+- Cover status metrics and dashboard rendering with pytest.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 

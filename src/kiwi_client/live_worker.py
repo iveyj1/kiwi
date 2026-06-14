@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+StatusCallback = Callable[[dict], None]
+
 
 @dataclass(frozen=True)
 class OperationStatus:
@@ -20,6 +22,7 @@ class OperationStatus:
     finished_at: float | None
     result: dict | None
     error: str | None
+    metrics: dict | None = None
 
     @property
     def elapsed_seconds(self) -> float:
@@ -38,6 +41,7 @@ class OperationStatus:
             "elapsed_seconds": self.elapsed_seconds,
             "result": self.result,
             "error": self.error,
+            "metrics": self.metrics,
         }
 
 
@@ -54,8 +58,9 @@ class BackgroundOperation:
         self._finished_at: float | None = None
         self._result: dict | None = None
         self._error: str | None = None
+        self._metrics: dict | None = None
 
-    def start(self, name: str, target: Callable[[threading.Event, queue.Queue[str]], dict]) -> OperationStatus:
+    def start(self, name: str, target: Callable[[threading.Event, queue.Queue[str], StatusCallback], dict]) -> OperationStatus:
         """Start an operation in the background."""
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
@@ -67,6 +72,7 @@ class BackgroundOperation:
             self._finished_at = None
             self._result = None
             self._error = None
+            self._metrics = None
             self._thread = threading.Thread(target=self._run, args=(target,), daemon=True)
             self._thread.start()
             return self.status()
@@ -96,6 +102,7 @@ class BackgroundOperation:
             finished_at=self._finished_at,
             result=self._result,
             error=self._error,
+            metrics=self._metrics,
         )
 
     def join(self, timeout: float | None = None) -> OperationStatus:
@@ -105,9 +112,16 @@ class BackgroundOperation:
             thread.join(timeout)
         return self.status()
 
-    def _run(self, target: Callable[[threading.Event, queue.Queue[str]], dict]) -> None:
+    def update_metrics(self, metrics: dict) -> None:
+        """Merge live operation metrics into status."""
+        with self._lock:
+            current = dict(self._metrics or {})
+            current.update(metrics)
+            self._metrics = current
+
+    def _run(self, target: Callable[[threading.Event, queue.Queue[str], StatusCallback], dict]) -> None:
         try:
-            result = target(self._stop_event, self._command_queue)
+            result = target(self._stop_event, self._command_queue, self.update_metrics)
             with self._lock:
                 self._result = result
         except Exception as exc:  # pragma: no cover - defensive status path

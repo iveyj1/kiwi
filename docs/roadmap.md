@@ -191,14 +191,17 @@ Current capabilities:
 - Operation execution is dependency-injected so shell behavior is harness-testable without receiver/audio access.
 - A testable text dashboard renderer and thin curses TUI runner are available via `--tui` or `kiwi-tui`.
 - Background playback can be started with `play-bg --allow-live [--null-sink]`; `stop` requests cooperative shutdown and `operation-status` reports progress/result/error state.
+- Background recording and fixture capture can be started with `record-bg <output.wav> --allow-live [--overwrite]` and `capture-bg <output.jsonl> --allow-live [--overwrite]`.
 - TUI dashboard shows current background operation status.
+- Live SND operations publish latest RSSI/S-meter, sample-rate, SND frame, sequence-gap, and ADC-overflow metrics into operation status; the TUI dashboard displays those metrics when available.
+- The curses TUI redraws periodically, so changing RSSI/status/error information appears without waiting for a keypress.
 - `tune`, `mode`, and `filter` changes during active background playback queue `SET mod=...` commands to the live playback WebSocket after initial setup.
 
 Remaining capabilities needed:
 
-- Fuller persistent session lifecycle beyond background playback.
-- Confirm/document live retune behavior with a short receiver test.
-- Live status updates: sample rate, RSSI, sequence gaps, receiver errors.
+- Fuller persistent session lifecycle beyond background operations.
+- Confirm/document live retune and background record/capture behavior with short receiver tests.
+- Richer live status updates: receiver-side errors, explicit command sent/ack counters, and more polished meter widgets.
 - Richer TUI controls and status panes.
 
 Shape notes:

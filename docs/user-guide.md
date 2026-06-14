@@ -67,8 +67,10 @@ Supported commands:
 - `operation-status`
 - `record-plan <output.wav>`
 - `record <output.wav> --allow-live [--overwrite]`
+- `record-bg <output.wav> --allow-live [--overwrite]`
 - `capture-plan <output.jsonl>`
 - `capture <output.jsonl> --allow-live [--overwrite]`
+- `capture-bg <output.jsonl> --allow-live [--overwrite]`
 - `help`
 - `quit`
 
@@ -77,7 +79,7 @@ Current limitations:
 - `connect` and `disconnect` only update client state for now.
 - Live operations from the shell require explicit `--allow-live`.
 - TUI is an initial curses command/dashboard shell, not a full SDR interface yet.
-- No live RSSI/sample-rate/status stream yet.
+- RSSI/S-meter display is a simple latest-value readout from SND frames, not a calibrated meter widget.
 - `connect` is not a continuously open retunable WebSocket session yet.
 
 Example shell commands for persistent live settings and guarded execution:
@@ -100,6 +102,22 @@ stop
 wait 2
 operation-status
 ```
+
+Example background record/capture from the shell/TUI:
+
+```text
+record-bg recordings/client-5000-am.wav --allow-live --overwrite
+operation-status
+stop
+wait 2
+
+capture-bg tests/fixtures/kiwi/client-5000-am.jsonl --allow-live --overwrite
+operation-status
+stop
+wait 2
+```
+
+While a background SND operation is running, `operation-status` and the TUI dashboard show latest RSSI/S-meter/SND frame metrics after the first SND frame arrives. The dashboard also shows sample rate, sequence gap count, and ADC overflow count when available. The TUI refreshes periodically, so these fields and background operation errors update without requiring a keypress.
 
 During background playback, these parameter changes queue `SET mod=...` to the active playback WebSocket after the initial Kiwi SND setup has completed:
 
