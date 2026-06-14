@@ -91,3 +91,7 @@ def _run_curses(stdscr, controller: ClientController) -> None:
             command = command[:-1]
         elif 0 <= ch < 256:
             command += chr(ch)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

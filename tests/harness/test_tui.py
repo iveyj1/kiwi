@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from kiwi_client.client_app import ClientState
 from kiwi_client.tui import render_dashboard
 
@@ -25,3 +27,10 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Last response: play" in text
     assert "Message: ok" in text
+
+
+def test_tui_module_has_python_m_entrypoint():
+    source = Path("src/kiwi_client/tui.py").read_text(encoding="utf-8")
+
+    assert 'if __name__ == "__main__"' in source
+    assert "raise SystemExit(main())" in source
