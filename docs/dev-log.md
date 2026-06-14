@@ -131,6 +131,8 @@ Added controller commands `tune-step`, `volume`, and `volume-step`. TUI keymap m
 
 Added `[live] allow_live = false` to the TOML config schema. When a TUI config explicitly sets `allow_live = true`, controller live-operation guard checks accept commands like `:pb --null-sink` without requiring `--allow-live` each time. The default remains guarded.
 
+Hardened TUI key handling for modified arrow escape sequences. Known curses shift-left/shift-right codes map to configured `shift-left`/`shift-right`; unknown modified-key/escape inputs are ignored in keymap mode instead of exiting or becoming bogus control-key names. Added TOML live limit settings (`duration_seconds`, `max_frames`, `0` = unlimited) and receiver policy settings (`[receivers] restricted`, `allowed`). TUI-created controllers now apply configured live limits and receiver policy to play/record/capture configs.
+
 ## YYYY-MM-DD
 
 ### Finding

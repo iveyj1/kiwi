@@ -2,18 +2,21 @@
 
 ## Current slice
 
-Goal: Add interactive command aliases, then build keymap/command-mode TUI support, configurable keymaps, and tune/volume step actions.
+Goal: Harden modified-key handling and add config-driven live limits and receiver policy.
 
 Done criteria:
 
-- Slice 1: add command aliases (`?` for status, `re`, `tu`, `mo`, `fi`, `du`, `fr`, `pb`, `rb`, `cb`, `sp`, `he`, `q`, `qu`) with tests.
-- Slice 2: add two-mode TUI input: keymap mode by default, `:` command mode, enter/escape behavior, and command history up/down.
-- Slice 3: add TOML configuration defaults for keymaps and step sizes.
-- Slice 4: add tune-step and volume/volume-step actions wired to keymaps.
+- Shift-right/shift-left are recognized where curses reports them as distinct keys.
+- Unknown modified-key/escape-sequence inputs are ignored safely in keymap mode.
+- TOML config supports live `duration_seconds` and `max_frames`, where `0` means unlimited.
+- TOML config supports receiver restrictions, defaulting to local receivers and allowing explicit unrestricted receiver use.
+- TUI-created client state applies configured live limits and receiver policy.
+- Live play/record/capture validation and loops support configured limits and receiver policy.
+- Cover key handling, config parsing, controller wiring, and validation with pytest.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no; harness-first UI/controller work.
+Live-radio needed: no; harness-first UI/config work.
 
 Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 

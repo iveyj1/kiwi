@@ -12,6 +12,10 @@ def test_default_config_has_keymaps_and_steps():
     assert config.steps.large_hz == 5000
     assert config.volume.step_percent == 10
     assert config.live.allow_live is False
+    assert config.live.duration_seconds == 60.0
+    assert config.live.max_frames == 1500
+    assert config.receivers.restricted is True
+    assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +medium"
     assert config.keys["up"] == "volume-step +10"
@@ -30,6 +34,12 @@ step_percent = 5
 
 [live]
 allow_live = true
+duration_seconds = 0
+max_frames = 0
+
+[receivers]
+restricted = false
+allowed = ["example.com:8073"]
 
 [keys]
 "l" = "tune-step +large"
@@ -45,9 +55,22 @@ allow_live = true
     assert config.steps.large_hz == 5000
     assert config.volume.step_percent == 5
     assert config.live.allow_live is True
+    assert config.live.duration_seconds == 0
+    assert config.live.max_frames == 0
+    assert config.receivers.restricted is False
+    assert config.receivers.allowed == ("example.com:8073",)
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +large"
     assert config.keys["x"] == "stop"
+
+
+def test_load_config_accepts_timeout_seconds_alias(tmp_path: Path):
+    path = tmp_path / "config.toml"
+    path.write_text("[live]\ntimeout_seconds = 12\n", encoding="utf-8")
+
+    config = load_config(path)
+
+    assert config.live.duration_seconds == 12.0
 
 
 def test_tui_parser_accepts_config_path(tmp_path: Path):

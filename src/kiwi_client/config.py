@@ -19,6 +19,12 @@ step_percent = 10
 
 [live]
 allow_live = false
+duration_seconds = 60
+max_frames = 1500
+
+[receivers]
+restricted = true
+allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 
 [keys]
 "right" = "tune-step +medium"
@@ -38,6 +44,7 @@ allow_live = false
 "down" = "volume-step -10"
 "j" = "volume-step -10"
 ":" = "command-mode"
+"q" = "quit"
 """
 
 
@@ -62,6 +69,16 @@ class LiveConfig:
     """Live-operation guard settings."""
 
     allow_live: bool = False
+    duration_seconds: float = 60.0
+    max_frames: int = 1500
+
+
+@dataclass(frozen=True)
+class ReceiverConfig:
+    """Receiver allowlist settings."""
+
+    restricted: bool = True
+    allowed: tuple[str, ...] = ("10.0.0.40:8073", "10.0.0.41:8073")
 
 
 @dataclass(frozen=True)
@@ -71,6 +88,7 @@ class KiwiClientConfig:
     steps: StepConfig = field(default_factory=StepConfig)
     volume: VolumeConfig = field(default_factory=VolumeConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
+    receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
     keys: dict[str, str] = field(default_factory=dict)
 
 
@@ -92,6 +110,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     steps = config.steps
     volume = config.volume
     live = config.live
+    receivers = config.receivers
     keys = dict(config.keys)
 
     if isinstance(data.get("steps"), dict):
@@ -107,11 +126,24 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         volume = replace(volume, step_percent=int(volume_data.get("step_percent", volume.step_percent)))
     if isinstance(data.get("live"), dict):
         live_data = data["live"]
-        live = replace(live, allow_live=bool(live_data.get("allow_live", live.allow_live)))
+        live = replace(
+            live,
+            allow_live=bool(live_data.get("allow_live", live.allow_live)),
+            duration_seconds=float(live_data.get("duration_seconds", live_data.get("timeout_seconds", live.duration_seconds))),
+            max_frames=int(live_data.get("max_frames", live.max_frames)),
+        )
+    if isinstance(data.get("receivers"), dict):
+        receiver_data = data["receivers"]
+        allowed = receiver_data.get("allowed", receivers.allowed)
+        receivers = replace(
+            receivers,
+            restricted=bool(receiver_data.get("restricted", receivers.restricted)),
+            allowed=tuple(str(receiver) for receiver in allowed),
+        )
     if isinstance(data.get("keys"), dict):
         keys.update({str(key): str(value) for key, value in data["keys"].items()})
 
-    return KiwiClientConfig(steps=steps, volume=volume, live=live, keys=keys)
+    return KiwiClientConfig(steps=steps, volume=volume, live=live, receivers=receivers, keys=keys)
 
 
 def _config_from_dict(data: dict[str, Any]) -> KiwiClientConfig:

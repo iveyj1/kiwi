@@ -98,8 +98,21 @@ def test_live_record_cli_dry_run_does_not_connect(tmp_path: Path, capsys):
     assert "ws://10.0.0.40:8073/123456/SND" in capsys.readouterr().out
 
 
-def test_live_record_rejects_non_local_receiver(tmp_path: Path):
+def test_live_record_rejects_non_allowed_receiver(tmp_path: Path):
     config = LiveSndWavRecordConfig(host="example.com", port=8073, output=tmp_path / "x.wav")
 
-    with pytest.raises(LiveCaptureError, match="local receivers"):
+    with pytest.raises(LiveCaptureError, match="allowed receivers"):
         config.validate()
+
+
+def test_live_record_allows_unrestricted_receiver_and_unlimited_limits(tmp_path: Path):
+    config = LiveSndWavRecordConfig(
+        host="example.com",
+        port=8073,
+        output=tmp_path / "x.wav",
+        receivers_restricted=False,
+        duration_seconds=0,
+        max_frames=0,
+    )
+
+    config.validate()

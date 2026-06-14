@@ -4,7 +4,15 @@ import curses
 
 from kiwi_client.client_app import ClientController, ClientState
 from kiwi_client.config import load_config
-from kiwi_client.tui import InputMode, TuiInputState, expand_key_action, handle_tui_key, render_dashboard
+from kiwi_client.tui import (
+    InputMode,
+    TuiInputState,
+    expand_key_action,
+    handle_tui_key,
+    normalize_key_name,
+    render_dashboard,
+    state_from_config,
+)
 
 
 def test_render_dashboard_includes_persistent_live_state():
@@ -87,6 +95,28 @@ def test_tui_command_mode_pb_uses_configured_allow_live(tmp_path):
     controller.execute("wait 1")
 
 
+def test_tui_state_from_config_applies_live_limits_and_receiver_policy(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[live]
+duration_seconds = 0
+max_frames = 0
+
+[receivers]
+restricted = false
+allowed = ["example.com:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+    state = state_from_config(load_config(config_path))
+
+    assert state.duration_seconds == 0
+    assert state.max_frames == 0
+    assert state.receivers_restricted is False
+    assert state.allowed_receivers == ("example.com:8073",)
+
+
 def test_tui_keymap_mode_executes_configured_tune_and_volume_actions(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -119,6 +149,27 @@ def test_tui_expand_key_action_uses_configured_steps(tmp_path):
     config = load_config(config_path)
 
     assert expand_key_action("tune-step +large", ClientController(), config) == "tune 5012.500"
+
+
+def test_tui_modified_and_unknown_keys_are_safe_in_keymap_mode():
+    controller = ClientController()
+    state = TuiInputState()
+
+    if getattr(curses, "KEY_SRIGHT", None) is not None:
+        assert normalize_key_name(curses.KEY_SRIGHT) == "shift-right"
+        response, message = handle_tui_key(curses.KEY_SRIGHT, state, controller, load_config())
+        assert response["state"]["frequency_khz"] == 5000.1
+        assert message == ""
+
+    response, message = handle_tui_key(27, state, controller, load_config())
+    assert response is None
+    assert message is None
+    assert controller.running is True
+
+    response, message = handle_tui_key(9999, state, controller, load_config())
+    assert response is None
+    assert message is None
+    assert controller.running is True
 
 
 def test_tui_command_mode_executes_and_exits_to_keymap():

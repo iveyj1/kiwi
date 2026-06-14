@@ -22,7 +22,9 @@ from kiwi_client.live_capture import (
     MAX_FRAMES,
     WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
     LiveCaptureError,
-    sorted_receiver_names,
+    allowed_receiver_names,
+    snd_loop_allowed,
+    snd_loop_timeout,
 )
 from kiwi_client.recorder import SndWavRecorder, WavRecordingResult
 from kiwi_client.transport import ReplayTransport
@@ -45,18 +47,20 @@ class LiveSndWavRecordConfig:
     compression: bool = False
     timestamp: int | None = None
     overwrite: bool = False
+    receivers_restricted: bool = True
+    allowed_receivers: tuple[str, ...] | None = None
 
     @property
     def receiver(self) -> str:
         return f"{self.host}:{self.port}"
 
     def validate(self) -> None:
-        if (self.host, self.port) not in LOCAL_RECEIVERS:
-            raise LiveCaptureError(f"receiver must be one of the local receivers: {sorted_receiver_names()}")
-        if not (0 < self.duration_seconds <= MAX_DURATION_SECONDS):
-            raise LiveCaptureError(f"duration must be > 0 and <= {MAX_DURATION_SECONDS} seconds")
-        if not (1 <= self.max_frames <= MAX_FRAMES):
-            raise LiveCaptureError(f"max_frames must be between 1 and {MAX_FRAMES}")
+        if self.receivers_restricted and self.receiver not in allowed_receiver_names(self.allowed_receivers):
+            raise LiveCaptureError(f"receiver must be one of the allowed receivers: {allowed_receiver_names(self.allowed_receivers)}")
+        if self.duration_seconds < 0:
+            raise LiveCaptureError("duration must be >= 0 seconds; 0 means unlimited")
+        if self.max_frames < 0:
+            raise LiveCaptureError("max_frames must be >= 0; 0 means unlimited")
         if self.compression:
             raise LiveCaptureError("first direct WAV recording path must use compression=0")
         if self.output.exists() and not self.overwrite:
@@ -154,11 +158,11 @@ async def record_live_snd_wav(
         close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
     ) as websocket:
         await websocket.send(encode_auth())
-        while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+        while snd_loop_allowed(start, snd_frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
             if stop_event is not None and stop_event.is_set():
                 break
-            remaining = config.duration_seconds - (time.monotonic() - start)
-            if remaining <= 0:
+            remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
+            if remaining == 0:
                 break
             try:
                 message = await asyncio.wait_for(websocket.recv(), timeout=remaining)

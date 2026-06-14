@@ -44,6 +44,8 @@ class ClientState:
     duration_seconds: float = 60.0
     max_frames: int = 1500
     volume_percent: int = 100
+    receivers_restricted: bool = True
+    allowed_receivers: tuple[str, ...] = ("10.0.0.40:8073", "10.0.0.41:8073")
     connected: bool = False
 
     @property
@@ -391,6 +393,8 @@ class ClientController:
             high_cut_hz=self.state.high_cut_hz,
             duration_seconds=self.state.duration_seconds,
             max_frames=self.state.max_frames,
+            receivers_restricted=self.state.receivers_restricted,
+            allowed_receivers=self.state.allowed_receivers,
         )
 
     def _record_config(self, output: Path, *, overwrite: bool = False) -> LiveSndWavRecordConfig:
@@ -406,6 +410,8 @@ class ClientController:
             duration_seconds=self.state.duration_seconds,
             max_frames=self.state.max_frames,
             overwrite=overwrite,
+            receivers_restricted=self.state.receivers_restricted,
+            allowed_receivers=self.state.allowed_receivers,
         )
 
     def _capture_config(self, output: Path, *, overwrite: bool = False) -> LiveSndCaptureConfig:
@@ -421,6 +427,8 @@ class ClientController:
             duration_seconds=self.state.duration_seconds,
             max_frames=self.state.max_frames,
             overwrite=overwrite,
+            receivers_restricted=self.state.receivers_restricted,
+            allowed_receivers=self.state.allowed_receivers,
         )
 
 

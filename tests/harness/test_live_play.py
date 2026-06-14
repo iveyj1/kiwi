@@ -80,8 +80,14 @@ def test_live_play_cli_dry_run_does_not_connect(capsys):
     assert "ws://10.0.0.40:8073/123456/SND" in capsys.readouterr().out
 
 
-def test_live_play_rejects_non_local_receiver():
+def test_live_play_rejects_non_allowed_receiver():
     config = LiveSndPlaybackConfig(host="example.com")
 
-    with pytest.raises(LiveCaptureError, match="local receivers"):
+    with pytest.raises(LiveCaptureError, match="allowed receivers"):
         config.validate()
+
+
+def test_live_play_allows_unrestricted_receiver_and_unlimited_limits():
+    config = LiveSndPlaybackConfig(host="example.com", receivers_restricted=False, duration_seconds=0, max_frames=0)
+
+    config.validate()

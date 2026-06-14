@@ -5,11 +5,24 @@ import pytest
 from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, main
 
 
-def test_live_capture_config_rejects_non_local_receiver(tmp_path: Path):
+def test_live_capture_config_rejects_non_allowed_receiver(tmp_path: Path):
     config = LiveSndCaptureConfig(host="example.com", port=8073, output=tmp_path / "x.jsonl")
 
-    with pytest.raises(LiveCaptureError, match="local receivers"):
+    with pytest.raises(LiveCaptureError, match="allowed receivers"):
         config.validate()
+
+
+def test_live_capture_config_can_allow_unrestricted_receiver_and_unlimited_limits(tmp_path: Path):
+    config = LiveSndCaptureConfig(
+        host="example.com",
+        port=8073,
+        output=tmp_path / "x.jsonl",
+        receivers_restricted=False,
+        duration_seconds=0,
+        max_frames=0,
+    )
+
+    config.validate()
 
 
 def test_live_capture_config_allows_about_one_minute(tmp_path: Path):
@@ -24,8 +37,8 @@ def test_live_capture_config_allows_about_one_minute(tmp_path: Path):
     config.validate()
 
 
-def test_live_capture_config_rejects_too_long_duration(tmp_path: Path):
-    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "x.jsonl", duration_seconds=61)
+def test_live_capture_config_rejects_negative_duration(tmp_path: Path):
+    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "x.jsonl", duration_seconds=-1)
 
     with pytest.raises(LiveCaptureError, match="duration"):
         config.validate()

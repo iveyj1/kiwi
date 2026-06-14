@@ -46,6 +46,14 @@ step_percent = 10
 [live]
 # Default is false. Set true only for trusted local interactive use.
 allow_live = false
+# 0 means unlimited. Defaults remain bounded.
+duration_seconds = 60
+max_frames = 1500
+
+[receivers]
+# Default is restricted to local receivers.
+restricted = true
+allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 
 [keys]
 "right" = "tune-step +medium"
@@ -68,7 +76,7 @@ In keymap mode, the default bindings are:
 - up arrow or `k`: increase volume by the configured volume step.
 - down arrow or `j`: decrease volume by the configured volume step.
 
-Terminal support for modified arrow keys varies; letter bindings are the portable fallback.
+Terminal support for modified arrow keys varies; letter bindings are the portable fallback. Unknown modified-key escape sequences are ignored in keymap mode. If curses reports shift-arrow keys distinctly, shift-right/shift-left use the configured small frequency step.
 
 If you want TUI command aliases like `:pb` to start live operations without typing `--allow-live` every time, explicitly opt in via your TUI config:
 
@@ -78,6 +86,31 @@ allow_live = true
 ```
 
 With that setting, `:pb --null-sink` is accepted as `play-bg --null-sink` using the configured live opt-in. Without it, live operations still require `--allow-live` on each command.
+
+Configured live limits can be made unlimited by setting either value to `0`:
+
+```toml
+[live]
+duration_seconds = 0
+max_frames = 0
+```
+
+Receiver restrictions can be changed with:
+
+```toml
+[receivers]
+restricted = true
+allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
+```
+
+or explicitly disabled for unrestricted receiver addresses:
+
+```toml
+[receivers]
+restricted = false
+```
+
+Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed.
 
 or, after installing the package scripts:
 

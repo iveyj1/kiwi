@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import curses
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
@@ -115,6 +115,10 @@ def normalize_key_name(ch: int) -> str | None:
         curses.KEY_UP: "up",
         curses.KEY_DOWN: "down",
     }
+    if getattr(curses, "KEY_SRIGHT", None) is not None:
+        special[curses.KEY_SRIGHT] = "shift-right"
+    if getattr(curses, "KEY_SLEFT", None) is not None:
+        special[curses.KEY_SLEFT] = "shift-left"
     if ch in special:
         return special[ch]
     if 1 <= ch <= 26:
@@ -168,9 +172,6 @@ def handle_tui_key(
                 return controller.execute(expand_key_action(action, controller, config)), ""
             except ClientCommandError as exc:
                 return None, f"error: {exc}"
-        if ch in (27,):
-            controller.running = False
-            return None, ""
         return None, None
 
     if ch in (27,):
@@ -219,12 +220,25 @@ def handle_tui_key(
     return None, None
 
 
+def state_from_config(config: KiwiClientConfig, state: ClientState | None = None) -> ClientState:
+    """Return client state with live limits and receiver policy from config."""
+    state = state or ClientState()
+    return replace(
+        state,
+        duration_seconds=config.live.duration_seconds,
+        max_frames=config.live.max_frames,
+        receivers_restricted=config.receivers.restricted,
+        allowed_receivers=config.receivers.allowed,
+    )
+
+
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
     config = config or load_config()
-    controller = controller or ClientController(allow_live_default=config.live.allow_live)
+    controller = controller or ClientController(state=state_from_config(config), allow_live_default=config.live.allow_live)
     if controller is not None:
         controller.allow_live_default = config.live.allow_live
+        controller.state = state_from_config(config, controller.state)
     curses.wrapper(_run_curses, controller, config)
 
 
@@ -240,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     config = load_config(args.config)
-    run_tui(ClientController(allow_live_default=config.live.allow_live), config=config)
+    run_tui(ClientController(state=state_from_config(config), allow_live_default=config.live.allow_live), config=config)
     return 0
 
 

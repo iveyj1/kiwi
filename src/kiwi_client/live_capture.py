@@ -51,6 +51,8 @@ class LiveSndCaptureConfig:
     compression: bool = False
     timestamp: int | None = None
     overwrite: bool = False
+    receivers_restricted: bool = True
+    allowed_receivers: tuple[str, ...] | None = None
 
     @property
     def receiver(self) -> str:
@@ -58,12 +60,12 @@ class LiveSndCaptureConfig:
 
     def validate(self) -> None:
         """Validate guardrails before any live network operation."""
-        if (self.host, self.port) not in LOCAL_RECEIVERS:
-            raise LiveCaptureError(f"receiver must be one of the local receivers: {sorted_receiver_names()}")
-        if not (0 < self.duration_seconds <= MAX_DURATION_SECONDS):
-            raise LiveCaptureError(f"duration must be > 0 and <= {MAX_DURATION_SECONDS} seconds")
-        if not (1 <= self.max_frames <= MAX_FRAMES):
-            raise LiveCaptureError(f"max_frames must be between 1 and {MAX_FRAMES}")
+        if self.receivers_restricted and self.receiver not in allowed_receiver_names(self.allowed_receivers):
+            raise LiveCaptureError(f"receiver must be one of the allowed receivers: {allowed_receiver_names(self.allowed_receivers)}")
+        if self.duration_seconds < 0:
+            raise LiveCaptureError("duration must be >= 0 seconds; 0 means unlimited")
+        if self.max_frames < 0:
+            raise LiveCaptureError("max_frames must be >= 0; 0 means unlimited")
         if self.compression:
             raise LiveCaptureError("first live SND capture must use compression=0 for existing PCM parser coverage")
         if self.output.exists() and not self.overwrite:
@@ -106,6 +108,28 @@ class LiveSndCaptureConfig:
 def sorted_receiver_names() -> list[str]:
     """Return local receiver names for user-facing messages."""
     return [f"{host}:{port}" for host, port in sorted(LOCAL_RECEIVERS)]
+
+
+def allowed_receiver_names(configured: tuple[str, ...] | None = None) -> tuple[str, ...]:
+    """Return configured receiver allowlist names, defaulting to local receivers."""
+    return tuple(configured or sorted_receiver_names())
+
+
+def snd_loop_allowed(start: float, frames: int, *, duration_seconds: float, max_frames: int) -> bool:
+    """Return true while a guarded SND loop should continue.
+
+    A value of 0 for duration or max_frames means that limit is disabled.
+    """
+    within_frame_limit = max_frames == 0 or frames < max_frames
+    within_time_limit = duration_seconds == 0 or (time.monotonic() - start) < duration_seconds
+    return within_frame_limit and within_time_limit
+
+
+def snd_loop_timeout(start: float, *, duration_seconds: float) -> float | None:
+    """Return remaining timeout for one receive, or None when duration is unlimited."""
+    if duration_seconds == 0:
+        return None
+    return max(0.0, duration_seconds - (time.monotonic() - start))
 
 
 def _capture_metadata(config: LiveSndCaptureConfig) -> SndCaptureMetadata:
@@ -163,11 +187,11 @@ async def capture_live_snd(
         sent_ar_ok = False
         sent_setup = False
 
-        while frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+        while snd_loop_allowed(start, frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
             if stop_event is not None and stop_event.is_set():
                 break
-            remaining = config.duration_seconds - (time.monotonic() - start)
-            if remaining <= 0:
+            remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
+            if remaining == 0:
                 break
             try:
                 message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
