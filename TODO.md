@@ -2,21 +2,20 @@
 
 ## Current slice
 
-Goal: Build a guarded SND live capture CLI/tool without executing live receiver access.
+Goal: Try recording offline by converting the captured SND fixture into a standard mono PCM WAV file.
 
 Done criteria:
 
-- Add a CLI entrypoint/module for short local SND capture.
-- Enforce local receiver allowlist, short duration, frame cap, output overwrite guard, and explicit `--allow-live` requirement.
-- Support `--dry-run` to print the planned URI and fixture-tested command sequence without connecting.
-- Write live captures using the existing JSONL capture writer when explicitly run later.
-- Keep live-radio testing deferred in this slice.
+- Add a recording helper for uncompressed mono SND fixture audio.
+- Use `MSG sample_rate` as WAV sample-rate source, rounded to integer Hz for the WAV header.
+- Validate WAV channel count, sample width, frame rate, frame count, SND frame count, and sequence gaps with pytest.
+- Produce a local WAV artifact from `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl`.
 
-Test command: `python3 -m pytest tests/harness tests/protocol tests/audio`
+Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
 
 Live-radio needed: no
 
-Docs to update: `docs/harness.md`, `docs/dev-log.md`, `docs/user-guide.md`
+Docs to update: `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 

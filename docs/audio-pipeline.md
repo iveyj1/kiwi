@@ -65,6 +65,19 @@ Fixture coverage:
 - `tests/fixtures/kiwi/snd-sequence-gap.jsonl` contains frames `1, 3, 4`; the tracker reports one missing frame at expected sequence `2`.
 - `tests/audio/test_snd_sequence.py` covers gap detection, wraparound, out-of-order detection, and ADC overflow flag exposure.
 
+## WAV recording
+
+`src/kiwi_client/recorder.py` can convert an uncompressed mono SND JSONL fixture into a standard WAV file:
+
+- Input frames are decoded with the existing SND parser.
+- Samples are written as mono signed 16-bit little-endian PCM, as required by standard WAV.
+- `MSG sample_rate` is used as the source sample rate and rounded to an integer for the WAV header.
+- Sequence gaps are counted during recording so callers can decide whether a recording is continuous enough to use.
+
+Fixture coverage:
+
+- `tests/audio/test_wav_recorder.py` records `tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl` to a temporary WAV and validates 1 channel, 16-bit samples, 11999 Hz, 20 SND frames, 10240 WAV frames, and zero sequence gaps.
+
 ## Questions to resolve
 
 - Whether audio frames should directly carry a `sample_rate` snapshot or whether consumers should pair frames with receiver state.
@@ -72,7 +85,6 @@ Fixture coverage:
 - Mono/stereo handling beyond the first mono fixture.
 - Audio codec/compression fixture strategy.
 - Buffer target latency.
-- Recording format.
 - Detector handoff format.
 
 ## Design constraints

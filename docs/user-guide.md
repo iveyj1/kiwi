@@ -55,6 +55,26 @@ Guardrails:
 - compression off for first SND PCM fixture path,
 - no output overwrite unless requested.
 
+Offline fixture-to-WAV recording is available from Python:
+
+```bash
+PYTHONPATH=src python3 - <<'PY'
+from kiwi_client.recorder import write_snd_fixture_wav
+result = write_snd_fixture_wav(
+    'tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl',
+    'recordings/local-snd-5000-am-10khz.wav',
+)
+print(result)
+PY
+```
+
+Current recording limitations:
+
+- uncompressed mono SND fixtures only,
+- no live recording loop yet,
+- no compressed ADPCM,
+- sample rate is rounded to integer Hz for the WAV header.
+
 Expected later operations:
 
 - Start manual recording
