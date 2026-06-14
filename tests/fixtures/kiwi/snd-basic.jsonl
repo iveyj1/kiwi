@@ -1,0 +1,2 @@
+{"t":0.000,"dir":"meta","stream":"snd","type":"note","source":"synthetic","description":"Minimal uncompressed mono SND frame for parser/audio tests; full WebSocket payload is base64 encoded.","expected":{"tag":"SND","flags":0,"seq":1,"smeter":850,"rssi":-42.0,"samples":[-32768,-1,0,1,32767]}}
+{"t":0.000,"dir":"rx","stream":"snd","type":"binary","encoding":"base64","data":"U05EAAEAAAADUoAA//8AAAABf/8="}

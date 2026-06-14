@@ -1,0 +1,15 @@
+[project]
+name = "kiwi-client"
+version = "0.1.0"
+description = "Fixture-first KiwiSDR client experiments"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

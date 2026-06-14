@@ -1,0 +1,5 @@
+{"t":0.000,"dir":"meta","stream":"snd","type":"note","source":"synthetic based on kiwiclient/test/kiwi_server.py handshake ordering","description":"Minimal SND session fixture with MSG state followed by one uncompressed mono SND frame."}
+{"t":0.000,"dir":"rx","stream":"snd","type":"msg","text":"MSG audio_rate=12000"}
+{"t":0.001,"dir":"rx","stream":"snd","type":"msg","text":"MSG sample_rate=12001.135"}
+{"t":0.002,"dir":"rx","stream":"snd","type":"msg","text":"MSG version_maj=1 version_min=237 bandwidth=30000000"}
+{"t":0.010,"dir":"rx","stream":"snd","type":"binary","encoding":"base64","data":"U05EAAEAAAADUoAA//8AAAABf/8="}
