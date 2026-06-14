@@ -112,6 +112,8 @@ restricted = false
 
 Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed.
 
+For long-running live playback/record/capture, the client sends periodic SND keepalives after initial setup. If a session still stops unexpectedly, check the TUI operation result/error and confirm both `duration_seconds` and `max_frames` are `0` if you intend no client-side limit.
+
 or, after installing the package scripts:
 
 ```bash

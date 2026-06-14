@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, main
+from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, keepalive_due, main
+
+
+def test_keepalive_due_only_after_setup_and_interval():
+    assert keepalive_due(100.0, 60.0, sent_setup=True)
+    assert not keepalive_due(89.0, 60.0, sent_setup=True)
+    assert not keepalive_due(100.0, 60.0, sent_setup=False)
 
 
 def test_live_capture_config_rejects_non_allowed_receiver(tmp_path: Path):

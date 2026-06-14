@@ -133,6 +133,8 @@ Added `[live] allow_live = false` to the TOML config schema. When a TUI config e
 
 Hardened TUI key handling for modified arrow escape sequences. Known curses shift-left/shift-right codes map to configured `shift-left`/`shift-right`; unknown modified-key/escape inputs are ignored in keymap mode instead of exiting or becoming bogus control-key names. Added TOML live limit settings (`duration_seconds`, `max_frames`, `0` = unlimited) and receiver policy settings (`[receivers] restricted`, `allowed`). TUI-created controllers now apply configured live limits and receiver policy to play/record/capture configs.
 
+Added periodic live SND keepalives for playback, recording, and capture loops. The initial setup still sends `SET keepalive`, and long-running sessions now send another keepalive after the configured interval once setup has completed. This addresses receiver-side disconnects around the one-minute mark when client duration/frame limits are unlimited.
+
 ## YYYY-MM-DD
 
 ### Finding

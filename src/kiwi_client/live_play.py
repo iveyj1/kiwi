@@ -17,7 +17,7 @@ from threading import Event
 from typing import Any, Callable
 
 from kiwi_client.audio import SndMetricsTracker
-from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
+from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup, encode_keepalive
 from kiwi_client.live_capture import (
     LOCAL_RECEIVERS,
     MAX_DURATION_SECONDS,
@@ -25,6 +25,7 @@ from kiwi_client.live_capture import (
     WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
     LiveCaptureError,
     allowed_receiver_names,
+    keepalive_due,
     snd_loop_allowed,
     snd_loop_timeout,
 )
@@ -212,6 +213,7 @@ async def play_live_snd(
     bytes_written = 0
     metrics_tracker = SndMetricsTracker()
     start = time.monotonic()
+    last_keepalive = start
 
     async with websockets.connect(
         config.websocket_uri(),
@@ -223,6 +225,10 @@ async def play_live_snd(
             while snd_loop_allowed(start, snd_frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
                 if stop_event is not None and stop_event.is_set():
                     break
+                now = time.monotonic()
+                if keepalive_due(now, last_keepalive, sent_setup=sent_setup):
+                    await websocket.send(encode_keepalive())
+                    last_keepalive = now
                 remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
                 if remaining == 0:
                     break

@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 from kiwi_client.audio import SndMetricsTracker
 from kiwi_client.capture import JsonlCaptureWriter, SndCaptureMetadata
-from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
+from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup, encode_keepalive
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
 
@@ -28,6 +28,7 @@ LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
 MAX_DURATION_SECONDS = 60.0
 MAX_FRAMES = 1500
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
+KEEPALIVE_INTERVAL_SECONDS = 30.0
 
 
 class LiveCaptureError(RuntimeError):
@@ -132,6 +133,11 @@ def snd_loop_timeout(start: float, *, duration_seconds: float) -> float | None:
     return max(0.0, duration_seconds - (time.monotonic() - start))
 
 
+def keepalive_due(now: float, last_keepalive: float, *, sent_setup: bool, interval_seconds: float = KEEPALIVE_INTERVAL_SECONDS) -> bool:
+    """Return true when a live SND session should send another keepalive."""
+    return sent_setup and (now - last_keepalive) >= interval_seconds
+
+
 def _capture_metadata(config: LiveSndCaptureConfig) -> SndCaptureMetadata:
     now_utc = datetime.now(tz=ZoneInfo("UTC"))
     now_local = datetime.now().astimezone()
@@ -186,10 +192,17 @@ async def capture_live_snd(
         metrics_tracker = SndMetricsTracker()
         sent_ar_ok = False
         sent_setup = False
+        last_keepalive = start
 
         while snd_loop_allowed(start, frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
             if stop_event is not None and stop_event.is_set():
                 break
+            now = time.monotonic()
+            if keepalive_due(now, last_keepalive, sent_setup=sent_setup):
+                command = encode_keepalive()
+                writer.add_tx_cmd(now - start, command)
+                await websocket.send(command)
+                last_keepalive = now
             remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
             if remaining == 0:
                 break
