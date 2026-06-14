@@ -97,6 +97,7 @@ Fixture coverage:
 - `SoundDeviceSink` supports real 16-bit PCM output through optional `sounddevice`.
 - `live_play.py` provides guarded live SND playback using the same local receiver allowlist and explicit `--allow-live` pattern.
 - A short 5000 kHz AM live run wrote 60 SND frames to the default audio output.
+- Playback teardown now stops the audio sink before WebSocket close and uses a short WebSocket close timeout to avoid slow prompt return after audio completes.
 
 ## Questions to resolve
 

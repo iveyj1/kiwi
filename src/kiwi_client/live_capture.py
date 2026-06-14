@@ -25,6 +25,7 @@ from kiwi_client.receiver_model import ReceiverState
 LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
 MAX_DURATION_SECONDS = 5.0
 MAX_FRAMES = 100
+WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
 
 
 class LiveCaptureError(RuntimeError):
@@ -140,7 +141,11 @@ async def capture_live_snd(config: LiveSndCaptureConfig, *, allow_live: bool = F
     start = time.monotonic()
     frames = 0
 
-    async with websockets.connect(config.websocket_uri(), max_queue=0) as websocket:
+    async with websockets.connect(
+        config.websocket_uri(),
+        max_queue=0,
+        close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+    ) as websocket:
         auth_command = encode_auth()
         writer.add_tx_cmd(time.monotonic() - start, auth_command)
         await websocket.send(auth_command)

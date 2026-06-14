@@ -95,6 +95,10 @@ Committed as `1c8f47e` (`Add basic scriptable client shell`).
 
 Extended the client shell with executable guarded `play`, `record`, and `capture` commands. These require explicit `--allow-live` and reuse the existing guarded live operation modules; tests inject fake operations so command behavior is covered without receiver/audio access. `play --null-sink`, `record --overwrite`, and `capture --overwrite` are supported.
 
+Committed as `58336e2` (`Execute guarded operations from client shell`).
+
+Reduced live operation teardown latency by setting a short WebSocket close timeout for SND capture/record/play and by stopping the audio sink before closing the playback WebSocket. Timing checks at 5000 kHz AM, 60 frames: null-sink returned in about 2.9s and real sounddevice output in about 3.4s.
+
 ## YYYY-MM-DD
 
 ### Finding

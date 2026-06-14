@@ -15,7 +15,14 @@ from pathlib import Path
 from typing import Any
 
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
-from kiwi_client.live_capture import LOCAL_RECEIVERS, MAX_DURATION_SECONDS, MAX_FRAMES, LiveCaptureError, sorted_receiver_names
+from kiwi_client.live_capture import (
+    LOCAL_RECEIVERS,
+    MAX_DURATION_SECONDS,
+    MAX_FRAMES,
+    WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+    LiveCaptureError,
+    sorted_receiver_names,
+)
 from kiwi_client.recorder import SndWavRecorder, WavRecordingResult
 from kiwi_client.transport import ReplayTransport
 
@@ -134,7 +141,11 @@ async def record_live_snd_wav(config: LiveSndWavRecordConfig, *, allow_live: boo
     sent_ar_ok = False
     sent_setup = False
 
-    async with websockets.connect(config.websocket_uri(), max_queue=0) as websocket:
+    async with websockets.connect(
+        config.websocket_uri(),
+        max_queue=0,
+        close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+    ) as websocket:
         await websocket.send(encode_auth())
         while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
             remaining = config.duration_seconds - (time.monotonic() - start)

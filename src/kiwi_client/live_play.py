@@ -15,7 +15,14 @@ from pathlib import Path
 from typing import Any
 
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
-from kiwi_client.live_capture import LOCAL_RECEIVERS, MAX_DURATION_SECONDS, MAX_FRAMES, LiveCaptureError, sorted_receiver_names
+from kiwi_client.live_capture import (
+    LOCAL_RECEIVERS,
+    MAX_DURATION_SECONDS,
+    MAX_FRAMES,
+    WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+    LiveCaptureError,
+    sorted_receiver_names,
+)
 from kiwi_client.playback import AudioSink, NullAudioSink, PlaybackResult, SoundDeviceSink, samples_to_pcm16le
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
@@ -161,33 +168,40 @@ async def play_live_snd(config: LiveSndPlaybackConfig, sink: AudioSink, *, allow
     bytes_written = 0
     start = time.monotonic()
 
-    async with websockets.connect(config.websocket_uri(), max_queue=0) as websocket:
-        await websocket.send(encode_auth())
-        while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
-            remaining = config.duration_seconds - (time.monotonic() - start)
-            if remaining <= 0:
-                break
-            try:
-                message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
-            except asyncio.TimeoutError:
-                break
-            if isinstance(message, str):
-                state = state.apply_msg_params(parse_msg(message).params)
-            else:
-                payload = bytes(message)
-                if payload.startswith(b"MSG"):
-                    state = state.apply_msg_params(parse_msg(payload).params)
+    async with websockets.connect(
+        config.websocket_uri(),
+        max_queue=0,
+        close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+    ) as websocket:
+        try:
+            await websocket.send(encode_auth())
+            while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+                remaining = config.duration_seconds - (time.monotonic() - start)
+                if remaining <= 0:
+                    break
+                try:
+                    message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    break
+                if isinstance(message, str):
+                    state = state.apply_msg_params(parse_msg(message).params)
                 else:
-                    sink_started, frames, byte_count = _write_snd_to_sink(payload, sink, state, sink_started)
-                    snd_frames += 1
-                    total_frames += frames
-                    bytes_written += byte_count
-                    continue
-            commands, sent_ar_ok, sent_setup = _commands_after_msg(state, sent_ar_ok, sent_setup, config)
-            for command in commands:
-                await websocket.send(command)
-    if sink_started:
-        sink.stop()
+                    payload = bytes(message)
+                    if payload.startswith(b"MSG"):
+                        state = state.apply_msg_params(parse_msg(payload).params)
+                    else:
+                        sink_started, frames, byte_count = _write_snd_to_sink(payload, sink, state, sink_started)
+                        snd_frames += 1
+                        total_frames += frames
+                        bytes_written += byte_count
+                        continue
+                commands, sent_ar_ok, sent_setup = _commands_after_msg(state, sent_ar_ok, sent_setup, config)
+                for command in commands:
+                    await websocket.send(command)
+        finally:
+            if sink_started:
+                sink.stop()
+                sink_started = False
     return PlaybackResult(
         path=Path("<live-snd>"),
         sample_rate_hz=int(round(state.sample_rate or 0)),
