@@ -2,15 +2,15 @@
 
 ## Current slice
 
-Goal: Continue Milestone 6 by executing guarded play/record/capture functions from the scriptable client shell.
+Goal: Push live play/record/capture toward usable live mode by allowing explicit sessions up to about 60 seconds.
 
 Done criteria:
 
-- Add executable `play`, `record`, and `capture` commands to `kiwi-client`.
-- Require explicit `--allow-live` for executable live operations while preserving existing `*-plan` commands.
-- Support `play --null-sink`, `record --overwrite`, and `capture --overwrite` options.
-- Keep operation execution dependency-injected so tests use fake operations and avoid live radio/audio hardware.
-- Cover command execution and safety refusal with pytest.
+- Increase guarded live duration cap from 5 seconds to 60 seconds.
+- Increase guarded live SND frame cap from 100 to 1500 frames.
+- Keep default operations short unless the user explicitly requests longer values.
+- Cover the new guardrail limits for capture, record, and playback with pytest.
+- Update user docs and roadmap.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 

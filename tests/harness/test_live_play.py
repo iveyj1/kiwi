@@ -40,6 +40,12 @@ def test_play_replay_snd_feeds_null_sink_from_live_fixture():
     assert sink.chunks == 20
 
 
+def test_live_play_allows_about_one_minute():
+    config = LiveSndPlaybackConfig(duration_seconds=60, max_frames=1500)
+
+    config.validate()
+
+
 def test_live_play_dry_run_plan_has_commands():
     config = LiveSndPlaybackConfig(timestamp=123456)
 

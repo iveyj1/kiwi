@@ -12,8 +12,20 @@ def test_live_capture_config_rejects_non_local_receiver(tmp_path: Path):
         config.validate()
 
 
-def test_live_capture_config_rejects_long_duration(tmp_path: Path):
-    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "x.jsonl", duration_seconds=30)
+def test_live_capture_config_allows_about_one_minute(tmp_path: Path):
+    config = LiveSndCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=tmp_path / "x.jsonl",
+        duration_seconds=60,
+        max_frames=1500,
+    )
+
+    config.validate()
+
+
+def test_live_capture_config_rejects_too_long_duration(tmp_path: Path):
+    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "x.jsonl", duration_seconds=61)
 
     with pytest.raises(LiveCaptureError, match="duration"):
         config.validate()

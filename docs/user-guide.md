@@ -105,7 +105,9 @@ PYTHONPATH=src python3 -m kiwi_client.live_capture \
 Guardrails:
 
 - local receivers only,
-- short capture only,
+- live duration capped at 60 seconds,
+- live SND frames capped at 1500,
+- defaults remain short unless longer values are explicitly requested,
 - no admin commands,
 - compression off for first SND PCM fixture path,
 - no output overwrite unless requested.
@@ -155,6 +157,8 @@ PYTHONPATH=src python3 -m kiwi_client.live_record \
   --mode am \
   --low-cut-hz -5000 \
   --high-cut-hz 5000 \
+  --duration-seconds 60 \
+  --max-frames 1500 \
   --output recordings/live-5000-am.wav \
   --json
 ```
@@ -162,7 +166,7 @@ PYTHONPATH=src python3 -m kiwi_client.live_record \
 Current recording limitations:
 
 - uncompressed mono SND only,
-- short guarded sessions only,
+- guarded sessions only, capped at 60 seconds / 1500 SND frames,
 - no compressed ADPCM,
 - no stereo/IQ,
 - sample rate is rounded to integer Hz for the WAV header,
@@ -208,8 +212,8 @@ PYTHONPATH=src python3 -m kiwi_client.live_play \
   --mode am \
   --low-cut-hz -5000 \
   --high-cut-hz 5000 \
-  --duration-seconds 5 \
-  --max-frames 60 \
+  --duration-seconds 60 \
+  --max-frames 1500 \
   --json
 ```
 
@@ -230,7 +234,7 @@ PYTHONPATH=src python3 -m kiwi_client.live_play \
 Current playback limitations:
 
 - uncompressed mono SND only,
-- short guarded sessions only,
+- guarded sessions only, capped at 60 seconds / 1500 SND frames,
 - no compressed ADPCM,
 - no stereo/IQ,
 - no user-facing audio device selector yet,

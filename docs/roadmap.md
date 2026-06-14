@@ -18,8 +18,9 @@ Current verified baseline:
 - Offline tests pass: `python3 -m pytest`.
 - Local receiver fixture captured from `10.0.0.40:8073` at 5000 kHz AM, 10 kHz bandwidth.
 - Captured uncompressed mono SND fixture can be converted to a standard WAV file.
-- A short guarded direct live-to-WAV recording has been verified against the local receiver.
-- A short guarded live playback run has written real radio audio to the default `sounddevice` output.
+- Guarded direct live-to-WAV recording has been verified against the local receiver.
+- Guarded live playback has written real radio audio to the default `sounddevice` output.
+- Explicit live play/record/capture sessions are currently capped at 60 seconds / 1500 SND frames.
 
 ## Milestone 1 — SND protocol and harness foundation
 
@@ -82,7 +83,7 @@ Remaining follow-ons:
 
 - Better busy/max-user fixture and error handling.
 - More capture presets.
-- Longer controlled captures after buffering/recording logic matures.
+- Longer controlled captures beyond the current 60 second cap after buffering/recording logic matures.
 
 ## Milestone 3 — Offline WAV recording
 
@@ -134,7 +135,7 @@ Evidence:
 Remaining follow-ons:
 
 - Decide whether live recording should also save a JSONL sidecar by default.
-- Add longer controlled recording mode after buffering/gap policy matures.
+- Add longer controlled recording mode beyond the current 60 second cap after buffering/gap policy matures.
 - Add compressed and stereo/IQ recording paths later.
 
 Risks/questions:
@@ -164,7 +165,7 @@ Remaining follow-ons:
 
 - Better buffering and underflow/overflow diagnostics.
 - User-selectable audio device.
-- Longer attended playback tests.
+- Longer attended playback tests beyond the current 60 second cap.
 - Playback for compressed and stereo/IQ modes.
 
 Open decisions:

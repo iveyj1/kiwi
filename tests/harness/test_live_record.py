@@ -43,6 +43,18 @@ def test_record_replay_snd_wav_uses_live_fixture_command_flow(tmp_path: Path):
         assert wav.getnframes() == 20 * 512
 
 
+def test_live_record_allows_about_one_minute(tmp_path: Path):
+    config = LiveSndWavRecordConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=tmp_path / "direct.wav",
+        duration_seconds=60,
+        max_frames=1500,
+    )
+
+    config.validate()
+
+
 def test_live_record_dry_run_plan_has_wav_output_and_commands(tmp_path: Path):
     config = LiveSndWavRecordConfig(
         host="10.0.0.40",

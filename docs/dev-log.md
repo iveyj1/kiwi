@@ -99,6 +99,10 @@ Committed as `58336e2` (`Execute guarded operations from client shell`).
 
 Reduced live operation teardown latency by setting a short WebSocket close timeout for SND capture/record/play and by stopping the audio sink before closing the playback WebSocket. Timing checks at 5000 kHz AM, 60 frames: null-sink returned in about 2.9s and real sounddevice output in about 3.4s.
 
+Committed as `261703a` (`Reduce live audio teardown latency`).
+
+Raised explicit live play/record/capture guardrail caps to 60 seconds and 1500 SND frames. Defaults remain short, so longer live sessions require the user to pass `--duration-seconds` and `--max-frames` explicitly.
+
 ## YYYY-MM-DD
 
 ### Finding

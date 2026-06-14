@@ -23,8 +23,8 @@ from kiwi_client.protocol import parse_msg
 from kiwi_client.receiver_model import ReceiverState
 
 LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
-MAX_DURATION_SECONDS = 5.0
-MAX_FRAMES = 100
+MAX_DURATION_SECONDS = 60.0
+MAX_FRAMES = 1500
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
 
 
