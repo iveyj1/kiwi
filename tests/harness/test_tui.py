@@ -13,6 +13,7 @@ from kiwi_client.tui import (
     normalize_key_name,
     render_dashboard,
     request_tui_quit,
+    startup_state_and_presets,
     state_from_config,
 )
 
@@ -72,6 +73,9 @@ def test_render_dashboard_includes_persistent_live_state():
 class TuiFakeVolumeControl:
     def __init__(self):
         self.values = []
+
+    def get_percent(self) -> int:
+        return self.values[-1] if self.values else 10
 
     def set_percent(self, percent: int) -> dict:
         self.values.append(percent)
@@ -151,10 +155,10 @@ step_percent = 5
     assert state.mode == InputMode.KEYMAP
 
     response, message = handle_tui_key(ord("k"), state, controller, config)
-    assert response["state"]["volume_percent"] == 105
-    assert response["volume"] == {"backend": "fake", "percent": 105}
+    assert response["state"]["volume_percent"] == 15
+    assert response["volume"] == {"backend": "fake", "percent": 15}
     assert message == ""
-    assert volume.values == [105]
+    assert volume.values == [15]
 
 
 def test_tui_expand_key_action_uses_configured_steps(tmp_path):
@@ -236,6 +240,81 @@ def test_tui_safe_quit_keeps_running_when_operation_does_not_stop_quickly():
     assert message == "Stopping background operation before quit..."
     controller.background.stop()
     controller.background.join(timeout=1.0)
+
+
+def test_tui_keymap_digit_sequences_store_and_recall_presets():
+    controller = ClientController(volume_control=TuiFakeVolumeControl())
+    state = TuiInputState()
+
+    response, message = handle_tui_key(ord("1"), state, controller, load_config())
+    assert response is None
+    assert message == "Preset 1: press s=store, S=store all, r=recall"
+    response, message = handle_tui_key(ord("s"), state, controller, load_config())
+    assert response["type"] == "preset"
+    assert response["scope"] == "minimal"
+
+    controller.execute("agc gain 25")
+    handle_tui_key(ord("2"), state, controller, load_config())
+    response, message = handle_tui_key(ord("S"), state, controller, load_config())
+    assert response["scope"] == "all"
+
+    controller.execute("agc gain 50")
+    handle_tui_key(ord("2"), state, controller, load_config())
+    response, message = handle_tui_key(ord("r"), state, controller, load_config())
+    assert response["preset"] == 2
+    assert response["state"]["agc_gain"] == 25
+
+
+def test_tui_startup_state_and_safe_quit_persist_state(tmp_path):
+    config_path = tmp_path / "config.toml"
+    state_path = tmp_path / "state.json"
+    config_path.write_text(
+        f"""
+[startup]
+mode = "last"
+state_file = "{state_path}"
+
+[default_state]
+frequency_khz = 6000.0
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    state, presets = startup_state_and_presets(config)
+    controller = ClientController(state=state, presets=presets, volume_control=TuiFakeVolumeControl())
+    controller.execute("tune 7100")
+    controller.execute("store all 3")
+
+    response, message = request_tui_quit(controller, config=config)
+    restored_state, restored_presets = startup_state_and_presets(config)
+
+    assert response["type"] == "quit"
+    assert restored_state.frequency_khz == 7100.0
+    assert restored_presets[3]["frequency_khz"] == 7100.0
+
+
+def test_tui_startup_can_restore_configured_preset(tmp_path):
+    config_path = tmp_path / "config.toml"
+    state_path = tmp_path / "state.json"
+    config_path.write_text(
+        f"""
+[startup]
+mode = "preset"
+preset = 4
+state_file = "{state_path}"
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController(volume_control=TuiFakeVolumeControl())
+    controller.execute("tune 8200")
+    controller.execute("store all 4")
+    request_tui_quit(controller, config=config)
+
+    restored_state, restored_presets = startup_state_and_presets(config)
+
+    assert restored_state.frequency_khz == 8200.0
+    assert 4 in restored_presets
 
 
 def test_tui_command_mode_executes_and_exits_to_keymap():

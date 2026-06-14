@@ -26,6 +26,19 @@ max_frames = 1500
 restricted = true
 allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 
+[startup]
+state_file = "~/.local/state/kiwi-client/state.json"
+mode = "last"
+preset = 1
+
+[default_state]
+host = "10.0.0.40"
+port = 8073
+frequency_khz = 5000.0
+mode = "am"
+low_cut_hz = -5000
+high_cut_hz = 5000
+
 [keys]
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
@@ -82,6 +95,15 @@ class ReceiverConfig:
 
 
 @dataclass(frozen=True)
+class StartupConfig:
+    """TUI startup/restore settings."""
+
+    state_file: str = "~/.local/state/kiwi-client/state.json"
+    mode: str = "last"
+    preset: int = 1
+
+
+@dataclass(frozen=True)
 class KiwiClientConfig:
     """Loaded client configuration."""
 
@@ -89,6 +111,8 @@ class KiwiClientConfig:
     volume: VolumeConfig = field(default_factory=VolumeConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
     receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
+    startup: StartupConfig = field(default_factory=StartupConfig)
+    default_state: dict[str, Any] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
 
 
@@ -111,6 +135,8 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     volume = config.volume
     live = config.live
     receivers = config.receivers
+    startup = config.startup
+    default_state = dict(config.default_state)
     keys = dict(config.keys)
 
     if isinstance(data.get("steps"), dict):
@@ -140,10 +166,28 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
             restricted=bool(receiver_data.get("restricted", receivers.restricted)),
             allowed=tuple(str(receiver) for receiver in allowed),
         )
+    if isinstance(data.get("startup"), dict):
+        startup_data = data["startup"]
+        startup = replace(
+            startup,
+            state_file=str(startup_data.get("state_file", startup.state_file)),
+            mode=str(startup_data.get("mode", startup.mode)),
+            preset=int(startup_data.get("preset", startup.preset)),
+        )
+    if isinstance(data.get("default_state"), dict):
+        default_state.update(data["default_state"])
     if isinstance(data.get("keys"), dict):
         keys.update({str(key): str(value) for key, value in data["keys"].items()})
 
-    return KiwiClientConfig(steps=steps, volume=volume, live=live, receivers=receivers, keys=keys)
+    return KiwiClientConfig(
+        steps=steps,
+        volume=volume,
+        live=live,
+        receivers=receivers,
+        startup=startup,
+        default_state=default_state,
+        keys=keys,
+    )
 
 
 def _config_from_dict(data: dict[str, Any]) -> KiwiClientConfig:

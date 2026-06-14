@@ -16,6 +16,10 @@ def test_default_config_has_keymaps_and_steps():
     assert config.live.max_frames == 1500
     assert config.receivers.restricted is True
     assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
+    assert config.startup.mode == "last"
+    assert config.startup.preset == 1
+    assert config.startup.state_file.endswith("kiwi-client/state.json")
+    assert config.default_state["frequency_khz"] == 5000.0
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +medium"
     assert config.keys["up"] == "volume-step +10"
@@ -41,6 +45,15 @@ max_frames = 0
 restricted = false
 allowed = ["example.com:8073"]
 
+[startup]
+mode = "preset"
+preset = 7
+state_file = "state.json"
+
+[default_state]
+frequency_khz = 1234.5
+mode = "usb"
+
 [keys]
 "l" = "tune-step +large"
 "x" = "stop"
@@ -59,6 +72,11 @@ allowed = ["example.com:8073"]
     assert config.live.max_frames == 0
     assert config.receivers.restricted is False
     assert config.receivers.allowed == ("example.com:8073",)
+    assert config.startup.mode == "preset"
+    assert config.startup.preset == 7
+    assert config.startup.state_file == "state.json"
+    assert config.default_state["frequency_khz"] == 1234.5
+    assert config.default_state["mode"] == "usb"
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +large"
     assert config.keys["x"] == "stop"

@@ -11,6 +11,9 @@ class FakeVolumeControl:
     def __init__(self):
         self.values = []
 
+    def get_percent(self) -> int:
+        return self.values[-1] if self.values else 10
+
     def set_percent(self, percent: int) -> dict:
         self.values.append(percent)
         return {"backend": "fake", "percent": percent}
@@ -151,6 +154,45 @@ def test_client_agc_alias_and_query():
 
     assert response["type"] == "state"
     assert response["agc_command"] == "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50"
+
+
+def test_client_volume_step_reads_system_volume_before_applying_delta():
+    volume = FakeVolumeControl()
+    controller = ClientController(volume_control=volume)
+
+    response = controller.execute("volume-step 10")
+
+    assert response["state"]["volume_percent"] == 20
+    assert volume.values == [20]
+
+
+def test_client_store_and_recall_presets():
+    controller = ClientController(volume_control=FakeVolumeControl())
+
+    controller.execute("receiver 10.0.0.41:8073")
+    controller.execute("tune 7000")
+    controller.execute("mode usb 300 2700")
+    stored = controller.execute("store 1")
+    controller.execute("agc gain 25")
+    controller.execute("volume 40")
+    stored_all = controller.execute("store all 2")
+
+    controller.execute("receiver 10.0.0.40:8073")
+    controller.execute("tune 5000")
+    controller.execute("mode am -5000 5000")
+    controller.execute("agc gain 50")
+    recalled = controller.execute("recall 1")
+
+    assert stored == {"type": "preset", "preset": 1, "scope": "minimal", "state": stored["state"]}
+    assert stored_all["scope"] == "all"
+    assert recalled["state"]["receiver"] == "10.0.0.41:8073"
+    assert recalled["state"]["frequency_khz"] == 7000.0
+    assert recalled["state"]["mode"] == "usb"
+    assert recalled["state"]["agc_gain"] == 50
+
+    recalled_all = controller.execute("recall 2")
+    assert recalled_all["state"]["agc_gain"] == 25
+    assert recalled_all["state"]["volume_percent"] == 40
 
 
 def test_client_tune_step_and_volume_commands():

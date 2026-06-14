@@ -16,6 +16,7 @@ from pathlib import Path
 
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, available_commands
 from kiwi_client.config import KiwiClientConfig, load_config
+from kiwi_client.state_store import apply_preset, load_state_file, save_state_file
 
 
 class InputMode(Enum):
@@ -33,6 +34,7 @@ class TuiInputState:
     command: str = ""
     history: list[str] = field(default_factory=list)
     history_index: int | None = None
+    pending_preset_digit: str | None = None
 
 
 @dataclass(frozen=True)
@@ -151,7 +153,12 @@ def expand_key_action(action: str, controller: ClientController, config: KiwiCli
     return action
 
 
-def request_tui_quit(controller: ClientController, *, join_timeout: float = 2.0) -> tuple[dict[str, Any] | None, str]:
+def request_tui_quit(
+    controller: ClientController,
+    *,
+    join_timeout: float = 2.0,
+    config: KiwiClientConfig | None = None,
+) -> tuple[dict[str, Any] | None, str]:
     """Safely quit the TUI, stopping any active background operation first."""
     status = controller.background.status()
     if status.running:
@@ -160,8 +167,10 @@ def request_tui_quit(controller: ClientController, *, join_timeout: float = 2.0)
         if final.running:
             return {"type": "operation-status", "operation": final.as_dict()}, "Stopping background operation before quit..."
         controller.running = False
+        persist_tui_state(controller, config)
         return {"type": "operation-status", "operation": final.as_dict()}, "Stopped background operation and quitting."
     controller.running = False
+    persist_tui_state(controller, config)
     return {"type": "quit"}, ""
 
 
@@ -175,6 +184,18 @@ def handle_tui_key(
     config = config or load_config()
     if input_state.mode == InputMode.KEYMAP:
         key_name = normalize_key_name(ch)
+        if key_name is not None and key_name.isdigit():
+            input_state.pending_preset_digit = key_name
+            return None, f"Preset {key_name}: press s=store, S=store all, r=recall"
+        if input_state.pending_preset_digit is not None and key_name in {"s", "shift-s", "r"}:
+            digit = input_state.pending_preset_digit
+            input_state.pending_preset_digit = None
+            command = {"s": f"store {digit}", "shift-s": f"store all {digit}", "r": f"recall {digit}"}[key_name]
+            try:
+                return controller.execute(command), ""
+            except ClientCommandError as exc:
+                return None, f"error: {exc}"
+        input_state.pending_preset_digit = None
         action = config.keys.get(key_name) if key_name is not None else None
         if action == "command-mode" or ch == ord(":"):
             input_state.mode = InputMode.COMMAND
@@ -183,7 +204,7 @@ def handle_tui_key(
             return None, ""
         if action:
             if action == "quit":
-                return request_tui_quit(controller)
+                return request_tui_quit(controller, config=config)
             try:
                 return controller.execute(expand_key_action(action, controller, config)), ""
             except ClientCommandError as exc:
@@ -227,7 +248,7 @@ def handle_tui_key(
         if command == "help":
             return {"type": "help", "commands": available_commands()}, ""
         if command.lower() in {"quit", "exit", "q", "qu"}:
-            return request_tui_quit(controller)
+            return request_tui_quit(controller, config=config)
         try:
             return controller.execute(command), ""
         except ClientCommandError as exc:
@@ -238,9 +259,8 @@ def handle_tui_key(
     return None, None
 
 
-def state_from_config(config: KiwiClientConfig, state: ClientState | None = None) -> ClientState:
-    """Return client state with live limits and receiver policy from config."""
-    state = state or ClientState()
+def runtime_state_from_config(config: KiwiClientConfig, state: ClientState) -> ClientState:
+    """Apply non-radio runtime settings from config to a state."""
     return replace(
         state,
         duration_seconds=config.live.duration_seconds,
@@ -250,13 +270,50 @@ def state_from_config(config: KiwiClientConfig, state: ClientState | None = None
     )
 
 
+def state_from_config(config: KiwiClientConfig, state: ClientState | None = None) -> ClientState:
+    """Return client state with default radio state plus runtime config."""
+    state = state or ClientState()
+    if config.default_state:
+        state = apply_preset(state, config.default_state)
+    return runtime_state_from_config(config, state)
+
+
+def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, dict[int, dict[str, Any]]]:
+    """Resolve startup state and presets from config/state file."""
+    persisted = load_state_file(config.startup.state_file)
+    presets = {int(key): value for key, value in persisted.get("presets", {}).items()}
+    state = state_from_config(config)
+    mode = config.startup.mode.lower()
+    if mode == "last" and persisted.get("last_state"):
+        state = runtime_state_from_config(config, apply_preset(state, persisted["last_state"]))
+    elif mode == "preset" and config.startup.preset in presets:
+        state = runtime_state_from_config(config, apply_preset(state, presets[config.startup.preset]))
+    elif mode == "default":
+        state = state_from_config(config)
+    return state, presets
+
+
+def persist_tui_state(controller: ClientController, config: KiwiClientConfig | None) -> None:
+    """Persist last state and presets for future TUI startup."""
+    if config is None:
+        return
+    save_state_file(config.startup.state_file, last_state=controller.state, presets=controller.presets)
+
+
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
     config = config or load_config()
-    controller = controller or ClientController(state=state_from_config(config), allow_live_default=config.live.allow_live)
+    startup_state, presets = startup_state_and_presets(config)
+    controller = controller or ClientController(
+        state=startup_state,
+        allow_live_default=config.live.allow_live,
+        presets=presets,
+    )
     if controller is not None:
         controller.allow_live_default = config.live.allow_live
         controller.state = state_from_config(config, controller.state)
+        if not controller.presets:
+            controller.presets.update(presets)
     curses.wrapper(_run_curses, controller, config)
 
 
@@ -272,7 +329,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     config = load_config(args.config)
-    run_tui(ClientController(state=state_from_config(config), allow_live_default=config.live.allow_live), config=config)
+    startup_state, presets = startup_state_and_presets(config)
+    run_tui(ClientController(state=startup_state, allow_live_default=config.live.allow_live, presets=presets), config=config)
     return 0
 
 

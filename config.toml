@@ -1,0 +1,55 @@
+[steps]
+small_hz = 100
+medium_hz = 1000
+large_hz = 5000
+
+[volume]
+step_percent = 10
+
+[live]
+# Set true only for trusted local interactive use.
+allow_live = true
+# 0 means unlimited.
+duration_seconds = 0
+max_frames = 0
+
+[receivers]
+# Keep restricted=true for normal local-radio work.
+# Set restricted=false only when you explicitly want unrestricted receiver addresses.
+restricted = false
+allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+
+[startup]
+# mode can be "last", "default", or "preset".
+mode = "last"
+preset = 1
+state_file = "~/.local/state/kiwi-client/state.json"
+
+[default_state]
+host = "10.0.0.41"
+port = 8073
+frequency_khz = 5000.0
+mode = "am"
+low_cut_hz = -5000
+high_cut_hz = 5000
+
+[keys]
+"right" = "tune-step +medium"
+"l" = "tune-step +medium"
+"left" = "tune-step -medium"
+"h" = "tune-step -medium"
+"shift-right" = "tune-step +small"
+"shift-l" = "tune-step +small"
+"shift-left" = "tune-step -small"
+"shift-h" = "tune-step -small"
+"ctrl-right" = "tune-step +large"
+"ctrl-l" = "tune-step +large"
+"ctrl-left" = "tune-step -large"
+"ctrl-h" = "tune-step -large"
+"up" = "volume-step +10"
+"k" = "volume-step +10"
+"down" = "volume-step -10"
+"j" = "volume-step -10"
+":" = "command-mode"
+# Safe quit: requests background stop before exiting the TUI.
+"q" = "quit"

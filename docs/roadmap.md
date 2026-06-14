@@ -198,6 +198,7 @@ Current capabilities:
 - The TUI has a two-mode input model and can load TOML keymap/step configuration with `--config`.
 - Keymap mode supports configured tune-step and volume-step actions; volume controls local system output via common Linux mixer tools.
 - TUI quit paths request cooperative background stop before exiting.
+- Presets and last-state persistence support restoring startup state from last run, default config, or a configured preset.
 - Interactive AGC controls are available and can be queued to active background playback.
 - TUI config can set live duration/max-frame limits, with `0` meaning unlimited, and can configure or disable receiver restrictions.
 - `tune`, `mode`, and `filter` changes during active background playback queue `SET mod=...` commands to the live playback WebSocket after initial setup.

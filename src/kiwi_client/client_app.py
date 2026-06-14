@@ -24,6 +24,7 @@ from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
+from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
 
@@ -162,12 +163,14 @@ class ClientController:
         background: BackgroundOperation | None = None,
         allow_live_default: bool = False,
         volume_control: VolumeControl | None = None,
+        presets: dict[int, dict[str, Any]] | None = None,
     ) -> None:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
         self.background = background or BackgroundOperation()
         self.allow_live_default = allow_live_default
         self.volume_control = volume_control or SystemVolumeControl()
+        self.presets: dict[int, dict[str, Any]] = dict(presets or {})
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -223,9 +226,14 @@ class ClientController:
             return self._set_volume(self._clamp_volume(int(args[0])))
         if command == "volume-step":
             self._require_arg_count(args, 1, "volume-step <delta_percent>")
-            return self._set_volume(self._clamp_volume(self.state.volume_percent + int(args[0])))
+            return self._set_volume(self._clamp_volume(self._current_volume_percent() + int(args[0])))
         if command == "agc":
             return self._handle_agc(args)
+        if command == "store":
+            return self._handle_store(args)
+        if command == "recall":
+            self._require_arg_count(args, 1, "recall <n>")
+            return self._recall_preset(int(args[0]))
         if command == "duration":
             self._require_arg_count(args, 1, "duration <seconds>")
             self.state = replace(self.state, duration_seconds=float(args[0]))
@@ -351,6 +359,31 @@ class ClientController:
         response["active_command"] = command
         response["operation"] = status.as_dict()
         return response
+
+    def _handle_store(self, args: list[str]) -> dict[str, Any]:
+        if len(args) == 1:
+            preset_id = int(args[0])
+            self.presets[preset_id] = minimal_preset(self.state)
+            return {"type": "preset", "preset": preset_id, "scope": "minimal", "state": self.state.as_dict()}
+        if len(args) == 2 and args[0].lower() == "all":
+            preset_id = int(args[1])
+            self.presets[preset_id] = full_preset(self.state)
+            return {"type": "preset", "preset": preset_id, "scope": "all", "state": self.state.as_dict()}
+        raise ClientCommandError("usage: store <n> | store all <n>")
+
+    def _recall_preset(self, preset_id: int) -> dict[str, Any]:
+        if preset_id not in self.presets:
+            raise ClientCommandError(f"unknown preset: {preset_id}")
+        self.state = apply_preset(self.state, self.presets[preset_id])
+        response = self._state_response()
+        response["preset"] = preset_id
+        return response
+
+    def _current_volume_percent(self) -> int:
+        try:
+            return self.volume_control.get_percent()
+        except RuntimeError:
+            return self.state.volume_percent
 
     def _set_volume(self, percent: int) -> dict[str, Any]:
         self.state = replace(self.state, volume_percent=percent)
@@ -548,6 +581,8 @@ def command_aliases() -> dict[str, str]:
         "mo": "mode",
         "fi": "filter",
         "ag": "agc",
+        "stp": "store",
+        "rc": "recall",
         "du": "duration",
         "fr": "frames",
         "pb": "play-bg",
@@ -573,6 +608,9 @@ def available_commands() -> list[str]:
         "volume <percent>",
         "volume-step <delta_percent>",
         "agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]",
+        "store <n>",
+        "store all <n>",
+        "recall <n>",
         "duration <seconds>",
         "frames <max_snd_frames>",
         "dashboard",

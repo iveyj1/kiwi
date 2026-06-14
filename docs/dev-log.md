@@ -141,6 +141,8 @@ Changed `volume` / `volume-step` to control local system output volume via an in
 
 Fixed TUI quit behavior while background playback is active. Keymap `q` and command-mode `quit`/`q`/`qu`/`exit` now request cooperative background stop and wait briefly before ending curses. If the worker does not stop quickly, the TUI stays open and reports that shutdown is in progress.
 
+Changed `volume-step` to read the current local system output volume before applying the configured delta. Added preset commands `store <n>`, `store all <n>`, and `recall <n>`, plus TUI keymap digit sequences `<n>s`, `<n>S`, and `<n>r`. The TUI now persists last full state and presets to a JSON state file on safe exit and can start from `[startup] mode = "last"`, `"default"`, or `"preset"`.
+
 ## YYYY-MM-DD
 
 ### Finding

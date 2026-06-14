@@ -32,6 +32,7 @@ TUI input has two modes:
 - In command mode, `Esc` clears the command and returns to keymap mode.
 - In command mode, up/down arrows browse command history; the selected command is placed in the prompt for editing.
 - In keymap mode, `q` requests cooperative stop of any background operation before exiting the TUI.
+- In keymap mode, digit sequences manage presets: `<n>s` stores receiver/frequency/mode/filter, `<n>S` stores all state, and `<n>r` recalls preset `<n>`.
 
 Default TUI keymap/step configuration shape:
 
@@ -55,6 +56,20 @@ max_frames = 1500
 # Default is restricted to local receivers.
 restricted = true
 allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
+
+[startup]
+# mode can be "last", "default", or "preset".
+mode = "last"
+preset = 1
+state_file = "~/.local/state/kiwi-client/state.json"
+
+[default_state]
+host = "10.0.0.40"
+port = 8073
+frequency_khz = 5000.0
+mode = "am"
+low_cut_hz = -5000
+high_cut_hz = 5000
 
 [keys]
 "right" = "tune-step +medium"
@@ -157,6 +172,9 @@ Supported commands:
 - `volume <percent>`
 - `volume-step <delta_percent>`
 - `agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]`
+- `store <n>`
+- `store all <n>`
+- `recall <n>`
 - `duration <seconds>`
 - `frames <max_snd_frames>`
 - `dashboard`
@@ -206,13 +224,23 @@ agc set on=true hang=false thresh=-100 slope=6 decay=1000 gain=50
 
 During active background playback, AGC changes are queued to the active SND WebSocket.
 
+Presets:
+
+```text
+store 1        # receiver/frequency/mode/filter only
+store all 2    # full client/radio state
+recall 1
+```
+
+In keymap mode, press `1s`, `2S`, or `1r` for the same operations. The TUI persists the last full state and presets to `[startup].state_file` on safe exit. On restart, `[startup].mode` controls whether to use `last`, `default`, or a configured `preset`.
+
 Current limitations:
 
 - `connect` and `disconnect` only update client state for now.
 - Live operations from the shell require explicit `--allow-live`.
 - TUI is an initial curses command/dashboard shell, not a full SDR interface yet.
 - RSSI/S-meter display is a simple latest-value readout from SND frames, not a calibrated meter widget.
-- `volume` / `volume-step` control local system output volume via common Linux mixer tools (`wpctl`, `pactl`, then `amixer`). The local `kiwiclient` reference has verified `SET agc=...` receiver-side gain control, but no verified Kiwi radio-side volume command.
+- `volume-step` reads the current system output volume before applying its delta, then sets the new local system volume via common Linux mixer tools (`wpctl`, `pactl`, then `amixer`). The local `kiwiclient` reference has verified `SET agc=...` receiver-side gain control, but no verified Kiwi radio-side volume command.
 - `connect` is not a continuously open retunable WebSocket session yet.
 
 Example shell commands for persistent live settings and guarded execution:

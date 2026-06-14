@@ -2,19 +2,22 @@
 
 ## Current slice
 
-Goal: Fix TUI keymap quit while live playback is active.
+Goal: Add system-volume read-before-step, presets, and persisted startup state.
 
 Done criteria:
 
-- Keymap `q` / configured `quit` action requests cooperative background stop before ending the TUI.
-- Command-mode `quit`, `q`, `qu`, and `exit` use the same safe TUI quit path.
-- If the background operation does not stop quickly, keep TUI running and report that stop is still in progress.
-- Cover safe quit behavior with harness tests.
-- Update the example root config and docs/dev-log.
+- `volume-step` reads current system output volume before applying its delta.
+- Add `store <n>`, `store all <n>`, and `recall <n>` commands.
+- Minimal presets store receiver/frequency/mode/filter; all presets store full radio/client state.
+- Add TUI keymap digit sequences `<n>s`, `<n>S`, and `<n>r`.
+- Save last full radio state and presets on TUI safe exit.
+- Restore startup state from config: last state, default state, or preset.
+- Cover behavior with harness tests.
+- Update root `config.toml` and docs.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no; harness-first TUI shutdown work.
+Live-radio needed: no; harness-first UI/state work.
 
 Docs to update: root `config.toml`, `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
