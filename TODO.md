@@ -2,13 +2,14 @@
 
 ## Current slice
 
-Goal: Add an offline JSONL capture-writer shape for future SND live-to-fixture capture.
+Goal: Add a strict offline replay transport for command/response fixture scripts.
 
 Done criteria:
 
-- Add capture metadata structure for short SND captures.
-- Add a JSONL capture writer for tx commands, rx MSG events, and rx binary payloads.
-- Round-trip writer output through the existing fixture loader, MSG parser, receiver state, and SND parser.
+- Add a replay transport that consumes fixture events in order.
+- Validate transmitted command text against `tx`/`cmd` fixture events.
+- Return received MSG and binary payload events without network access.
+- Cover successful SND setup/session replay and command mismatch failure with pytest.
 - Keep live-radio testing deferred.
 
 Test command: `python3 -m pytest tests/harness tests/protocol`

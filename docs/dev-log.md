@@ -36,7 +36,13 @@ Added offline JSONL capture writer shape in `src/kiwi_client/capture.py`. It rec
 
 ### Follow-up
 
-Next useful slice: add a fake transport/replay driver that can feed command expectations and fixture responses without network access, or add the first guarded live capture command-line tool while leaving execution for a separate explicit live-radio-test step.
+Committed as `68770f5` (`Add offline SND capture fixture writer`).
+
+Added strict offline `ReplayTransport` in `src/kiwi_client/transport.py`. It consumes fixture events in order, validates transmitted commands, and returns received MSG/binary events. `tests/harness/test_replay_transport.py` covers successful setup/session replay and command mismatch failure.
+
+`python3 -m pytest tests/harness tests/protocol` passed: 18 tests.
+
+Next useful slice: add the first guarded live capture command-line tool while leaving actual execution for a separate explicit live-radio-test step, or add more parser coverage for sequence/dropout handling before live capture.
 
 ## YYYY-MM-DD
 

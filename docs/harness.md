@@ -88,6 +88,16 @@ The future live capture path should use the same JSONL event shape as the tests.
 
 `tests/harness/test_capture_writer.py` round-trips writer output through the fixture loader, MSG parser, receiver state, and SND audio parser. This is the expected file shape for the first short local capture when live-radio testing is explicitly started.
 
+## Offline replay transport
+
+`src/kiwi_client/transport.py` includes `ReplayTransport`, a strict no-network transport for fixture scripts:
+
+- `send(text)` consumes the next event and requires it to be a matching `tx`/`cmd`.
+- `receive()` consumes the next event and returns a received `MSG` text or binary payload.
+- Any command mismatch, wrong direction, unsupported type, or exhausted fixture raises `ReplayTransportError`.
+
+Use this before live testing to validate that setup commands and expected responses are in the intended order.
+
 ## First SND capture plan, after harness gate passes
 
 Do not run this until command encoding and parser fixture tests pass.
