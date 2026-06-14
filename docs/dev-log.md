@@ -28,9 +28,15 @@ Documented the first short SND live-to-fixture capture plan in `docs/harness.md`
 
 `python3 -m pytest tests/harness tests/protocol` passed: 15 tests.
 
+Committed as `dc44b44` (`Add fixture-tested SND command encoders`).
+
+Added offline JSONL capture writer shape in `src/kiwi_client/capture.py`. It records SND capture metadata, tx commands, rx MSG events, and rx binary WebSocket payloads. `tests/harness/test_capture_writer.py` round-trips a synthetic capture through the fixture loader, MSG parser, receiver state, and SND parser.
+
+`python3 -m pytest tests/harness tests/protocol` passed: 16 tests.
+
 ### Follow-up
 
-Next useful slice: implement an offline capture-writer shape or fake transport replay for the planned short SND capture. Live receiver access remains deferred until the capture tool can write the documented JSONL metadata/events.
+Next useful slice: add a fake transport/replay driver that can feed command expectations and fixture responses without network access, or add the first guarded live capture command-line tool while leaving execution for a separate explicit live-radio-test step.
 
 ## YYYY-MM-DD
 

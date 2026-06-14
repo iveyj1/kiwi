@@ -77,6 +77,17 @@ fixture-name.bin        concatenated binary payloads
 
 The JSONL file should contain byte offsets and lengths into the binary file.
 
+## Offline capture writer
+
+The future live capture path should use the same JSONL event shape as the tests. `src/kiwi_client/capture.py` provides an offline `JsonlCaptureWriter` that records:
+
+- one metadata event with receiver/time/frequency/mode/filter/compression fields,
+- transmitted command events,
+- received `MSG` text events,
+- received binary WebSocket payload events encoded as base64.
+
+`tests/harness/test_capture_writer.py` round-trips writer output through the fixture loader, MSG parser, receiver state, and SND audio parser. This is the expected file shape for the first short local capture when live-radio testing is explicitly started.
+
 ## First SND capture plan, after harness gate passes
 
 Do not run this until command encoding and parser fixture tests pass.

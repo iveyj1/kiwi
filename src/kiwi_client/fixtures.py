@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Iterable
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +33,42 @@ class FixtureEvent:
         if not isinstance(data, str):
             raise ValueError("binary event data must be a base64 string")
         return base64.b64decode(data, validate=True)
+
+
+def binary_event_payload(payload: bytes) -> dict[str, str]:
+    """Return JSON fields for a base64-encoded binary fixture payload."""
+    return {
+        "encoding": "base64",
+        "data": base64.b64encode(payload).decode("ascii"),
+    }
+
+
+def fixture_event(
+    *,
+    t: float,
+    dir: str,
+    stream: str,
+    type: str,
+    **fields: Any,
+) -> dict[str, Any]:
+    """Build one JSON-serializable fixture event dictionary."""
+    return {
+        "t": t,
+        "dir": dir,
+        "stream": stream,
+        "type": type,
+        **fields,
+    }
+
+
+def write_jsonl_events(path: str | Path, events: Iterable[dict[str, Any]]) -> None:
+    """Write fixture events as UTF-8 JSONL with stable key order."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fp:
+        for event in events:
+            json.dump(event, fp, separators=(",", ":"))
+            fp.write("\n")
 
 
 def load_jsonl_events(path: str | Path) -> list[FixtureEvent]:
