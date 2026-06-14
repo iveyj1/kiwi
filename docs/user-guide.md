@@ -4,16 +4,58 @@ This file should describe user-visible behavior as the application develops.
 
 ## Basic client
 
-TBD.
+The first basic client is a scriptable command shell. It manages client state and can produce dry-run plans for guarded live operations without connecting.
 
-Expected early operations:
+Run interactively:
 
-- Connect to receiver
-- Disconnect from receiver
-- Select frequency
-- Select mode
-- Start/stop audio playback
-- View status/errors
+```bash
+PYTHONPATH=src python3 -m kiwi_client.client_app --json
+```
+
+Run a script:
+
+```bash
+cat > /tmp/kiwi-client-script.txt <<'EOF'
+status
+tune 5000
+mode am -5000 5000
+play-plan
+record-plan recordings/client-5000-am.wav
+capture-plan tests/fixtures/kiwi/client-5000-am.jsonl
+quit
+EOF
+
+PYTHONPATH=src python3 -m kiwi_client.client_app \
+  --script /tmp/kiwi-client-script.txt \
+  --json
+```
+
+Supported commands:
+
+- `status`
+- `connect` / `disconnect` (state only; no persistent receiver session yet)
+- `receiver <host>[:port]`
+- `tune <frequency_khz>`
+- `mode <mode> [low_cut_hz high_cut_hz]`
+- `filter <low_cut_hz> <high_cut_hz>`
+- `play-plan`
+- `record-plan <output.wav>`
+- `capture-plan <output.jsonl>`
+- `help`
+- `quit`
+
+Current limitations:
+
+- `connect` and `disconnect` only update client state for now.
+- Plans do not execute live operations from inside the shell yet.
+- No live RSSI/sample-rate/status display yet.
+- No TUI yet.
+
+Expected next operations:
+
+- Execute guarded playback/record/capture from the shell.
+- Add live status/error display.
+- Add persistent session lifecycle.
 
 ## Waterfall
 

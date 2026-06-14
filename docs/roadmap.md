@@ -174,24 +174,31 @@ Open decisions:
 
 ## Milestone 6 — Basic interactive client
 
-Status: **Planned**
+Status: **In progress**
 
 Goal:
 
 Provide a simple local control surface for connecting, tuning, mode selection, and status.
 
-Likely shape:
+Current capabilities:
 
-- Start with CLI or TUI for controls/status.
+- Scriptable CLI control surface exists as `python3 -m kiwi_client.client_app` / `kiwi-client`.
+- Client state is separate from protocol/transport/audio code.
+- Commands support status, connect/disconnect state, receiver selection, tune, mode/filter changes, and dry-run plans for playback, recording, and capture.
+- JSONL output is available for scripts/tests.
+
+Remaining capabilities needed:
+
+- Actual persistent connect/disconnect session lifecycle.
+- Execute play/record/capture commands from the client shell, not only plans.
+- Live status updates: sample rate, RSSI, sequence gaps, receiver errors.
+- TUI or richer interactive surface.
+
+Shape notes:
+
+- Start with CLI/script shell for controls/status.
 - Keep waterfall separate initially if easier.
 - Keep protocol and transport separate from UI.
-
-Capabilities needed:
-
-- Connect/disconnect lifecycle.
-- Tune frequency.
-- Change mode/filter.
-- Show sample rate, RSSI, sequence gaps, and receiver errors.
 
 ## Milestone 7 — Waterfall
 

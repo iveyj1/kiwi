@@ -1,0 +1,76 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from kiwi_client.client_app import ClientCommandError, ClientController, run_script, main
+
+
+def test_client_controller_status_and_state_changes():
+    controller = ClientController()
+
+    controller.execute("receiver 10.0.0.41:8073")
+    controller.execute("tune 10000")
+    controller.execute("mode usb 300 2700")
+    response = controller.execute("status")
+
+    state = response["state"]
+    assert state["receiver"] == "10.0.0.41:8073"
+    assert state["frequency_khz"] == 10000.0
+    assert state["mode"] == "usb"
+    assert state["low_cut_hz"] == 300
+    assert state["high_cut_hz"] == 2700
+
+
+def test_client_controller_connect_disconnect_state_only():
+    controller = ClientController()
+
+    assert controller.execute("connect")["state"]["connected"] is True
+    assert controller.execute("disconnect")["state"]["connected"] is False
+
+
+def test_client_plans_reuse_current_state():
+    controller = ClientController()
+    controller.execute("tune 5000")
+    controller.execute("mode am -5000 5000")
+
+    play = controller.execute("play-plan")["plan"]
+    record = controller.execute("record-plan recordings/test.wav")["plan"]
+    capture = controller.execute("capture-plan tests/fixtures/kiwi/test.jsonl")["plan"]
+
+    for plan in (play, record, capture):
+        assert plan["frequency_khz"] == 5000.0
+        assert plan["mode"] == "am"
+        assert plan["low_cut_hz"] == -5000
+        assert plan["high_cut_hz"] == 5000
+        assert "SET mod=am low_cut=-5000 high_cut=5000 freq=5000.000" in plan["dynamic_commands"]
+    assert record["output"] == "recordings/test.wav"
+    assert capture["output"] == "tests/fixtures/kiwi/test.jsonl"
+
+
+def test_run_script_stops_at_quit():
+    responses = run_script([
+        "status",
+        "quit",
+        "tune 7000",
+    ])
+
+    assert [response["type"] for response in responses] == ["status", "quit"]
+
+
+def test_client_rejects_bad_command():
+    with pytest.raises(ClientCommandError, match="unknown command"):
+        ClientController().execute("wat")
+
+
+def test_client_app_script_json_output(tmp_path: Path, capsys):
+    script = tmp_path / "client.txt"
+    script.write_text("tune 5000\nplay-plan\n", encoding="utf-8")
+
+    code = main(["--script", str(script), "--json"])
+
+    lines = capsys.readouterr().out.splitlines()
+    assert code == 0
+    decoded = [json.loads(line) for line in lines]
+    assert decoded[0]["state"]["frequency_khz"] == 5000.0
+    assert decoded[1]["type"] == "play-plan"

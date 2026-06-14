@@ -2,22 +2,21 @@
 
 ## Current slice
 
-Goal: Get short guarded live SND playback working.
+Goal: Start Milestone 6 with a basic scriptable client control surface.
 
 Done criteria:
 
-- Add optional `sounddevice` sink behind the existing playback `AudioSink` interface.
-- Add guarded live SND playback CLI with dry-run, null-sink, and explicit `--allow-live` modes.
-- Cover live playback command/session flow with replay transport and `NullAudioSink`.
-- Verify one short local null-sink live playback run.
-- Verify one short local real audio output run if an output device is available.
-- Update roadmap and user docs.
+- Add a small client controller/app state layer separate from protocol/transport/audio code.
+- Support status, connect/disconnect state, receiver, tune, mode, filter, play-plan, record-plan, and capture-plan commands.
+- Add a `kiwi-client` CLI that can run a command script and emit JSONL responses.
+- Cover state transitions and generated operation plans with pytest.
+- Keep live-radio testing deferred for this first Milestone 6 slice.
 
-Test command: `python3 -m pytest tests/audio tests/harness tests/protocol`
+Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: yes, short local receiver only after harness passes.
+Live-radio needed: no
 
-Docs to update: `docs/roadmap.md`, `docs/audio-pipeline.md`, `docs/user-guide.md`, `docs/radio-lab.md`, `docs/dev-log.md`
+Docs to update: `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 
