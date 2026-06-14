@@ -6,12 +6,16 @@ ClientController commands so it does not duplicate protocol/audio behavior.
 
 from __future__ import annotations
 
+import argparse
 import curses
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from pathlib import Path
+
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, available_commands
+from kiwi_client.config import KiwiClientConfig, load_config
 
 
 class InputMode(Enum):
@@ -165,19 +169,28 @@ def handle_tui_key(
     return None, None
 
 
-def run_tui(controller: ClientController | None = None) -> None:
+def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
     controller = controller or ClientController()
-    curses.wrapper(_run_curses, controller)
+    curses.wrapper(_run_curses, controller, config or load_config())
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the TUI CLI argument parser."""
+    parser = argparse.ArgumentParser(description="KiwiSDR curses TUI")
+    parser.add_argument("--config", type=Path, help="optional TOML configuration file")
+    return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for the curses TUI."""
-    run_tui(ClientController())
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    run_tui(ClientController(), config=load_config(args.config))
     return 0
 
 
-def _run_curses(stdscr, controller: ClientController) -> None:
+def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) -> None:
     curses.curs_set(1)
     stdscr.timeout(250)
     last_response: dict[str, Any] | None = None

@@ -125,6 +125,8 @@ Added client command aliases for interactive use: `?` for status, `re`, `tu`, `m
 
 Added a two-mode TUI input model. The TUI starts in keymap mode, `:` enters command mode, `Enter` executes and exits command mode, `Esc` clears/exits command mode, and up/down in command mode browse command history for editing.
 
+Added TOML configuration loading in `src/kiwi_client/config.py`. Defaults include small/medium/large frequency steps, volume step percent, and keymap actions. The TUI accepts `--config <path>` to overlay defaults.
+
 ## YYYY-MM-DD
 
 ### Finding
