@@ -55,6 +55,17 @@ step_percent = 10
 ":" = "command-mode"
 ```
 
+In keymap mode, the default bindings are:
+
+- right arrow or `l`: increase frequency by the configured medium step.
+- left arrow or `h`: decrease frequency by the configured medium step.
+- uppercase `L` / `H`: increase/decrease by the configured small step.
+- Ctrl+`l` / Ctrl+`h`: increase/decrease by the configured large step where the terminal reports those control keys distinctly.
+- up arrow or `k`: increase volume by the configured volume step.
+- down arrow or `j`: decrease volume by the configured volume step.
+
+Terminal support for modified arrow keys varies; letter bindings are the portable fallback.
+
 or, after installing the package scripts:
 
 ```bash
@@ -93,6 +104,9 @@ Supported commands:
 - `tune <frequency_khz>`
 - `mode <mode> [low_cut_hz high_cut_hz]`
 - `filter <low_cut_hz> <high_cut_hz>`
+- `tune-step <+/-hz|small|medium|large>`
+- `volume <percent>`
+- `volume-step <delta_percent>`
 - `duration <seconds>`
 - `frames <max_snd_frames>`
 - `dashboard`

@@ -127,6 +127,8 @@ Added a two-mode TUI input model. The TUI starts in keymap mode, `:` enters comm
 
 Added TOML configuration loading in `src/kiwi_client/config.py`. Defaults include small/medium/large frequency steps, volume step percent, and keymap actions. The TUI accepts `--config <path>` to overlay defaults.
 
+Added controller commands `tune-step`, `volume`, and `volume-step`. TUI keymap mode now executes configured key actions, expanding named frequency steps using the loaded TOML step sizes. Volume is currently client state/display only; applying gain to live PCM remains future work.
+
 ## YYYY-MM-DD
 
 ### Finding

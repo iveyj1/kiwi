@@ -59,6 +59,7 @@ def render_dashboard(
         f"Connected: {'yes' if state.connected else 'no'}",
         f"Frequency: {state.frequency_khz:.3f} kHz",
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
+        f"Volume: {state.volume_percent}%",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
         "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, record-bg, capture-bg, stop, help, quit",
@@ -106,18 +107,67 @@ def render_dashboard(
     return "\n".join(lines)
 
 
+def normalize_key_name(ch: int) -> str | None:
+    """Return a config key name for a curses key code."""
+    special = {
+        curses.KEY_RIGHT: "right",
+        curses.KEY_LEFT: "left",
+        curses.KEY_UP: "up",
+        curses.KEY_DOWN: "down",
+    }
+    if ch in special:
+        return special[ch]
+    if 1 <= ch <= 26:
+        return f"ctrl-{chr(ch + 96)}"
+    if 0 <= ch < 256:
+        char = chr(ch)
+        if char.isalpha() and char.isupper():
+            return f"shift-{char.lower()}"
+        return char
+    return None
+
+
+def expand_key_action(action: str, controller: ClientController, config: KiwiClientConfig) -> str:
+    """Expand configured key actions into controller commands."""
+    parts = action.split()
+    if len(parts) == 2 and parts[0] == "tune-step":
+        sign = -1 if parts[1].startswith("-") else 1
+        token = parts[1].lstrip("+-")
+        step_hz = {
+            "small": config.steps.small_hz,
+            "medium": config.steps.medium_hz,
+            "large": config.steps.large_hz,
+        }.get(token)
+        if step_hz is not None:
+            new_frequency = controller.state.frequency_khz + sign * step_hz / 1000.0
+            return f"tune {new_frequency:.3f}"
+    if len(parts) == 2 and parts[0] == "volume-step" and parts[1] in {"+10", "-10"}:
+        sign = -1 if parts[1].startswith("-") else 1
+        return f"volume-step {sign * config.volume.step_percent}"
+    return action
+
+
 def handle_tui_key(
     ch: int,
     input_state: TuiInputState,
     controller: ClientController,
+    config: KiwiClientConfig | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Handle one curses key and return an optional response/message."""
+    config = config or load_config()
     if input_state.mode == InputMode.KEYMAP:
-        if ch == ord(":"):
+        key_name = normalize_key_name(ch)
+        action = config.keys.get(key_name) if key_name is not None else None
+        if action == "command-mode" or ch == ord(":"):
             input_state.mode = InputMode.COMMAND
             input_state.command = ""
             input_state.history_index = None
             return None, ""
+        if action:
+            try:
+                return controller.execute(expand_key_action(action, controller, config)), ""
+            except ClientCommandError as exc:
+                return None, f"error: {exc}"
         if ch in (27,):
             controller.running = False
             return None, ""
@@ -215,7 +265,7 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
         ch = stdscr.getch()
         if ch == -1:
             continue
-        response, new_message = handle_tui_key(ch, input_state, controller)
+        response, new_message = handle_tui_key(ch, input_state, controller, config)
         if response is not None:
             last_response = response
         if new_message is not None:

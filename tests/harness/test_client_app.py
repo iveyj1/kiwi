@@ -119,6 +119,18 @@ def test_client_controller_connect_disconnect_state_only():
     assert controller.execute("disconnect")["state"]["connected"] is False
 
 
+def test_client_tune_step_and_volume_commands():
+    controller = ClientController()
+
+    assert controller.execute("tune-step +medium")["state"]["frequency_khz"] == pytest.approx(5001.0)
+    assert controller.execute("tune-step -small")["state"]["frequency_khz"] == pytest.approx(5000.9)
+    assert controller.execute("tune-step +5000")["state"]["frequency_khz"] == pytest.approx(5005.9)
+    assert controller.execute("volume 55")["state"]["volume_percent"] == 55
+    assert controller.execute("volume-step 10")["state"]["volume_percent"] == 65
+    assert controller.execute("volume-step -1000")["state"]["volume_percent"] == 0
+    assert controller.execute("volume 1000")["state"]["volume_percent"] == 200
+
+
 def test_client_plans_reuse_current_state():
     controller = ClientController()
     controller.execute("tune 5000")

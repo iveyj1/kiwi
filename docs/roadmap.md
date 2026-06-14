@@ -196,6 +196,7 @@ Current capabilities:
 - Live SND operations publish latest RSSI/S-meter, sample-rate, SND frame, sequence-gap, and ADC-overflow metrics into operation status; the TUI dashboard displays those metrics when available.
 - The curses TUI redraws periodically, so changing RSSI/status/error information appears without waiting for a keypress.
 - The TUI has a two-mode input model and can load TOML keymap/step configuration with `--config`.
+- Keymap mode supports configured tune-step and volume-step actions; volume is currently client state/display only.
 - `tune`, `mode`, and `filter` changes during active background playback queue `SET mod=...` commands to the live playback WebSocket after initial setup.
 
 Remaining capabilities needed:

@@ -3,7 +3,8 @@ from pathlib import Path
 import curses
 
 from kiwi_client.client_app import ClientController, ClientState
-from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_dashboard
+from kiwi_client.config import load_config
+from kiwi_client.tui import InputMode, TuiInputState, expand_key_action, handle_tui_key, render_dashboard
 
 
 def test_render_dashboard_includes_persistent_live_state():
@@ -44,6 +45,7 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Connected: yes" in text
     assert "Frequency: 10000.000 kHz" in text
     assert "Mode/filter: usb 300..2700 Hz" in text
+    assert "Volume: 100%" in text
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Operation: play" in text
     assert "Running: yes" in text
@@ -55,6 +57,40 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Last response: state" in text
     assert "Applied to active stream: SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000" in text
     assert "Message: ok" in text
+
+
+def test_tui_keymap_mode_executes_configured_tune_and_volume_actions(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[steps]
+medium_hz = 2500
+
+[volume]
+step_percent = 5
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController()
+    state = TuiInputState()
+
+    response, message = handle_tui_key(ord("l"), state, controller, config)
+    assert response["state"]["frequency_khz"] == 5002.5
+    assert message == ""
+    assert state.mode == InputMode.KEYMAP
+
+    response, message = handle_tui_key(ord("k"), state, controller, config)
+    assert response["state"]["volume_percent"] == 105
+    assert message == ""
+
+
+def test_tui_expand_key_action_uses_configured_steps(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text("[steps]\nlarge_hz = 12500\n", encoding="utf-8")
+    config = load_config(config_path)
+
+    assert expand_key_action("tune-step +large", ClientController(), config) == "tune 5012.500"
 
 
 def test_tui_command_mode_executes_and_exits_to_keymap():

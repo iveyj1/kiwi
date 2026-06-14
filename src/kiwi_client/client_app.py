@@ -43,6 +43,7 @@ class ClientState:
     user: str = "kiwi-client"
     duration_seconds: float = 60.0
     max_frames: int = 1500
+    volume_percent: int = 100
     connected: bool = False
 
     @property
@@ -199,6 +200,19 @@ class ClientController:
             self._require_arg_count(args, 2, "filter <low_cut_hz> <high_cut_hz>")
             self.state = replace(self.state, low_cut_hz=int(args[0]), high_cut_hz=int(args[1]))
             return self._state_response()
+        if command == "tune-step":
+            self._require_arg_count(args, 1, "tune-step <+/-hz|small|medium|large>")
+            delta_hz = self._parse_tune_step_hz(args[0])
+            self.state = replace(self.state, frequency_khz=self.state.frequency_khz + delta_hz / 1000.0)
+            return self._state_response()
+        if command == "volume":
+            self._require_arg_count(args, 1, "volume <percent>")
+            self.state = replace(self.state, volume_percent=self._clamp_volume(int(args[0])))
+            return {"type": "state", "state": self.state.as_dict()}
+        if command == "volume-step":
+            self._require_arg_count(args, 1, "volume-step <delta_percent>")
+            self.state = replace(self.state, volume_percent=self._clamp_volume(self.state.volume_percent + int(args[0])))
+            return {"type": "state", "state": self.state.as_dict()}
         if command == "duration":
             self._require_arg_count(args, 1, "duration <seconds>")
             self.state = replace(self.state, duration_seconds=float(args[0]))
@@ -323,6 +337,23 @@ class ClientController:
         return response
 
     @staticmethod
+    def _parse_tune_step_hz(value: str) -> int:
+        sign = 1
+        token = value.strip().lower()
+        if token.startswith("+"):
+            token = token[1:]
+        elif token.startswith("-"):
+            token = token[1:]
+            sign = -1
+        named = {"small": 100, "medium": 1000, "large": 5000}
+        hz = named[token] if token in named else int(token)
+        return sign * hz
+
+    @staticmethod
+    def _clamp_volume(value: int) -> int:
+        return max(0, min(200, value))
+
+    @staticmethod
     def _require_arg_count(args: list[str], count: int, usage: str) -> None:
         if len(args) != count:
             raise ClientCommandError(f"usage: {usage}")
@@ -418,6 +449,9 @@ def available_commands() -> list[str]:
         "tune <frequency_khz>",
         "mode <mode> [low_cut_hz high_cut_hz]",
         "filter <low_cut_hz> <high_cut_hz>",
+        "tune-step <+/-hz|small|medium|large>",
+        "volume <percent>",
+        "volume-step <delta_percent>",
         "duration <seconds>",
         "frames <max_snd_frames>",
         "dashboard",
