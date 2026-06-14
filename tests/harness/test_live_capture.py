@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, keepalive_due, main
+from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, keepalive_due, main, receive_poll_timeout
+
+
+def test_receive_poll_timeout_caps_unlimited_and_long_duration():
+    assert receive_poll_timeout(100.0, duration_seconds=0, poll_seconds=0.5) == 0.5
+    assert receive_poll_timeout(100.0, duration_seconds=60, poll_seconds=0.5) <= 0.5
 
 
 def test_keepalive_due_only_after_setup_and_interval():

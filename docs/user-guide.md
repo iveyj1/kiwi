@@ -130,6 +130,8 @@ Use unrestricted mode carefully; project live-radio practice still prefers local
 
 For long-running live playback/record/capture, the client sends periodic SND keepalives after initial setup. If a session still stops unexpectedly, check the TUI operation result/error and confirm both `duration_seconds` and `max_frames` are `0` if you intend no client-side limit.
 
+If playback appears active but you hear no audio, check the local output volume because `volume` / `volume-step` now operate on the system mixer. From command mode you can try `:volume 50`, and outside the app check the selected output device/mute state with your desktop audio controls or `wpctl`/`pactl`.
+
 or, after installing the package scripts:
 
 ```bash

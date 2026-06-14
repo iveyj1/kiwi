@@ -143,6 +143,8 @@ Fixed TUI quit behavior while background playback is active. Keymap `q` and comm
 
 Changed `volume-step` to read the current local system output volume before applying the configured delta. Added preset commands `store <n>`, `store all <n>`, and `recall <n>`, plus TUI keymap digit sequences `<n>s`, `<n>S`, and `<n>r`. The TUI now persists last full state and presets to a JSON state file on safe exit and can start from `[startup] mode = "last"`, `"default"`, or `"preset"`.
 
+Fixed another cooperative shutdown issue for long/unlimited live sessions. Live play/record/capture receive loops now use a short poll timeout around WebSocket receive, so `stop`/TUI `q` can be observed promptly even when `duration_seconds = 0` and no receive timeout would otherwise be active.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -24,8 +24,8 @@ from kiwi_client.live_capture import (
     LiveCaptureError,
     allowed_receiver_names,
     keepalive_due,
+    receive_poll_timeout,
     snd_loop_allowed,
-    snd_loop_timeout,
 )
 from kiwi_client.recorder import SndWavRecorder, WavRecordingResult
 from kiwi_client.transport import ReplayTransport
@@ -167,13 +167,13 @@ async def record_live_snd_wav(
             if keepalive_due(now, last_keepalive, sent_setup=sent_setup):
                 await websocket.send(encode_keepalive())
                 last_keepalive = now
-            remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
+            remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
             if remaining == 0:
                 break
             try:
                 message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
             except asyncio.TimeoutError:
-                break
+                continue
 
             if isinstance(message, str):
                 text = message

@@ -29,6 +29,7 @@ MAX_DURATION_SECONDS = 60.0
 MAX_FRAMES = 1500
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
 KEEPALIVE_INTERVAL_SECONDS = 30.0
+RECEIVE_POLL_TIMEOUT_SECONDS = 0.5
 
 
 class LiveCaptureError(RuntimeError):
@@ -133,6 +134,14 @@ def snd_loop_timeout(start: float, *, duration_seconds: float) -> float | None:
     return max(0.0, duration_seconds - (time.monotonic() - start))
 
 
+def receive_poll_timeout(start: float, *, duration_seconds: float, poll_seconds: float = RECEIVE_POLL_TIMEOUT_SECONDS) -> float:
+    """Return a short receive timeout so cooperative stop is responsive."""
+    remaining = snd_loop_timeout(start, duration_seconds=duration_seconds)
+    if remaining is None:
+        return poll_seconds
+    return min(poll_seconds, remaining)
+
+
 def keepalive_due(now: float, last_keepalive: float, *, sent_setup: bool, interval_seconds: float = KEEPALIVE_INTERVAL_SECONDS) -> bool:
     """Return true when a live SND session should send another keepalive."""
     return sent_setup and (now - last_keepalive) >= interval_seconds
@@ -203,13 +212,13 @@ async def capture_live_snd(
                 writer.add_tx_cmd(now - start, command)
                 await websocket.send(command)
                 last_keepalive = now
-            remaining = snd_loop_timeout(start, duration_seconds=config.duration_seconds)
+            remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
             if remaining == 0:
                 break
             try:
                 message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
             except asyncio.TimeoutError:
-                break
+                continue
             t = time.monotonic() - start
 
             if isinstance(message, str):
