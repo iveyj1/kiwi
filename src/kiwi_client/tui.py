@@ -22,7 +22,13 @@ class DashboardModel:
     message: str = ""
 
 
-def render_dashboard(state: ClientState, last_response: dict[str, Any] | None = None, *, message: str = "") -> str:
+def render_dashboard(
+    state: ClientState,
+    last_response: dict[str, Any] | None = None,
+    *,
+    message: str = "",
+    operation: dict[str, Any] | None = None,
+) -> str:
     """Render a text dashboard for tests and curses display."""
     lines = [
         "KiwiSDR Client",
@@ -33,8 +39,20 @@ def render_dashboard(state: ClientState, last_response: dict[str, Any] | None = 
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
-        "Commands: status, receiver, tune, mode, filter, duration, frames, play, record, capture, help, quit",
+        "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, stop, record, capture, help, quit",
     ]
+    if operation is not None:
+        lines.extend([
+            "",
+            f"Operation: {operation.get('name') or 'none'}",
+            f"Running: {'yes' if operation.get('running') else 'no'}",
+            f"Stop requested: {'yes' if operation.get('stop_requested') else 'no'}",
+            f"Elapsed: {operation.get('elapsed_seconds', 0.0):.1f}s",
+        ])
+        if operation.get("result"):
+            lines.append(f"Operation result: {operation['result']}")
+        if operation.get("error"):
+            lines.append(f"Operation error: {operation['error']}")
     if last_response is not None:
         lines.extend(["", f"Last response: {last_response.get('type', 'unknown')}"])
         if "result" in last_response:
@@ -66,7 +84,12 @@ def _run_curses(stdscr, controller: ClientController) -> None:
 
     while controller.running:
         stdscr.erase()
-        dashboard = render_dashboard(controller.state, last_response, message=message)
+        dashboard = render_dashboard(
+            controller.state,
+            last_response,
+            message=message,
+            operation=controller.background.status().as_dict(),
+        )
         height, width = stdscr.getmaxyx()
         for row, line in enumerate(dashboard.splitlines()[: max(0, height - 3)]):
             stdscr.addnstr(row, 0, line, max(0, width - 1))

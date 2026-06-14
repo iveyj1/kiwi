@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -10,9 +11,13 @@ class FakeOperations:
     def __init__(self):
         self.calls = []
 
-    def play(self, config, *, null_sink: bool):
-        self.calls.append(("play", config, null_sink))
-        return {"frames": 1024, "dry_run": null_sink}
+    def play(self, config, *, null_sink: bool, stop_event=None):
+        self.calls.append(("play", config, null_sink, stop_event))
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set())}
 
     def record(self, config):
         self.calls.append(("record", config))
@@ -89,7 +94,7 @@ def test_client_executes_play_record_capture_with_injected_operations():
     record = controller.execute("record recordings/shell.wav --allow-live --overwrite")
     capture = controller.execute("capture tests/fixtures/kiwi/shell.jsonl --allow-live --overwrite")
 
-    assert play == {"type": "play", "result": {"frames": 1024, "dry_run": True}}
+    assert play == {"type": "play", "result": {"frames": 1024, "dry_run": True, "stopped": False}}
     assert record["result"]["path"] == "recordings/shell.wav"
     assert capture["result"]["path"] == "tests/fixtures/kiwi/shell.jsonl"
     assert operations.calls[0][0] == "play"
@@ -99,6 +104,22 @@ def test_client_executes_play_record_capture_with_injected_operations():
     assert operations.calls[0][1].max_frames == 1500
     assert operations.calls[1][1].overwrite is True
     assert operations.calls[2][1].overwrite is True
+
+
+def test_client_play_bg_and_stop_with_injected_operations():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    started = controller.execute("play-bg --allow-live --null-sink")
+    assert started["operation"]["running"] is True
+
+    stopped = controller.execute("stop")
+    assert stopped["operation"]["stop_requested"] is True
+    final = controller.background.join(timeout=2.0)
+
+    assert final.running is False
+    assert final.result["stopped"] is True
+    assert controller.execute("operation-status")["operation"]["running"] is False
 
 
 def test_client_refuses_live_operations_without_allow_live():

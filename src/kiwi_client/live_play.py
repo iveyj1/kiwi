@@ -12,6 +12,7 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup
@@ -149,7 +150,14 @@ def play_replay_snd(transport: ReplayTransport, sink: AudioSink, *, config: Live
     )
 
 
-async def play_live_snd(config: LiveSndPlaybackConfig, sink: AudioSink, *, allow_live: bool = False, dry_run: bool = False) -> PlaybackResult:
+async def play_live_snd(
+    config: LiveSndPlaybackConfig,
+    sink: AudioSink,
+    *,
+    allow_live: bool = False,
+    dry_run: bool = False,
+    stop_event: Event | None = None,
+) -> PlaybackResult:
     """Run one guarded live SND playback session."""
     config.validate()
     if not allow_live:
@@ -176,6 +184,8 @@ async def play_live_snd(config: LiveSndPlaybackConfig, sink: AudioSink, *, allow
         try:
             await websocket.send(encode_auth())
             while snd_frames < config.max_frames and (time.monotonic() - start) < config.duration_seconds:
+                if stop_event is not None and stop_event.is_set():
+                    break
                 remaining = config.duration_seconds - (time.monotonic() - start)
                 if remaining <= 0:
                     break

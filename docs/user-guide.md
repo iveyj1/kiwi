@@ -61,6 +61,9 @@ Supported commands:
 - `dashboard`
 - `play-plan`
 - `play --allow-live [--null-sink]`
+- `play-bg --allow-live [--null-sink]`
+- `stop`
+- `operation-status`
 - `record-plan <output.wav>`
 - `record <output.wav> --allow-live [--overwrite]`
 - `capture-plan <output.jsonl>`
@@ -85,6 +88,17 @@ play --allow-live --null-sink
 record recordings/client-5000-am.wav --allow-live --overwrite
 capture tests/fixtures/kiwi/client-5000-am.jsonl --allow-live --overwrite
 ```
+
+Example background playback from the shell/TUI:
+
+```text
+play-bg --allow-live --null-sink
+operation-status
+stop
+operation-status
+```
+
+Parameter changes during background playback update desired client state and the dashboard. Applying retune/mode/filter changes to the active WebSocket stream is not implemented yet.
 
 Expected next operations:
 

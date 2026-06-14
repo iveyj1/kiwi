@@ -14,11 +14,13 @@ import json
 import shlex
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
+from threading import Event
 from typing import Any, Iterable, Protocol
 
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
+from kiwi_client.live_worker import BackgroundOperation
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
 
 
@@ -58,7 +60,7 @@ class ClientCommandError(ValueError):
 class ClientOperations(Protocol):
     """Executable operations used by the client controller."""
 
-    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool) -> dict[str, Any]: ...
+    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool, stop_event: Event | None = None) -> dict[str, Any]: ...
 
     def record(self, config: LiveSndWavRecordConfig) -> dict[str, Any]: ...
 
@@ -68,9 +70,9 @@ class ClientOperations(Protocol):
 class LiveClientOperations:
     """Default operations that call guarded live play/record/capture modules."""
 
-    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool) -> dict[str, Any]:
+    def play(self, config: LiveSndPlaybackConfig, *, null_sink: bool, stop_event: Event | None = None) -> dict[str, Any]:
         sink = NullAudioSink() if null_sink else SoundDeviceSink()
-        result = asyncio.run(play_live_snd(config, sink, allow_live=True, dry_run=null_sink))
+        result = asyncio.run(play_live_snd(config, sink, allow_live=True, dry_run=null_sink, stop_event=stop_event))
         data = asdict(result)
         data["path"] = str(result.path)
         return data
@@ -89,9 +91,15 @@ class LiveClientOperations:
 class ClientController:
     """Apply simple user commands to client state and produce plans."""
 
-    def __init__(self, state: ClientState | None = None, operations: ClientOperations | None = None) -> None:
+    def __init__(
+        self,
+        state: ClientState | None = None,
+        operations: ClientOperations | None = None,
+        background: BackgroundOperation | None = None,
+    ) -> None:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
+        self.background = background or BackgroundOperation()
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -163,6 +171,21 @@ class ClientController:
             self._require_arg_count(positional, 0, "play --allow-live [--null-sink]")
             self._require_allow_live(flags, "play-plan")
             return {"type": "play", "result": self.operations.play(self._playback_config(), null_sink="--null-sink" in flags)}
+        if command == "play-bg":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--null-sink"})
+            self._require_arg_count(positional, 0, "play-bg --allow-live [--null-sink]")
+            self._require_allow_live(flags, "play-plan")
+            config = self._playback_config()
+            null_sink = "--null-sink" in flags
+            status = self.background.start(
+                "play",
+                lambda stop_event: self.operations.play(config, null_sink=null_sink, stop_event=stop_event),
+            )
+            return {"type": "operation-status", "operation": status.as_dict()}
+        if command == "stop":
+            return {"type": "operation-status", "operation": self.background.stop().as_dict()}
+        if command == "operation-status":
+            return {"type": "operation-status", "operation": self.background.status().as_dict()}
         if command == "record":
             positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
             self._require_arg_count(positional, 1, "record <output.wav> --allow-live [--overwrite]")
@@ -268,6 +291,9 @@ def available_commands() -> list[str]:
         "dashboard",
         "play-plan",
         "play --allow-live [--null-sink]",
+        "play-bg --allow-live [--null-sink]",
+        "stop",
+        "operation-status",
         "record-plan <output.wav>",
         "record <output.wav> --allow-live [--overwrite]",
         "capture-plan <output.jsonl>",

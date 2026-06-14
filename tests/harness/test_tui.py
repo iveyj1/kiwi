@@ -17,7 +17,12 @@ def test_render_dashboard_includes_persistent_live_state():
         connected=True,
     )
 
-    text = render_dashboard(state, {"type": "play", "result": {"frames": 1024}}, message="ok")
+    text = render_dashboard(
+        state,
+        {"type": "play", "result": {"frames": 1024}},
+        message="ok",
+        operation={"name": "play", "running": True, "stop_requested": False, "elapsed_seconds": 1.25},
+    )
 
     assert "KiwiSDR Client" in text
     assert "Receiver: 10.0.0.41:8073" in text
@@ -25,6 +30,8 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Frequency: 10000.000 kHz" in text
     assert "Mode/filter: usb 300..2700 Hz" in text
     assert "Live limits: 45s / 1200 SND frames" in text
+    assert "Operation: play" in text
+    assert "Running: yes" in text
     assert "Last response: play" in text
     assert "Message: ok" in text
 

@@ -190,10 +190,13 @@ Current capabilities:
 - JSONL output is available for scripts/tests.
 - Operation execution is dependency-injected so shell behavior is harness-testable without receiver/audio access.
 - A testable text dashboard renderer and thin curses TUI runner are available via `--tui` or `kiwi-tui`.
+- Background playback can be started with `play-bg --allow-live [--null-sink]`; `stop` requests cooperative shutdown and `operation-status` reports progress/result/error state.
+- TUI dashboard shows current background operation status.
 
 Remaining capabilities needed:
 
 - Actual continuously open retunable WebSocket session lifecycle.
+- Applying tune/mode/filter changes to an already-running stream.
 - Live status updates: sample rate, RSSI, sequence gaps, receiver errors.
 - Richer TUI controls and status panes.
 

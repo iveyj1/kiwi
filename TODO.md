@@ -2,16 +2,16 @@
 
 ## Current slice
 
-Goal: Start persistent live-mode settings and TUI for Milestone 6.
+Goal: Add background live playback worker and interactive stop/status support for the current TUI/client shell.
 
 Done criteria:
 
-- Add persistent client-state fields for live duration and max SND frames.
-- Add `duration`, `frames`, and `dashboard` commands to the scriptable client shell.
-- Ensure play/record/capture plans and executable commands reuse persistent live settings.
-- Add a testable text dashboard renderer and a thin curses TUI runner.
-- Add `--tui` and `kiwi-tui` entry points.
-- Cover persistent settings and dashboard rendering with pytest.
+- Add a framework-neutral background operation worker.
+- Add cooperative stop support to live SND playback.
+- Add `play-bg --allow-live [--null-sink]`, `stop`, and `operation-status` commands.
+- Show background operation state in the TUI dashboard.
+- Cover worker behavior, command behavior, and dashboard rendering with pytest.
+- Keep retuning during active playback as desired-state-only for now.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 

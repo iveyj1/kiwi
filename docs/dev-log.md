@@ -107,6 +107,10 @@ Committed as `9b04c00` (`Allow one minute guarded live sessions`).
 
 Started persistent live-mode settings and TUI work for Milestone 6. `ClientState` now carries `duration_seconds` and `max_frames`; `duration` and `frames` commands persist those settings across play/record/capture plans and executions. Added `dashboard` command plus `src/kiwi_client/tui.py`, a pure text dashboard renderer with a thin curses runner. Entry points: `PYTHONPATH=src python3 -m kiwi_client.client_app --tui` and `PYTHONPATH=src python3 -m kiwi_client.tui` / `kiwi-tui`.
 
+Committed as `94f69b4` (`Add TUI dashboard and persistent live settings`). Follow-up fix `115350a` added the missing `python -m kiwi_client.tui` entrypoint.
+
+Added `src/kiwi_client/live_worker.py`, a framework-neutral background operation worker. Client shell now supports `play-bg --allow-live [--null-sink]`, `stop`, and `operation-status`. Live playback accepts a cooperative `stop_event`, and the TUI dashboard displays background operation state. Retune/mode/filter changes during playback currently update desired state only; applying them to the active WebSocket stream remains future work.
+
 ## YYYY-MM-DD
 
 ### Finding
