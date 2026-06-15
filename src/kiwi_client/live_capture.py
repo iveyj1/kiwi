@@ -36,6 +36,25 @@ class LiveCaptureError(RuntimeError):
     """Raised when live capture is not allowed or cannot proceed."""
 
 
+def kiwi_error_from_msg_params(params: dict[str, str | None], *, receiver: str) -> str | None:
+    """Return a user-facing Kiwi server error from MSG params, if present."""
+    if "too_busy" in params:
+        slots = params.get("too_busy") or "all"
+        return f"server busy: all {slots} client slots are taken on {receiver}"
+    if params.get("badp") == "1":
+        return f"server busy or bad password: all no-password channels may be busy on {receiver}"
+    if "down" in params:
+        return f"server down: {receiver}"
+    return None
+
+
+def raise_for_kiwi_error(params: dict[str, str | None], *, receiver: str) -> None:
+    """Raise LiveCaptureError for known Kiwi server error MSG params."""
+    error = kiwi_error_from_msg_params(params, receiver=receiver)
+    if error is not None:
+        raise LiveCaptureError(error)
+
+
 @dataclass(frozen=True)
 class LiveSndCaptureConfig:
     """Configuration for one short, attended SND capture."""
@@ -239,6 +258,7 @@ async def capture_live_snd(
                     continue
 
             params = parse_msg(text).params
+            raise_for_kiwi_error(params, receiver=config.receiver)
             state = state.apply_msg_params(params)
             if state.audio_rate is not None and not sent_ar_ok:
                 command = encode_ar_ok(state.audio_rate)

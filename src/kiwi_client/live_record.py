@@ -24,9 +24,11 @@ from kiwi_client.live_capture import (
     LiveCaptureError,
     allowed_receiver_names,
     keepalive_due,
+    raise_for_kiwi_error,
     receive_poll_timeout,
     snd_loop_allowed,
 )
+from kiwi_client.protocol import parse_msg
 from kiwi_client.recorder import SndWavRecorder, WavRecordingResult
 from kiwi_client.transport import ReplayTransport
 
@@ -177,11 +179,16 @@ async def record_live_snd_wav(
 
             if isinstance(message, str):
                 text = message
+                params = parse_msg(text).params
+                raise_for_kiwi_error(params, receiver=config.receiver)
                 recorder.add_msg(text)
             else:
                 payload = bytes(message)
                 if payload.startswith(b"MSG"):
-                    recorder.add_msg(payload.decode("utf-8", errors="replace"))
+                    text = payload.decode("utf-8", errors="replace")
+                    params = parse_msg(text).params
+                    raise_for_kiwi_error(params, receiver=config.receiver)
+                    recorder.add_msg(text)
                 else:
                     recorder.add_snd_payload(payload)
                     if payload.startswith(b"SND"):

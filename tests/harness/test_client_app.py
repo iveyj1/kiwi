@@ -124,6 +124,18 @@ def test_client_operation_aliases_with_injected_operations():
     assert controller.execute("qu")["type"] == "quit"
 
 
+def test_client_status_reports_connected_while_background_operation_runs():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("play-bg --allow-live --null-sink")
+    status = controller.execute("status")
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert status["state"]["connected"] is True
+
+
 def test_client_controller_connect_disconnect_state_only():
     controller = ClientController()
 

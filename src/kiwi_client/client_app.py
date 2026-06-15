@@ -188,7 +188,7 @@ class ClientController:
         if command == "help":
             return {"type": "help", "commands": available_commands()}
         if command == "status":
-            return {"type": "status", "state": self.state.as_dict()}
+            return {"type": "status", "state": self._state_dict_with_connection()}
         if command == "connect":
             self.state = replace(self.state, connected=True)
             return {"type": "state", "state": self.state.as_dict()}
@@ -331,6 +331,11 @@ class ClientController:
             )
             return {"type": "operation-status", "operation": status.as_dict()}
         raise ClientCommandError(f"unknown command: {command}")
+
+    def _state_dict_with_connection(self) -> dict[str, Any]:
+        state = self.state.as_dict()
+        state["connected"] = bool(self.state.connected or self.background.status().running)
+        return state
 
     def _with_receiver(self, value: str) -> ClientState:
         if ":" in value:

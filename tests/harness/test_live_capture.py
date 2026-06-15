@@ -2,7 +2,31 @@ from pathlib import Path
 
 import pytest
 
-from kiwi_client.live_capture import LiveCaptureError, LiveSndCaptureConfig, keepalive_due, main, receive_poll_timeout
+from kiwi_client.live_capture import (
+    LiveCaptureError,
+    LiveSndCaptureConfig,
+    keepalive_due,
+    kiwi_error_from_msg_params,
+    main,
+    raise_for_kiwi_error,
+    receive_poll_timeout,
+)
+
+
+def test_kiwi_busy_error_messages_are_user_facing():
+    assert kiwi_error_from_msg_params({"too_busy": "4"}, receiver="10.0.0.40:8073") == (
+        "server busy: all 4 client slots are taken on 10.0.0.40:8073"
+    )
+    assert kiwi_error_from_msg_params({"badp": "1"}, receiver="10.0.0.40:8073") == (
+        "server busy or bad password: all no-password channels may be busy on 10.0.0.40:8073"
+    )
+    assert kiwi_error_from_msg_params({"down": None}, receiver="10.0.0.40:8073") == "server down: 10.0.0.40:8073"
+    assert kiwi_error_from_msg_params({"sample_rate": "12000"}, receiver="10.0.0.40:8073") is None
+
+
+def test_raise_for_kiwi_error_raises_live_capture_error():
+    with pytest.raises(LiveCaptureError, match="server busy"):
+        raise_for_kiwi_error({"too_busy": "4"}, receiver="10.0.0.40:8073")
 
 
 def test_receive_poll_timeout_caps_unlimited_and_long_duration():

@@ -280,7 +280,9 @@ stop
 wait 2
 ```
 
-While a background SND operation is running, `operation-status` and the TUI dashboard show latest RSSI/S-meter/SND frame metrics after the first SND frame arrives. The dashboard also shows sample rate, sequence gap count, and ADC overflow count when available. The TUI refreshes periodically, so these fields and background operation errors update without requiring a keypress.
+While a background SND operation is running, `status`, `operation-status`, and the TUI dashboard report the client as connected. The dashboard shows latest RSSI/S-meter/SND frame metrics after the first SND frame arrives. It also shows sample rate, sequence gap count, and ADC overflow count when available. The TUI refreshes periodically, so these fields and background operation errors update without requiring a keypress.
+
+If the Kiwi reports `too_busy`, `badp=1`, or `down`, the live operation error shows an explicit server busy/down message instead of a generic failure.
 
 During background playback, these parameter changes queue `SET mod=...` to the active playback WebSocket after the initial Kiwi SND setup has completed:
 

@@ -18,6 +18,14 @@ from kiwi_client.tui import (
 )
 
 
+def test_render_dashboard_shows_connected_for_running_operation():
+    state = ClientState(connected=False)
+
+    text = render_dashboard(state, operation={"name": "play", "running": True, "stop_requested": False, "elapsed_seconds": 0.1})
+
+    assert "Connected: yes" in text
+
+
 def test_render_dashboard_includes_persistent_live_state():
     state = ClientState(
         host="10.0.0.41",

@@ -2,24 +2,22 @@
 
 ## Current slice
 
-Goal: Add system-volume read-before-step, presets, and persisted startup state.
+Goal: Fix connected status and surface explicit busy-server messages.
 
 Done criteria:
 
-- `volume-step` reads current system output volume before applying its delta.
-- Add `store <n>`, `store all <n>`, and `recall <n>` commands.
-- Minimal presets store receiver/frequency/mode/filter; all presets store full radio/client state.
-- Add TUI keymap digit sequences `<n>s`, `<n>S`, and `<n>r`.
-- Save last full radio state and presets on TUI safe exit.
-- Restore startup state from config: last state, default state, or preset.
-- Cover behavior with harness tests.
-- Update root `config.toml` and docs.
+- Dashboard connected status shows yes while a live background operation is running.
+- `status` command reports computed connected state when background operation is active.
+- Detect Kiwi `MSG too_busy=<n>` and report a clear server-busy error.
+- Detect Kiwi `MSG badp=1` as bad password or all no-password channels busy.
+- Detect Kiwi `MSG down` as server down.
+- Cover behavior with harness tests/fixtures.
 
 Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
 
-Live-radio needed: no; harness-first UI/state work.
+Live-radio needed: no; harness-first status/error work.
 
-Docs to update: root `config.toml`, `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: root `config.toml` if needed, `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
 
 ## Next
 

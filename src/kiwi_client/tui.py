@@ -58,7 +58,7 @@ def render_dashboard(
         "KiwiSDR Client",
         "==============",
         f"Receiver: {state.receiver}",
-        f"Connected: {'yes' if state.connected else 'no'}",
+        f"Connected: {'yes' if state.connected or (operation is not None and operation.get('running')) else 'no'}",
         f"Frequency: {state.frequency_khz:.3f} kHz",
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
         f"Volume: {state.volume_percent}%",

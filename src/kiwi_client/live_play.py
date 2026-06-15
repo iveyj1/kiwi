@@ -26,6 +26,7 @@ from kiwi_client.live_capture import (
     LiveCaptureError,
     allowed_receiver_names,
     keepalive_due,
+    raise_for_kiwi_error,
     receive_poll_timeout,
     snd_loop_allowed,
 )
@@ -243,11 +244,15 @@ async def play_live_snd(
                 except asyncio.TimeoutError:
                     continue
                 if isinstance(message, str):
-                    state = state.apply_msg_params(parse_msg(message).params)
+                    params = parse_msg(message).params
+                    raise_for_kiwi_error(params, receiver=config.receiver)
+                    state = state.apply_msg_params(params)
                 else:
                     payload = bytes(message)
                     if payload.startswith(b"MSG"):
-                        state = state.apply_msg_params(parse_msg(payload).params)
+                        params = parse_msg(payload).params
+                        raise_for_kiwi_error(params, receiver=config.receiver)
+                        state = state.apply_msg_params(params)
                     else:
                         sink_started, frames, byte_count = _write_snd_to_sink(
                             payload,
