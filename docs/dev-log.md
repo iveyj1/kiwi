@@ -157,15 +157,19 @@ Updated normal-mode key hints and key behavior to the register-prefix model. Pre
 
 Improved pending-register normal-mode hints. After `p`, `s`, or `S`, defined preset registers show saved frequency and mode. After `r`, receiver registers show configured receiver addresses from `[receivers].allowed`.
 
-Fixed receiver register switching during active playback. `r <receiver-register>` now reports the selected receiver explicitly; if background playback is running, the TUI stops it and restarts playback on the new receiver with the current radio parameters. If the new playback fails immediately, e.g. because the receiver is busy, the TUI restores the previous receiver, restarts playback there when possible, and displays the failure message.
+Fixed receiver register switching during active playback. `r <receiver-register>` now reports the selected receiver explicitly; if background playback is running, the TUI stops it and restarts playback on the new receiver with the current radio parameters. If playback had already failed, `r <receiver-register>` now switches receiver and starts playback instead of only changing state and leaving the stale operation error visible. If the new playback fails immediately, e.g. because the receiver is busy, the TUI restores the previous receiver, restarts playback there when possible, and displays the failure message.
 
-Added `add-receiver <receiver-register> <ip/url[:port]> <description>` with alias `ad`. Stored receiver registers are persisted in the TUI state file, shown in `r` pending-register hints with address/description, and take precedence over fallback receivers from `[receivers].allowed`.
+Added `add-receiver <receiver-register> <ip/url[:port]> <description>` with alias `ad`. Stored receiver registers are normalized to `host:port`, persisted in the TUI state file, shown in `r` pending-register hints with address/description, and take precedence over fallback receivers from `[receivers].allowed`.
 
 Added `[startup] playback = true|false`. The project root config enables it so local TUI startup begins background playback automatically when `[live].allow_live = true`; built-in defaults remain guarded with startup playback disabled.
 
 Added `[audio] startup_mute_ms` and defaulted it to 300 ms in the built-in config. Live/replay SND playback still observes startup SND frames for metrics, but drops the configured amount of decoded PCM before writing to the sink to reduce receiver/audio startup transients. Recorded bumpless transfer options in `docs/bumpless-transfer.md`.
 
 Added `[audio] startup_fade_in_ms` and `[audio] stop_fade_out_ms`, with the local root config tuned to 100 ms startup mute, 50 ms fade-in, and 50 ms fade-out. Playback now applies a linear sample-domain fade-in after startup mute/drop and a short fade-out on cooperative live stops when frames are still arriving.
+
+Documented the receiver/playback lifecycle architecture in `docs/radio-session-state.md`. The busy-receiver recovery issue showed that desired receiver, active stream, playback intent, background operation status, and stale errors need an explicit controller-owned session model rather than TUI helpers inferring state from raw worker status.
+
+Added controller-owned `RadioSessionState` and `ClientController.switch_receiver()`. Receiver-register switching now delegates lifecycle policy to the controller, which handles idle receiver changes, active playback restart, failed-playback recovery, and immediate busy rollback while exposing session snapshots in status/operation responses.
 
 ## YYYY-MM-DD
 

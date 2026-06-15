@@ -200,7 +200,7 @@ Current capabilities:
 - TUI quit paths request cooperative background stop before exiting.
 - Connected status reflects active background live operations, and Kiwi busy/down MSG errors are surfaced as explicit user-facing operation errors.
 - Semicolon-separated TUI/shell command batches are supported; radio/state-only batches validate atomically and active playback control commands are queued after successful validation.
-- TUI displays context-sensitive which-key style hints for normal keymaps and command-mode commands/arguments. Normal-mode presets use `p/s/S <register>` with `0..9,a..z`, and `r <receiver-register>` switches stored or configured receivers while preserving radio parameters. Stored receiver registers can be added with `add-receiver` / `ad`.
+- TUI displays context-sensitive which-key style hints for normal keymaps and command-mode commands/arguments. Normal-mode presets use `p/s/S <register>` with `0..9,a..z`, and `r <receiver-register>` switches stored or configured receivers while preserving radio parameters. Stored receiver registers can be added with `add-receiver` / `ad`. Receiver/playback switch policy is delegated to controller-owned radio session methods.
 - TUI can start background playback automatically at startup via `[startup] playback = true` when live use is allowed.
 - Live playback can drop an initial `[audio] startup_mute_ms` window to reduce startup/switch transients; fuller bumpless transfer remains future playback-manager work.
 - Presets and last-state persistence support restoring startup state from last run, default config, or a configured preset.
@@ -210,13 +210,14 @@ Current capabilities:
 
 Remaining capabilities needed:
 
-- Fuller persistent session lifecycle beyond background operations.
+- Grow the controller-owned radio session model into a small `RadioSessionManager` if crossfade/retry or multi-consumer lifecycle policy needs more structure; see `docs/radio-session-state.md`.
 - Confirm/document live retune and background record/capture behavior with short receiver tests.
 - Richer live status updates: receiver-side errors, explicit command sent/ack counters, and more polished meter widgets.
 - Richer TUI controls and status panes.
 
 Shape notes:
 
+- Keep TUI input/rendering separate from receiver/playback lifecycle policy.
 - Start with CLI/script shell for controls/status.
 - Keep waterfall separate initially if easier.
 - Keep protocol and transport separate from UI.

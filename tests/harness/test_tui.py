@@ -433,6 +433,19 @@ class TuiBlockingOperations(TuiFakeOperations):
         return {"receiver": f"{config.host}:{config.port}", "stopped": bool(stop_event and stop_event.is_set())}
 
 
+class TuiFailFirstReceiverOperations(TuiBlockingOperations):
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
+        self.play_configs.append(config)
+        receiver = f"{config.host}:{config.port}"
+        if receiver == "10.0.0.42:8073":
+            raise RuntimeError("server busy or bad password: all no-password channels may be busy on 10.0.0.42:8073")
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        return {"receiver": receiver, "stopped": bool(stop_event and stop_event.is_set())}
+
+
 class TuiBusyNewReceiverOperations(TuiBlockingOperations):
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         self.play_configs.append(config)
@@ -448,7 +461,7 @@ class TuiBusyNewReceiverOperations(TuiBlockingOperations):
 
 def test_tui_keymap_stored_receiver_prefix_switches_receiver():
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    controller.execute("add-receiver a 10.0.0.42:8073 Backup receiver")
+    controller.execute("add-receiver a http://10.0.0.42:8073/ Backup receiver")
     state = TuiInputState()
 
     response, message = handle_tui_key(ord("r"), state, controller, load_config())
@@ -516,6 +529,44 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
     assert response["type"] == "batch"
     assert controller.state.receiver == "10.0.0.40:8073"
     assert [f"{config.host}:{config.port}" for config in operations.play_configs] == ["10.0.0.41:8073", "10.0.0.40:8073"]
+
+
+def test_tui_receiver_switch_after_failed_playback_starts_new_receiver(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[live]
+allow_live = true
+
+[receivers]
+allowed = ["10.0.0.42:8073", "10.0.0.41:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    operations = TuiFailFirstReceiverOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+    state = TuiInputState()
+    controller.execute("receiver 10.0.0.42:8073")
+
+    controller.execute("play-bg --null-sink")
+    failed = controller.execute("wait 1")
+    handle_tui_key(ord("r"), state, controller, config)
+    response, message = handle_tui_key(ord("1"), state, controller, config)
+    running = controller.background.status()
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert "server busy" in failed["operation"]["error"]
+    assert message == "Receiver: 10.0.0.41:8073; started playback"
+    assert response["type"] == "batch"
+    assert controller.state.receiver == "10.0.0.41:8073"
+    assert running.running is True
+    assert running.error is None
+    assert [f"{play_config.host}:{play_config.port}" for play_config in operations.play_configs] == [
+        "10.0.0.42:8073",
+        "10.0.0.41:8073",
+    ]
 
 
 def test_tui_receiver_switch_busy_restores_previous_receiver_and_reports_error(tmp_path):

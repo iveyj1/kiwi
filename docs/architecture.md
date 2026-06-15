@@ -24,6 +24,8 @@ Receiver Client API
 
 Protocol handling must be usable without the desktop UI.
 
+Interactive receiver/playback lifecycle policy belongs in the controller layer, not in the TUI. See [Radio session state](radio-session-state.md) for the desired explicit session-state model around receiver switching, background playback, stale errors, and future bumpless transfer work.
+
 ## Suggested modules
 
 ```text

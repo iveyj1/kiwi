@@ -62,6 +62,36 @@ class FakeOperations:
         return {"path": str(config.output), "stopped": bool(stop_event and stop_event.is_set())}
 
 
+class FailFirstReceiverOperations(FakeOperations):
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
+        self.calls.append(("play", config, null_sink, stop_event, command_queue, status_callback))
+        receiver = f"{config.host}:{config.port}"
+        if receiver == "10.0.0.42:8073":
+            raise RuntimeError("server busy on 10.0.0.42:8073")
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        return {"receiver": receiver, "stopped": bool(stop_event and stop_event.is_set())}
+
+
+class BusyNewReceiverOperations(FakeOperations):
+    def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
+        self.calls.append(("play", config, null_sink, stop_event, command_queue, status_callback))
+        receiver = f"{config.host}:{config.port}"
+        if receiver == "10.0.0.40:8073":
+            raise RuntimeError("server busy on 10.0.0.40:8073")
+        if stop_event is not None:
+            deadline = time.monotonic() + 1.0
+            while not stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        return {"receiver": receiver, "stopped": bool(stop_event and stop_event.is_set())}
+
+
+def play_call_receivers(operations) -> list[str]:
+    return [f"{call[1].host}:{call[1].port}" for call in operations.calls if call[0] == "play"]
+
+
 def test_client_controller_status_and_state_changes():
     controller = ClientController()
 
@@ -152,8 +182,90 @@ def test_client_add_receiver_command_and_alias_store_receiver_registers():
         "description": "Backup receiver",
     }
     assert alias_response["register"] == "b"
-    assert alias_response["receiver"] == "http://example.test:8073"
+    assert alias_response["receiver"] == "example.test:8073"
     assert controller.receiver_presets["a"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+
+
+def test_client_receiver_url_with_trailing_slash_is_normalized():
+    controller = ClientController()
+
+    response = controller.execute('ad a http://kb8vuckiwi.proxy.kiwisdr.com:8073/ "wayland, mi"')
+    receiver_response = controller.execute("receiver http://kb8vuckiwi.proxy.kiwisdr.com:8073/")
+
+    assert response["receiver"] == "kb8vuckiwi.proxy.kiwisdr.com:8073"
+    assert response["description"] == "wayland, mi"
+    assert controller.receiver_presets["a"]["receiver"] == "kb8vuckiwi.proxy.kiwisdr.com:8073"
+    assert receiver_response["state"]["receiver"] == "kb8vuckiwi.proxy.kiwisdr.com:8073"
+
+
+def test_client_receiver_invalid_port_reports_command_error():
+    controller = ClientController()
+
+    with pytest.raises(ClientCommandError, match="invalid receiver port"):
+        controller.execute("receiver http://example.com:bad/")
+
+
+def test_client_switch_receiver_idle_updates_session_without_playback():
+    controller = ClientController()
+
+    response, message = controller.switch_receiver("10.0.0.40:8073")
+
+    assert message == "Receiver: 10.0.0.40:8073"
+    assert response["state"]["receiver"] == "10.0.0.40:8073"
+    assert response["session"]["desired_receiver"] == "10.0.0.40:8073"
+    assert response["session"]["desired_playback"] is False
+
+
+def test_client_switch_receiver_restarts_active_playback():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+
+    controller.execute("play-bg --null-sink")
+    response, message = controller.switch_receiver("10.0.0.40:8073")
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert message == "Receiver: 10.0.0.40:8073; restarted playback"
+    assert response["type"] == "batch"
+    assert controller.state.receiver == "10.0.0.40:8073"
+    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.40:8073"]
+
+
+def test_client_switch_receiver_recovers_failed_playback_session():
+    operations = FailFirstReceiverOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+    controller.execute("receiver 10.0.0.42:8073")
+
+    controller.execute("play-bg --null-sink")
+    failed = controller.execute("wait 1")
+    response, message = controller.switch_receiver("10.0.0.41:8073")
+    running = controller.background.status()
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert failed["session"]["mode"] == "failed"
+    assert "server busy" in failed["session"]["error"]
+    assert message == "Receiver: 10.0.0.41:8073; started playback"
+    assert response["session"]["error"] is None
+    assert running.running is True
+    assert running.error is None
+    assert play_call_receivers(operations) == ["10.0.0.42:8073", "10.0.0.41:8073"]
+
+
+def test_client_switch_receiver_busy_rolls_back_active_playback():
+    operations = BusyNewReceiverOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+
+    controller.execute("play-bg --null-sink")
+    response, message = controller.switch_receiver("10.0.0.40:8073")
+    controller.execute("stop")
+    controller.execute("wait 2")
+
+    assert response["type"] == "operation-status"
+    assert "server busy" in message
+    assert "restored receiver: 10.0.0.41:8073" in message
+    assert controller.state.receiver == "10.0.0.41:8073"
+    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.41:8073"]
 
 
 def test_client_command_aliases_update_state_and_status():

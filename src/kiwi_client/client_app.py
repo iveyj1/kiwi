@@ -14,6 +14,7 @@ import json
 import queue
 import shlex
 from dataclasses import asdict, dataclass, replace
+from urllib.parse import urlsplit
 from pathlib import Path
 from threading import Event
 from typing import Any, Iterable, Protocol
@@ -30,6 +31,22 @@ from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
 DEFAULT_LOW_CUT_HZ = -5000
 DEFAULT_HIGH_CUT_HZ = 5000
+
+
+@dataclass(frozen=True)
+class RadioSessionState:
+    """Controller-owned interactive receiver/playback session snapshot."""
+
+    mode: str = "idle"
+    desired_receiver: str | None = None
+    active_receiver: str | None = None
+    desired_playback: bool = False
+    operation_name: str | None = None
+    error: str | None = None
+    generation: int = 0
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -177,6 +194,7 @@ class ClientController:
         self.presets: dict[Any, dict[str, Any]] = dict(presets or {})
         self.receiver_presets: dict[Any, dict[str, str]] = dict(receiver_presets or {})
         self.last_play_bg_null_sink = False
+        self.session = RadioSessionState(desired_receiver=self.state.receiver)
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -266,7 +284,7 @@ class ClientController:
         if command == "help":
             return {"type": "help", "commands": available_commands()}
         if command == "status":
-            return {"type": "status", "state": self._state_dict_with_connection()}
+            return {"type": "status", "state": self._state_dict_with_connection(), "session": self.session_status().as_dict()}
         if command == "connect":
             self.state = replace(self.state, connected=True)
             return {"type": "state", "state": self.state.as_dict()}
@@ -275,8 +293,7 @@ class ClientController:
             return {"type": "state", "state": self.state.as_dict()}
         if command == "receiver":
             self._require_arg_count(args, 1, "receiver <host>[:port]")
-            self.state = self._with_receiver(args[0])
-            return {"type": "state", "state": self.state.as_dict()}
+            return self._set_receiver_response(args[0])
         if command == "add-receiver":
             return self._handle_add_receiver(args)
         if command == "tune":
@@ -344,29 +361,16 @@ class ClientController:
             positional, flags = self._parse_flags(args, {"--allow-live", "--null-sink"})
             self._require_arg_count(positional, 0, "play-bg --allow-live [--null-sink]")
             self._require_allow_live(flags, "play-plan")
-            config = self._playback_config()
-            null_sink = "--null-sink" in flags
-            self.last_play_bg_null_sink = null_sink
-            status = self.background.start(
-                "play",
-                lambda stop_event, command_queue, status_callback: self.operations.play(
-                    config,
-                    null_sink=null_sink,
-                    stop_event=stop_event,
-                    command_queue=command_queue,
-                    status_callback=status_callback,
-                ),
-            )
-            return {"type": "operation-status", "operation": status.as_dict()}
+            return self._start_playback_background("--null-sink" in flags)
         if command == "stop":
-            return {"type": "operation-status", "operation": self.background.stop().as_dict()}
+            return self._stop_background()
         if command == "wait":
             if len(args) > 1:
                 raise ClientCommandError("usage: wait [seconds]")
             timeout = float(args[0]) if args else None
-            return {"type": "operation-status", "operation": self.background.join(timeout=timeout).as_dict()}
+            return self._wait_background(timeout)
         if command == "operation-status":
-            return {"type": "operation-status", "operation": self.background.status().as_dict()}
+            return {"type": "operation-status", "operation": self.background.status().as_dict(), "session": self.session_status().as_dict()}
         if command == "record":
             positional, flags = self._parse_flags(args, {"--allow-live", "--overwrite"})
             self._require_arg_count(positional, 1, "record <output.wav> --allow-live [--overwrite]")
@@ -380,6 +384,7 @@ class ClientController:
             self._require_arg_count(positional, 1, "record-bg <output.wav> --allow-live [--overwrite]")
             self._require_allow_live(flags, "record-plan <output.wav>")
             config = self._record_config(Path(positional[0]), overwrite="--overwrite" in flags)
+            self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
             status = self.background.start(
                 "record",
                 lambda stop_event, command_queue, status_callback: self.operations.record(
@@ -402,6 +407,7 @@ class ClientController:
             self._require_arg_count(positional, 1, "capture-bg <output.jsonl> --allow-live [--overwrite]")
             self._require_allow_live(flags, "capture-plan <output.jsonl>")
             config = self._capture_config(Path(positional[0]), overwrite="--overwrite" in flags)
+            self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
             status = self.background.start(
                 "capture",
                 lambda stop_event, command_queue, status_callback: self.operations.capture(
@@ -418,11 +424,137 @@ class ClientController:
         state["connected"] = bool(self.state.connected or self.background.status().running)
         return state
 
+    def session_status(self) -> RadioSessionState:
+        """Return a session snapshot derived from controller intent and worker status."""
+        status = self.background.status()
+        if status.name == "play" and self.session.desired_playback:
+            if status.running:
+                mode = "stopping" if status.stop_requested else "playing"
+                return replace(
+                    self.session,
+                    mode=mode,
+                    desired_receiver=self.state.receiver,
+                    operation_name=status.name,
+                    error=None,
+                )
+            if status.error:
+                return replace(
+                    self.session,
+                    mode="failed",
+                    desired_receiver=self.state.receiver,
+                    active_receiver=None,
+                    operation_name=status.name,
+                    error=status.error,
+                )
+        return replace(
+            self.session,
+            mode="idle" if not self.session.desired_playback else self.session.mode,
+            desired_receiver=self.state.receiver,
+            operation_name=status.name,
+            error=status.error if status.name == "play" and status.error else None,
+        )
+
+    def switch_receiver(
+        self,
+        receiver: str,
+        *,
+        preserve_playback: bool = True,
+        join_timeout: float = 2.0,
+        startup_grace_seconds: float = 0.1,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Switch receiver, preserving/recovering playback intent when appropriate."""
+        status = self.background.status()
+        should_start_after_failed = (
+            preserve_playback
+            and status.name == "play"
+            and bool(status.error)
+            and not status.running
+            and self.session.desired_playback
+        )
+        if should_start_after_failed:
+            state_response = self._set_receiver_response(receiver)
+            start_response = self._start_playback_background(self.last_play_bg_null_sink)
+            return {"type": "batch", "responses": [state_response, start_response], "session": self.session_status().as_dict()}, f"Receiver: {self.state.receiver}; started playback"
+
+        if not preserve_playback or not status.running or status.name != "play":
+            response = self._set_receiver_response(receiver)
+            return response, f"Receiver: {self.state.receiver}"
+
+        previous_receiver = self.state.receiver
+        null_sink = self.last_play_bg_null_sink
+        self.session = replace(self.session, mode="switching", desired_receiver=receiver, error=None)
+        self.background.stop()
+        stopped = self.background.join(timeout=join_timeout)
+        if stopped.running:
+            self.session = replace(self.session, mode="stopping", error=None)
+            return {"type": "operation-status", "operation": stopped.as_dict(), "session": self.session_status().as_dict()}, "Stopping playback before receiver switch..."
+
+        state_response = self._set_receiver_response(receiver)
+        start_response = self._start_playback_background(null_sink)
+        startup_status = self.background.join(timeout=startup_grace_seconds)
+        if startup_status.error and not startup_status.running:
+            error = startup_status.error
+            self._set_receiver_response(previous_receiver)
+            restore_response = self._start_playback_background(null_sink)
+            return (
+                {
+                    "type": "operation-status",
+                    "operation": startup_status.as_dict(),
+                    "restore": restore_response,
+                    "session": self.session_status().as_dict(),
+                },
+                f"Receiver switch failed: {error}; restored receiver: {previous_receiver}",
+            )
+        return {"type": "batch", "responses": [state_response, start_response], "session": self.session_status().as_dict()}, f"Receiver: {self.state.receiver}; restarted playback"
+
     def _with_receiver(self, value: str) -> ClientState:
-        if ":" in value:
-            host, port = value.rsplit(":", 1)
-            return replace(self.state, host=host, port=int(port))
-        return replace(self.state, host=value)
+        host, port = normalize_receiver_address(value, default_port=self.state.port)
+        return replace(self.state, host=host, port=port)
+
+    def _set_receiver_response(self, value: str) -> dict[str, Any]:
+        self.state = self._with_receiver(value)
+        self.session = replace(self.session, desired_receiver=self.state.receiver)
+        return {"type": "state", "state": self.state.as_dict(), "session": self.session_status().as_dict()}
+
+    def _start_playback_background(self, null_sink: bool) -> dict[str, Any]:
+        config = self._playback_config()
+        self.last_play_bg_null_sink = null_sink
+        self.session = replace(
+            self.session,
+            mode="starting",
+            desired_receiver=self.state.receiver,
+            active_receiver=self.state.receiver,
+            desired_playback=True,
+            operation_name="play",
+            error=None,
+            generation=self.session.generation + 1,
+        )
+        status = self.background.start(
+            "play",
+            lambda stop_event, command_queue, status_callback: self.operations.play(
+                config,
+                null_sink=null_sink,
+                stop_event=stop_event,
+                command_queue=command_queue,
+                status_callback=status_callback,
+            ),
+        )
+        return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
+
+    def _stop_background(self) -> dict[str, Any]:
+        status = self.background.stop()
+        if status.name == "play":
+            self.session = replace(self.session, mode="stopping", desired_playback=False, error=None)
+        return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
+
+    def _wait_background(self, timeout: float | None) -> dict[str, Any]:
+        status = self.background.join(timeout=timeout)
+        if status.name == "play" and not status.running:
+            if status.error:
+                self.session = replace(self.session, mode="failed", active_receiver=None, error=status.error)
+            else:
+                self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
+        return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
     def _state_response(self) -> dict[str, Any]:
         command = encode_modulation(
@@ -450,7 +582,8 @@ class ClientController:
         if len(args) < 3:
             raise ClientCommandError("usage: add-receiver <receiver-register> <ip/url[:port]> <description>")
         register = parse_register_id(args[0])
-        receiver = args[1]
+        host, port = normalize_receiver_address(args[1], default_port=8073)
+        receiver = f"{host}:{port}"
         description = " ".join(args[2:]).strip()
         if not description:
             raise ClientCommandError("usage: add-receiver <receiver-register> <ip/url[:port]> <description>")
@@ -700,6 +833,35 @@ def parse_register_id(value: str) -> int | str:
     if len(token) != 1 or token not in REGISTER_KEYS:
         raise ClientCommandError("register must be [0..9] or [a..z]")
     return int(token) if token.isdigit() else token
+
+
+def normalize_receiver_address(value: str, *, default_port: int = 8073) -> tuple[str, int]:
+    """Normalize host[:port] or URL-ish receiver addresses."""
+    raw = value.strip()
+    if not raw:
+        raise ClientCommandError("receiver must not be empty")
+    if "://" in raw:
+        parsed = urlsplit(raw)
+        host = parsed.hostname or ""
+        try:
+            port = parsed.port or default_port
+        except ValueError as exc:
+            raise ClientCommandError(f"invalid receiver port: {raw}") from exc
+    else:
+        host_port = raw.split("/", 1)[0]
+        if ":" in host_port:
+            host, port_text = host_port.rsplit(":", 1)
+            try:
+                port = int(port_text)
+            except ValueError as exc:
+                raise ClientCommandError(f"invalid receiver port: {raw}") from exc
+        else:
+            host = host_port
+            port = default_port
+    host = host.strip("[]")
+    if not host:
+        raise ClientCommandError(f"invalid receiver address: {raw}")
+    return host, port
 
 
 def split_command_entry(line: str) -> list[str]:

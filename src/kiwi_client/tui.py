@@ -20,6 +20,7 @@ from kiwi_client.client_app import (
     ClientController,
     ClientState,
     available_commands,
+    normalize_receiver_address,
     command_aliases,
 )
 from kiwi_client.config import KiwiClientConfig, load_config
@@ -132,7 +133,8 @@ def render_pending_keymap_hints(
     if pending_key_action == "receiver":
         if controller is not None:
             for register, preset in sorted_receiver_registers(controller.receiver_presets):
-                lines.append(f"{register} — {preset['receiver']} {preset['description']}")
+                host, port = normalize_receiver_address(preset["receiver"], default_port=8073)
+                lines.append(f"{register} — {host}:{port} {preset['description']}")
         for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
             register = REGISTER_KEYS[index]
             if controller is not None and register in {str(key) for key in controller.receiver_presets}:
@@ -471,30 +473,13 @@ def switch_receiver_from_keymap(
     join_timeout: float = 2.0,
     startup_grace_seconds: float = 0.1,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Switch receiver from keymap mode, restarting active playback if needed."""
-    status = controller.background.status()
-    if not status.running or status.name != "play":
-        return controller.execute(f"receiver {receiver}"), f"Receiver: {receiver}"
-
-    previous_receiver = controller.state.receiver
-    null_sink = controller.last_play_bg_null_sink
-    controller.background.stop()
-    stopped = controller.background.join(timeout=join_timeout)
-    if stopped.running:
-        return {"type": "operation-status", "operation": stopped.as_dict()}, "Stopping playback before receiver switch..."
-
-    state_response = controller.execute(f"receiver {receiver}")
-    start_response = controller.execute(play_bg_command(null_sink))
-    startup_status = controller.background.join(timeout=startup_grace_seconds)
-    if startup_status.error and not startup_status.running:
-        error = startup_status.error
-        controller.execute(f"receiver {previous_receiver}")
-        restore_response = controller.execute(play_bg_command(null_sink))
-        return (
-            {"type": "operation-status", "operation": startup_status.as_dict(), "restore": restore_response},
-            f"Receiver switch failed: {error}; restored receiver: {previous_receiver}",
-        )
-    return {"type": "batch", "responses": [state_response, start_response]}, f"Receiver: {receiver}; restarted playback"
+    """Switch receiver from keymap mode, delegating lifecycle policy to the controller."""
+    return controller.switch_receiver(
+        receiver,
+        preserve_playback=True,
+        join_timeout=join_timeout,
+        startup_grace_seconds=startup_grace_seconds,
+    )
 
 
 def play_bg_command(null_sink: bool) -> str:
@@ -508,7 +493,8 @@ def play_bg_command(null_sink: bool) -> str:
 def receiver_for_register(register: str, config: KiwiClientConfig, controller: ClientController | None = None) -> str:
     """Return a stored or configured receiver address for a register key."""
     if controller is not None and register in controller.receiver_presets:
-        return controller.receiver_presets[register]["receiver"]
+        host, port = normalize_receiver_address(controller.receiver_presets[register]["receiver"], default_port=8073)
+        return f"{host}:{port}"
     index = REGISTER_KEYS.index(register)
     if index >= len(config.receivers.allowed):
         raise ClientCommandError(f"unknown receiver register: {register}")
