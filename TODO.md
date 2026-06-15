@@ -2,22 +2,21 @@
 
 ## Current slice
 
-Goal: Fix connected status and surface explicit busy-server messages.
+Goal: Add short configurable playback fade-in/fade-out around startup and receiver-switch stops.
 
 Done criteria:
 
-- Dashboard connected status shows yes while a live background operation is running.
-- `status` command reports computed connected state when background operation is active.
-- Detect Kiwi `MSG too_busy=<n>` and report a clear server-busy error.
-- Detect Kiwi `MSG badp=1` as bad password or all no-password channels busy.
-- Detect Kiwi `MSG down` as server down.
-- Cover behavior with harness tests/fixtures.
+- Add configurable `[audio] startup_fade_in_ms` and `stop_fade_out_ms`.
+- Live/replay SND playback fades in after the startup mute/drop window.
+- Cooperative live playback stop fades out before exiting when frames are still arriving.
+- TUI/client playback configs carry the settings.
+- Cover behavior with harness tests.
 
-Test command: `python3 -m pytest tests/harness tests/audio tests/protocol`
+Test command: `python3 -m pytest tests/harness/test_live_play.py tests/harness/test_config.py tests/harness/test_tui.py`
 
-Live-radio needed: no; harness-first status/error work.
+Live-radio needed: no; use replay fixture and harness tests first.
 
-Docs to update: root `config.toml` if needed, `docs/roadmap.md`, `docs/user-guide.md`, `docs/dev-log.md`
+Docs to update: root `config.toml`, `docs/user-guide.md`, `docs/dev-log.md`, `docs/bumpless-transfer.md`.
 
 ## Next
 

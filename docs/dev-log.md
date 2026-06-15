@@ -141,11 +141,31 @@ Changed `volume` / `volume-step` to control local system output volume via an in
 
 Fixed TUI quit behavior while background playback is active. Keymap `q` and command-mode `quit`/`q`/`qu`/`exit` now request cooperative background stop and wait briefly before ending curses. If the worker does not stop quickly, the TUI stays open and reports that shutdown is in progress.
 
-Changed `volume-step` to read the current local system output volume before applying the configured delta. Added preset commands `store <n>`, `store all <n>`, and `recall <n>`, plus TUI keymap digit sequences `<n>s`, `<n>S`, and `<n>r`. The TUI now persists last full state and presets to a JSON state file on safe exit and can start from `[startup] mode = "last"`, `"default"`, or `"preset"`.
+Changed `volume-step` to read the current local system output volume before applying the configured delta. Added preset commands `store <n>`, `store all <n>`, and `recall <n>`, plus TUI keymap preset sequences. The TUI now persists last full state and presets to a JSON state file on safe exit and can start from `[startup] mode = "last"`, `"default"`, or `"preset"`.
 
 Fixed another cooperative shutdown issue for long/unlimited live sessions. Live play/record/capture receive loops now use a short poll timeout around WebSocket receive, so `stop`/TUI `q` can be observed promptly even when `duration_seconds = 0` and no receive timeout would otherwise be active.
 
 Fixed connected status reporting for live background operations: `status` and the TUI dashboard now treat an active background live worker as connected. Added Kiwi MSG error detection for `too_busy`, `badp=1`, and `down`, surfacing explicit server busy/down messages in operation errors.
+
+Added semicolon-separated command batches for the shell and TUI command mode. Semicolons inside quoted arguments are preserved. Radio/state-only batches are validated against a temporary controller before committing changes, so invalid later commands do not partially mutate state. When background playback is active, an atomic radio batch queues final active-stream `SET mod=...` and/or `SET agc=...` commands only after validation succeeds. Mixed batches with live worker operations remain sequential and stop on first error.
+
+Fixed TUI startup restore for `[startup] mode = "last"`. `startup_state_and_presets()` restored the persisted state correctly, but `run_tui()` reapplied `[default_state]` before curses started and wiped out the restored radio state. `run_tui()` now applies only runtime settings at that stage, preserving restored last/preset radio values.
+
+Added which-key style TUI hints. Keymap mode shows configured keys with short action descriptions. Command mode shows command names, aliases, and descriptions; typed text filters rejected commands, unique matches show usage/sub-options, and semicolon-separated command entries use the current segment for context.
+
+Updated normal-mode key hints and key behavior to the register-prefix model. Presets now use `p <register>` to recall, `s <register>` to store frequency/mode/bandwidth, and `S <register>` to store all radio parameters, with registers `0..9,a..z`. Added `r <receiver-register>` to switch to a receiver from `[receivers].allowed` by register order while preserving current radio parameters. Letter preset registers are persisted alongside numeric registers.
+
+Improved pending-register normal-mode hints. After `p`, `s`, or `S`, defined preset registers show saved frequency and mode. After `r`, receiver registers show configured receiver addresses from `[receivers].allowed`.
+
+Fixed receiver register switching during active playback. `r <receiver-register>` now reports the selected receiver explicitly; if background playback is running, the TUI stops it and restarts playback on the new receiver with the current radio parameters. If the new playback fails immediately, e.g. because the receiver is busy, the TUI restores the previous receiver, restarts playback there when possible, and displays the failure message.
+
+Added `add-receiver <receiver-register> <ip/url[:port]> <description>` with alias `ad`. Stored receiver registers are persisted in the TUI state file, shown in `r` pending-register hints with address/description, and take precedence over fallback receivers from `[receivers].allowed`.
+
+Added `[startup] playback = true|false`. The project root config enables it so local TUI startup begins background playback automatically when `[live].allow_live = true`; built-in defaults remain guarded with startup playback disabled.
+
+Added `[audio] startup_mute_ms` and defaulted it to 300 ms in the built-in config. Live/replay SND playback still observes startup SND frames for metrics, but drops the configured amount of decoded PCM before writing to the sink to reduce receiver/audio startup transients. Recorded bumpless transfer options in `docs/bumpless-transfer.md`.
+
+Added `[audio] startup_fade_in_ms` and `[audio] stop_fade_out_ms`, with the local root config tuned to 100 ms startup mute, 50 ms fade-in, and 50 ms fade-out. Playback now applies a linear sample-domain fade-in after startup mute/drop and a short fade-out on cooperative live stops when frames are still arriving.
 
 ## YYYY-MM-DD
 

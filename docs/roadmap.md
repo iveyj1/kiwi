@@ -199,6 +199,10 @@ Current capabilities:
 - Keymap mode supports configured tune-step and volume-step actions; volume controls local system output via common Linux mixer tools.
 - TUI quit paths request cooperative background stop before exiting.
 - Connected status reflects active background live operations, and Kiwi busy/down MSG errors are surfaced as explicit user-facing operation errors.
+- Semicolon-separated TUI/shell command batches are supported; radio/state-only batches validate atomically and active playback control commands are queued after successful validation.
+- TUI displays context-sensitive which-key style hints for normal keymaps and command-mode commands/arguments. Normal-mode presets use `p/s/S <register>` with `0..9,a..z`, and `r <receiver-register>` switches stored or configured receivers while preserving radio parameters. Stored receiver registers can be added with `add-receiver` / `ad`.
+- TUI can start background playback automatically at startup via `[startup] playback = true` when live use is allowed.
+- Live playback can drop an initial `[audio] startup_mute_ms` window to reduce startup/switch transients; fuller bumpless transfer remains future playback-manager work.
 - Presets and last-state persistence support restoring startup state from last run, default config, or a configured preset.
 - Interactive AGC controls are available and can be queued to active background playback.
 - TUI config can set live duration/max-frame limits, with `0` meaning unlimited, and can configure or disable receiver restrictions.

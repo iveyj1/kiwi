@@ -6,6 +6,12 @@ large_hz = 5000
 [volume]
 step_percent = 10
 
+[audio]
+# Drop/fade decoded live playback audio to hide receiver/audio startup transients.
+startup_mute_ms = 100
+startup_fade_in_ms = 50
+stop_fade_out_ms = 50
+
 [live]
 # Set true only for trusted local interactive use.
 allow_live = true
@@ -24,6 +30,8 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
 mode = "last"
 preset = 1
 state_file = "~/.local/state/kiwi-client/state.json"
+# Start background playback automatically when [live].allow_live is true.
+playback = true
 
 [default_state]
 host = "10.0.0.41"
@@ -34,6 +42,11 @@ low_cut_hz = -5000
 high_cut_hz = 5000
 
 [keys]
+# Direct key actions remain configurable. Built-in prefix keymaps are:
+# p <register> = recall preset; s <register> = store minimal preset;
+# S <register> = store full preset; r <receiver-register> = switch receiver.
+# Registers are 0..9 and a..z. Receiver registers first use stored add-receiver entries,
+# then map to [receivers].allowed order.
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
 "left" = "tune-step -medium"

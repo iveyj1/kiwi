@@ -78,6 +78,84 @@ def test_client_controller_status_and_state_changes():
     assert state["high_cut_hz"] == 2700
 
 
+def test_client_executes_semicolon_command_batch():
+    controller = ClientController()
+
+    response = controller.execute("tu 7000; mo usb 300 2700; fi 100 2400")
+
+    assert response["type"] == "batch"
+    assert [item["type"] for item in response["responses"]] == ["state", "state", "state"]
+    assert controller.state.frequency_khz == 7000.0
+    assert controller.state.mode == "usb"
+    assert controller.state.low_cut_hz == 100
+    assert controller.state.high_cut_hz == 2400
+
+
+def test_client_command_batch_ignores_semicolon_inside_quotes():
+    controller = ClientController()
+
+    response = controller.execute("receiver 'example;host:8073'; tune 7100")
+
+    assert response["type"] == "batch"
+    assert controller.state.receiver == "example;host:8073"
+    assert controller.state.frequency_khz == 7100.0
+
+
+def test_client_radio_batch_is_atomic_on_validation_error():
+    controller = ClientController()
+
+    with pytest.raises(ClientCommandError, match="usage: mode"):
+        controller.execute("tune 7000; mode usb 300; filter 100 2400")
+
+    assert controller.state.frequency_khz == 5000.0
+    assert controller.state.mode == "am"
+    assert controller.state.low_cut_hz == -5000
+    assert controller.state.high_cut_hz == 5000
+
+
+def test_client_radio_batch_queues_active_commands_after_validation():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+
+    controller.execute("play-bg --allow-live --null-sink")
+    response = controller.execute("tune 7000; mode usb 300 2700; filter 100 2400; agc gain 35")
+    controller.execute("stop")
+    final = controller.execute("wait 2")
+
+    assert response["type"] == "batch"
+    assert response["active_commands"] == [
+        "SET mod=usb low_cut=100 high_cut=2400 freq=7000.000",
+        "SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=35",
+    ]
+    assert final["operation"]["result"]["commands"] == response["active_commands"]
+
+
+def test_client_mixed_batch_executes_sequentially_and_stops_on_error():
+    controller = ClientController()
+
+    with pytest.raises(ClientCommandError, match="unknown command"):
+        controller.execute("status; bogus; tune 7000")
+
+    assert controller.state.frequency_khz == 5000.0
+
+
+def test_client_add_receiver_command_and_alias_store_receiver_registers():
+    controller = ClientController()
+
+    response = controller.execute("add-receiver a 10.0.0.42:8073 Backup receiver")
+    alias_response = controller.execute("ad b http://example.test:8073 Example receiver")
+
+    assert response == {
+        "type": "receiver-preset",
+        "register": "a",
+        "receiver": "10.0.0.42:8073",
+        "description": "Backup receiver",
+    }
+    assert alias_response["register"] == "b"
+    assert alias_response["receiver"] == "http://example.test:8073"
+    assert controller.receiver_presets["a"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+
+
 def test_client_command_aliases_update_state_and_status():
     controller = ClientController()
 
@@ -176,6 +254,21 @@ def test_client_volume_step_reads_system_volume_before_applying_delta():
 
     assert response["state"]["volume_percent"] == 20
     assert volume.values == [20]
+
+
+def test_client_store_and_recall_letter_register_presets():
+    controller = ClientController(volume_control=FakeVolumeControl())
+
+    controller.execute("tune 7100")
+    controller.execute("mode usb 300 2700")
+    controller.execute("store all a")
+    controller.execute("tune 5000")
+    controller.execute("mode am -5000 5000")
+    recalled = controller.execute("recall a")
+
+    assert recalled["preset"] == "a"
+    assert recalled["state"]["frequency_khz"] == 7100.0
+    assert recalled["state"]["mode"] == "usb"
 
 
 def test_client_store_and_recall_presets():

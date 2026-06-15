@@ -17,6 +17,11 @@ large_hz = 5000
 [volume]
 step_percent = 10
 
+[audio]
+startup_mute_ms = 300
+startup_fade_in_ms = 100
+stop_fade_out_ms = 100
+
 [live]
 allow_live = false
 duration_seconds = 60
@@ -30,6 +35,7 @@ allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 state_file = "~/.local/state/kiwi-client/state.json"
 mode = "last"
 preset = 1
+playback = false
 
 [default_state]
 host = "10.0.0.40"
@@ -40,6 +46,11 @@ low_cut_hz = -5000
 high_cut_hz = 5000
 
 [keys]
+# Direct key actions remain configurable. Built-in prefix keymaps are:
+# p <register> = recall preset; s <register> = store minimal preset;
+# S <register> = store full preset; r <receiver-register> = switch receiver.
+# Registers are 0..9 and a..z. Receiver registers first use stored add-receiver entries,
+# then map to [receivers].allowed order.
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
 "left" = "tune-step -medium"
@@ -78,6 +89,15 @@ class VolumeConfig:
 
 
 @dataclass(frozen=True)
+class AudioConfig:
+    """Audio playback settings."""
+
+    startup_mute_ms: int = 300
+    startup_fade_in_ms: int = 100
+    stop_fade_out_ms: int = 100
+
+
+@dataclass(frozen=True)
 class LiveConfig:
     """Live-operation guard settings."""
 
@@ -101,6 +121,7 @@ class StartupConfig:
     state_file: str = "~/.local/state/kiwi-client/state.json"
     mode: str = "last"
     preset: int = 1
+    playback: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,6 +130,7 @@ class KiwiClientConfig:
 
     steps: StepConfig = field(default_factory=StepConfig)
     volume: VolumeConfig = field(default_factory=VolumeConfig)
+    audio: AudioConfig = field(default_factory=AudioConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
     receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
     startup: StartupConfig = field(default_factory=StartupConfig)
@@ -133,6 +155,7 @@ def load_config(path: str | Path | None = None) -> KiwiClientConfig:
 def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientConfig:
     steps = config.steps
     volume = config.volume
+    audio = config.audio
     live = config.live
     receivers = config.receivers
     startup = config.startup
@@ -150,6 +173,14 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     if isinstance(data.get("volume"), dict):
         volume_data = data["volume"]
         volume = replace(volume, step_percent=int(volume_data.get("step_percent", volume.step_percent)))
+    if isinstance(data.get("audio"), dict):
+        audio_data = data["audio"]
+        audio = replace(
+            audio,
+            startup_mute_ms=int(audio_data.get("startup_mute_ms", audio.startup_mute_ms)),
+            startup_fade_in_ms=int(audio_data.get("startup_fade_in_ms", audio.startup_fade_in_ms)),
+            stop_fade_out_ms=int(audio_data.get("stop_fade_out_ms", audio.stop_fade_out_ms)),
+        )
     if isinstance(data.get("live"), dict):
         live_data = data["live"]
         live = replace(
@@ -173,6 +204,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
             state_file=str(startup_data.get("state_file", startup.state_file)),
             mode=str(startup_data.get("mode", startup.mode)),
             preset=int(startup_data.get("preset", startup.preset)),
+            playback=bool(startup_data.get("playback", startup.playback)),
         )
     if isinstance(data.get("default_state"), dict):
         default_state.update(data["default_state"])
@@ -182,6 +214,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     return KiwiClientConfig(
         steps=steps,
         volume=volume,
+        audio=audio,
         live=live,
         receivers=receivers,
         startup=startup,

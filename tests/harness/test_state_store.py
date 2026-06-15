@@ -30,6 +30,32 @@ def test_apply_preset_preserves_unspecified_fields():
     assert applied.agc_gain == 25
 
 
+def test_save_and_load_letter_register_presets(tmp_path):
+    path = tmp_path / "state.json"
+    state = ClientState(frequency_khz=7100.0)
+
+    save_state_file(path, last_state=state, presets={"a": full_preset(state), 1: minimal_preset(state)})
+    loaded = load_state_file(path)
+
+    assert loaded["presets"]["a"]["frequency_khz"] == 7100.0
+    assert loaded["presets"]["1"]["frequency_khz"] == 7100.0
+
+
+def test_save_and_load_receiver_presets(tmp_path):
+    path = tmp_path / "state.json"
+    state = ClientState(frequency_khz=7100.0)
+
+    save_state_file(
+        path,
+        last_state=state,
+        presets={},
+        receiver_presets={"a": {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}},
+    )
+    loaded = load_state_file(path)
+
+    assert loaded["receiver_presets"]["a"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+
+
 def test_save_and_load_state_file(tmp_path):
     path = tmp_path / "state.json"
     state = ClientState(frequency_khz=7000.0, agc_gain=25)

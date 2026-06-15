@@ -46,6 +46,9 @@ class ClientState:
     duration_seconds: float = 60.0
     max_frames: int = 1500
     volume_percent: int = 100
+    audio_startup_mute_ms: int = 300
+    audio_startup_fade_in_ms: int = 100
+    audio_stop_fade_out_ms: int = 100
     agc_on: bool = True
     agc_hang: bool = False
     agc_threshold: int = -100
@@ -164,18 +167,93 @@ class ClientController:
         allow_live_default: bool = False,
         volume_control: VolumeControl | None = None,
         presets: dict[int, dict[str, Any]] | None = None,
+        receiver_presets: dict[Any, dict[str, str]] | None = None,
     ) -> None:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
         self.background = background or BackgroundOperation()
         self.allow_live_default = allow_live_default
         self.volume_control = volume_control or SystemVolumeControl()
-        self.presets: dict[int, dict[str, Any]] = dict(presets or {})
+        self.presets: dict[Any, dict[str, Any]] = dict(presets or {})
+        self.receiver_presets: dict[Any, dict[str, str]] = dict(receiver_presets or {})
+        self.last_play_bg_null_sink = False
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
-        """Execute one shell command and return a JSON-serializable response."""
-        stripped = line.strip()
+        """Execute one shell command entry and return a JSON-serializable response."""
+        commands = split_command_entry(line)
+        if not commands:
+            return None
+        if len(commands) == 1:
+            return self._execute_one(commands[0])
+        return self._execute_batch(commands)
+
+    def _execute_batch(self, commands: list[str]) -> dict[str, Any]:
+        if all(is_atomic_state_command(command) for command in commands):
+            return self._execute_atomic_state_batch(commands)
+        responses: list[dict[str, Any]] = []
+        for command in commands:
+            response = self._execute_one(command)
+            if response is not None:
+                responses.append(response)
+            if not self.running:
+                break
+        return {"type": "batch", "responses": responses}
+
+    def _execute_atomic_state_batch(self, commands: list[str]) -> dict[str, Any]:
+        trial = ClientController(
+            state=self.state,
+            operations=self.operations,
+            allow_live_default=self.allow_live_default,
+            volume_control=self.volume_control,
+            presets=self.presets,
+            receiver_presets=self.receiver_presets,
+        )
+        responses: list[dict[str, Any]] = []
+        touched_modulation = False
+        touched_agc = False
+        for command_line in commands:
+            command = normalized_command_name(command_line)
+            response = trial._execute_one(command_line)
+            if response is not None:
+                responses.append(response)
+            if command in MODULATION_STATE_COMMANDS:
+                touched_modulation = True
+            if command == "agc" and len(shlex.split(command_line)) > 1:
+                touched_agc = True
+        self.state = trial.state
+        self.presets = dict(trial.presets)
+        self.receiver_presets = dict(trial.receiver_presets)
+        active_commands: list[str] = []
+        if touched_modulation:
+            active_commands.append(
+                encode_modulation(
+                    self.state.mode,
+                    self.state.low_cut_hz,
+                    self.state.high_cut_hz,
+                    self.state.frequency_khz,
+                )
+            )
+        if touched_agc:
+            active_commands.append(self._agc_command())
+        active_operation: dict[str, Any] | None = None
+        for active_command in active_commands:
+            current_status = self.background.status()
+            if not current_status.running or current_status.name != "play":
+                active_operation = None
+                continue
+            try:
+                active_operation = self.background.send_command(active_command).as_dict()
+            except RuntimeError:
+                active_operation = None
+        result: dict[str, Any] = {"type": "batch", "responses": responses, "state": self.state.as_dict()}
+        if active_commands and active_operation is not None:
+            result["active_commands"] = active_commands
+            result["operation"] = active_operation
+        return result
+
+    def _execute_one(self, stripped: str) -> dict[str, Any] | None:
+        """Execute one parsed shell command and return a JSON-serializable response."""
         if not stripped or stripped.startswith("#"):
             return None
         parts = shlex.split(stripped)
@@ -199,6 +277,8 @@ class ClientController:
             self._require_arg_count(args, 1, "receiver <host>[:port]")
             self.state = self._with_receiver(args[0])
             return {"type": "state", "state": self.state.as_dict()}
+        if command == "add-receiver":
+            return self._handle_add_receiver(args)
         if command == "tune":
             self._require_arg_count(args, 1, "tune <frequency_khz>")
             self.state = replace(self.state, frequency_khz=float(args[0]))
@@ -233,7 +313,7 @@ class ClientController:
             return self._handle_store(args)
         if command == "recall":
             self._require_arg_count(args, 1, "recall <n>")
-            return self._recall_preset(int(args[0]))
+            return self._recall_preset(args[0])
         if command == "duration":
             self._require_arg_count(args, 1, "duration <seconds>")
             self.state = replace(self.state, duration_seconds=float(args[0]))
@@ -266,6 +346,7 @@ class ClientController:
             self._require_allow_live(flags, "play-plan")
             config = self._playback_config()
             null_sink = "--null-sink" in flags
+            self.last_play_bg_null_sink = null_sink
             status = self.background.start(
                 "play",
                 lambda stop_event, command_queue, status_callback: self.operations.play(
@@ -365,18 +446,35 @@ class ClientController:
         response["operation"] = status.as_dict()
         return response
 
+    def _handle_add_receiver(self, args: list[str]) -> dict[str, Any]:
+        if len(args) < 3:
+            raise ClientCommandError("usage: add-receiver <receiver-register> <ip/url[:port]> <description>")
+        register = parse_register_id(args[0])
+        receiver = args[1]
+        description = " ".join(args[2:]).strip()
+        if not description:
+            raise ClientCommandError("usage: add-receiver <receiver-register> <ip/url[:port]> <description>")
+        self.receiver_presets[register] = {"receiver": receiver, "description": description}
+        return {
+            "type": "receiver-preset",
+            "register": register,
+            "receiver": receiver,
+            "description": description,
+        }
+
     def _handle_store(self, args: list[str]) -> dict[str, Any]:
         if len(args) == 1:
-            preset_id = int(args[0])
+            preset_id = parse_register_id(args[0])
             self.presets[preset_id] = minimal_preset(self.state)
             return {"type": "preset", "preset": preset_id, "scope": "minimal", "state": self.state.as_dict()}
         if len(args) == 2 and args[0].lower() == "all":
-            preset_id = int(args[1])
+            preset_id = parse_register_id(args[1])
             self.presets[preset_id] = full_preset(self.state)
             return {"type": "preset", "preset": preset_id, "scope": "all", "state": self.state.as_dict()}
         raise ClientCommandError("usage: store <n> | store all <n>")
 
-    def _recall_preset(self, preset_id: int) -> dict[str, Any]:
+    def _recall_preset(self, preset_id: Any) -> dict[str, Any]:
+        preset_id = parse_register_id(str(preset_id))
         if preset_id not in self.presets:
             raise ClientCommandError(f"unknown preset: {preset_id}")
         self.state = apply_preset(self.state, self.presets[preset_id])
@@ -538,6 +636,9 @@ class ClientController:
             high_cut_hz=self.state.high_cut_hz,
             duration_seconds=self.state.duration_seconds,
             max_frames=self.state.max_frames,
+            startup_mute_ms=self.state.audio_startup_mute_ms,
+            startup_fade_in_ms=self.state.audio_startup_fade_in_ms,
+            stop_fade_out_ms=self.state.audio_stop_fade_out_ms,
             receivers_restricted=self.state.receivers_restricted,
             allowed_receivers=self.state.allowed_receivers,
         )
@@ -577,6 +678,78 @@ class ClientController:
         )
 
 
+ATOMIC_STATE_COMMANDS = {
+    "receiver",
+    "tune",
+    "mode",
+    "filter",
+    "tune-step",
+    "agc",
+    "duration",
+    "frames",
+    "recall",
+}
+
+MODULATION_STATE_COMMANDS = {"receiver", "tune", "mode", "filter", "tune-step", "recall"}
+REGISTER_KEYS = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def parse_register_id(value: str) -> int | str:
+    """Parse one preset register id, preserving digit compatibility."""
+    token = value.strip().lower()
+    if len(token) != 1 or token not in REGISTER_KEYS:
+        raise ClientCommandError("register must be [0..9] or [a..z]")
+    return int(token) if token.isdigit() else token
+
+
+def split_command_entry(line: str) -> list[str]:
+    """Split a command entry on semicolons outside quotes."""
+    commands: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in line:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            current.append(char)
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            current.append(char)
+            continue
+        if char == ";" and quote is None:
+            command = "".join(current).strip()
+            if command and not command.startswith("#"):
+                commands.append(command)
+            current = []
+            continue
+        current.append(char)
+    command = "".join(current).strip()
+    if command and not command.startswith("#"):
+        commands.append(command)
+    return commands
+
+
+def normalized_command_name(command_line: str) -> str:
+    """Return the canonical command name for a single command line."""
+    parts = shlex.split(command_line)
+    if not parts:
+        return ""
+    return command_aliases().get(parts[0].lower(), parts[0].lower())
+
+
+def is_atomic_state_command(command_line: str) -> bool:
+    """Return true if a command can be validated before mutating live state."""
+    return normalized_command_name(command_line) in ATOMIC_STATE_COMMANDS
+
+
 def command_aliases() -> dict[str, str]:
     """Return short command aliases for interactive use."""
     return {
@@ -586,6 +759,7 @@ def command_aliases() -> dict[str, str]:
         "mo": "mode",
         "fi": "filter",
         "ag": "agc",
+        "ad": "add-receiver",
         "stp": "store",
         "rc": "recall",
         "du": "duration",
@@ -606,6 +780,7 @@ def available_commands() -> list[str]:
         "connect",
         "disconnect",
         "receiver <host>[:port]",
+        "add-receiver <receiver-register> <ip/url[:port]> <description>",
         "tune <frequency_khz>",
         "mode <mode> [low_cut_hz high_cut_hz]",
         "filter <low_cut_hz> <high_cut_hz>",
@@ -633,7 +808,7 @@ def available_commands() -> list[str]:
         "capture-bg <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
-        "aliases: ?=status, re=receiver, tu=tune, mo=mode, fi=filter, ag=agc, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
+        "aliases: ?=status, re=receiver, ad=add-receiver, tu=tune, mo=mode, fi=filter, ag=agc, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
     ]
 
 

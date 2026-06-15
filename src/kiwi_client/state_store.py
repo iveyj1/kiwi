@@ -33,20 +33,30 @@ def apply_preset(state: Any, preset: dict[str, Any]) -> Any:
 def load_state_file(path: str | Path) -> dict[str, Any]:
     path = Path(path).expanduser()
     if not path.exists():
-        return {"last_state": None, "presets": {}}
+        return {"last_state": None, "presets": {}, "receiver_presets": {}}
     data = json.loads(path.read_text(encoding="utf-8"))
     return {
         "last_state": data.get("last_state"),
         "presets": {str(key): value for key, value in data.get("presets", {}).items()},
+        "receiver_presets": {str(key): value for key, value in data.get("receiver_presets", {}).items()},
     }
 
 
-def save_state_file(path: str | Path, *, last_state: Any, presets: dict[int, dict[str, Any]]) -> None:
+def save_state_file(
+    path: str | Path,
+    *,
+    last_state: Any,
+    presets: dict[Any, dict[str, Any]],
+    receiver_presets: dict[Any, dict[str, str]] | None = None,
+) -> None:
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
         "last_state": full_preset(last_state),
-        "presets": {str(key): value for key, value in sorted(presets.items())},
+        "presets": {str(key): value for key, value in sorted(presets.items(), key=lambda item: str(item[0]))},
+        "receiver_presets": {
+            str(key): value for key, value in sorted((receiver_presets or {}).items(), key=lambda item: str(item[0]))
+        },
     }
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

@@ -11,6 +11,9 @@ def test_default_config_has_keymaps_and_steps():
     assert config.steps.medium_hz == 1000
     assert config.steps.large_hz == 5000
     assert config.volume.step_percent == 10
+    assert config.audio.startup_mute_ms == 300
+    assert config.audio.startup_fade_in_ms == 100
+    assert config.audio.stop_fade_out_ms == 100
     assert config.live.allow_live is False
     assert config.live.duration_seconds == 60.0
     assert config.live.max_frames == 1500
@@ -18,6 +21,7 @@ def test_default_config_has_keymaps_and_steps():
     assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
     assert config.startup.mode == "last"
     assert config.startup.preset == 1
+    assert config.startup.playback is False
     assert config.startup.state_file.endswith("kiwi-client/state.json")
     assert config.default_state["frequency_khz"] == 5000.0
     assert config.keys["right"] == "tune-step +medium"
@@ -36,6 +40,11 @@ medium_hz = 2500
 [volume]
 step_percent = 5
 
+[audio]
+startup_mute_ms = 125
+startup_fade_in_ms = 50
+stop_fade_out_ms = 75
+
 [live]
 allow_live = true
 duration_seconds = 0
@@ -48,6 +57,7 @@ allowed = ["example.com:8073"]
 [startup]
 mode = "preset"
 preset = 7
+playback = true
 state_file = "state.json"
 
 [default_state]
@@ -67,6 +77,9 @@ mode = "usb"
     assert config.steps.medium_hz == 2500
     assert config.steps.large_hz == 5000
     assert config.volume.step_percent == 5
+    assert config.audio.startup_mute_ms == 125
+    assert config.audio.startup_fade_in_ms == 50
+    assert config.audio.stop_fade_out_ms == 75
     assert config.live.allow_live is True
     assert config.live.duration_seconds == 0
     assert config.live.max_frames == 0
@@ -74,12 +87,21 @@ mode = "usb"
     assert config.receivers.allowed == ("example.com:8073",)
     assert config.startup.mode == "preset"
     assert config.startup.preset == 7
+    assert config.startup.playback is True
     assert config.startup.state_file == "state.json"
     assert config.default_state["frequency_khz"] == 1234.5
     assert config.default_state["mode"] == "usb"
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +large"
     assert config.keys["x"] == "stop"
+
+
+def test_project_root_example_config_parses():
+    config = load_config(Path("config.toml"))
+
+    assert config.keys[":"] == "command-mode"
+    assert config.receivers.allowed
+    assert config.startup.playback is True
 
 
 def test_tui_parser_accepts_config_path(tmp_path: Path):

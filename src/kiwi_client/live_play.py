@@ -50,6 +50,9 @@ class LiveSndPlaybackConfig:
     duration_seconds: float = 3.0
     max_frames: int = 20
     compression: bool = False
+    startup_mute_ms: int = 300
+    startup_fade_in_ms: int = 100
+    stop_fade_out_ms: int = 100
     timestamp: int | None = None
     receivers_restricted: bool = True
     allowed_receivers: tuple[str, ...] | None = None
@@ -67,6 +70,12 @@ class LiveSndPlaybackConfig:
             raise LiveCaptureError("max_frames must be >= 0; 0 means unlimited")
         if self.compression:
             raise LiveCaptureError("first live playback path must use compression=0")
+        if self.startup_mute_ms < 0:
+            raise LiveCaptureError("startup_mute_ms must be >= 0")
+        if self.startup_fade_in_ms < 0:
+            raise LiveCaptureError("startup_fade_in_ms must be >= 0")
+        if self.stop_fade_out_ms < 0:
+            raise LiveCaptureError("stop_fade_out_ms must be >= 0")
 
     def websocket_uri(self) -> str:
         timestamp = self.timestamp if self.timestamp is not None else int(time.time())
@@ -93,6 +102,9 @@ class LiveSndPlaybackConfig:
             "duration_seconds": self.duration_seconds,
             "max_frames": self.max_frames,
             "compression": self.compression,
+            "startup_mute_ms": self.startup_mute_ms,
+            "startup_fade_in_ms": self.startup_fade_in_ms,
+            "stop_fade_out_ms": self.stop_fade_out_ms,
             "initial_commands": [encode_auth()],
             "dynamic_commands": ["SET AR OK in=<audio_rate> out=44100", *self.setup_commands()],
         }
@@ -115,23 +127,89 @@ def _write_snd_to_sink(
     state: ReceiverState,
     sink_started: bool,
     *,
+    startup_drop_samples: int = 0,
+    fade_in_remaining: int = 0,
+    fade_in_total: int = 0,
+    fade_out_remaining: int = 0,
+    fade_out_total: int = 0,
     status_callback: Callable[[dict], None] | None = None,
     metrics_tracker: SndMetricsTracker | None = None,
-) -> tuple[bool, int, int]:
+) -> tuple[bool, int, int, int, int, int, bool]:
     frame = parse_snd_uncompressed_mono(payload)
     if state.sample_rate is None:
         raise LiveCaptureError("received SND before MSG sample_rate")
-    if not sink_started:
-        sink.start(sample_rate_hz=int(round(state.sample_rate)), channels=1, sample_width_bytes=2)
-        sink_started = True
-    pcm = samples_to_pcm16le(frame.samples)
-    sink.write(pcm)
     if status_callback is not None:
         if metrics_tracker is None:
             status_callback({"smeter": frame.smeter, "rssi_db": frame.rssi_db, "snd_seq": frame.seq})
         else:
             status_callback(metrics_tracker.observe(frame, sample_rate=state.sample_rate))
-    return sink_started, len(frame.samples), len(pcm)
+
+    samples = frame.samples
+    if startup_drop_samples:
+        drop_count = min(startup_drop_samples, len(samples))
+        samples = samples[drop_count:]
+        startup_drop_samples -= drop_count
+    if samples and fade_in_remaining:
+        samples, fade_in_remaining = apply_fade_in(samples, fade_in_remaining=fade_in_remaining, fade_in_total=fade_in_total)
+    if samples and fade_out_remaining:
+        samples, fade_out_remaining = apply_fade_out(
+            samples,
+            fade_out_remaining=fade_out_remaining,
+            fade_out_total=fade_out_total,
+        )
+    if not samples:
+        return sink_started, 0, 0, startup_drop_samples, fade_in_remaining, fade_out_remaining, False
+
+    if not sink_started:
+        sink.start(sample_rate_hz=int(round(state.sample_rate)), channels=1, sample_width_bytes=2)
+        sink_started = True
+    pcm = samples_to_pcm16le(samples)
+    sink.write(pcm)
+    return sink_started, len(samples), len(pcm), startup_drop_samples, fade_in_remaining, fade_out_remaining, True
+
+
+def apply_fade_in(samples: tuple[int, ...], *, fade_in_remaining: int, fade_in_total: int) -> tuple[tuple[int, ...], int]:
+    """Apply linear fade-in to leading samples."""
+    if fade_in_remaining <= 0 or fade_in_total <= 0:
+        return samples, 0
+    faded: list[int] = []
+    remaining = fade_in_remaining
+    for sample in samples:
+        if remaining > 0:
+            done = fade_in_total - remaining
+            gain = max(0.0, min(1.0, done / fade_in_total))
+            faded.append(int(sample * gain))
+            remaining -= 1
+        else:
+            faded.append(sample)
+    return tuple(faded), remaining
+
+
+def apply_fade_out(samples: tuple[int, ...], *, fade_out_remaining: int, fade_out_total: int) -> tuple[tuple[int, ...], int]:
+    """Apply linear fade-out and truncate after fade completion."""
+    if fade_out_remaining <= 0 or fade_out_total <= 0:
+        return samples, 0
+    faded: list[int] = []
+    remaining = fade_out_remaining
+    for sample in samples:
+        if remaining <= 0:
+            break
+        gain = max(0.0, min(1.0, remaining / fade_out_total))
+        faded.append(int(sample * gain))
+        remaining -= 1
+    return tuple(faded), remaining
+
+
+def samples_for_ms(sample_rate: float | None, milliseconds: int) -> int:
+    """Return sample count for a duration in ms."""
+    if sample_rate is None or milliseconds <= 0:
+        return 0
+    return int(round(sample_rate * milliseconds / 1000.0))
+
+
+def startup_drop_samples(config: LiveSndPlaybackConfig, sample_rate: float | None) -> int:
+    """Return initial samples to drop for startup mute."""
+    return samples_for_ms(sample_rate, config.startup_mute_ms)
 
 
 def play_replay_snd(
@@ -151,6 +229,9 @@ def play_replay_snd(
     total_frames = 0
     bytes_written = 0
     metrics_tracker = SndMetricsTracker()
+    drop_samples_remaining: int | None = None
+    fade_in_remaining = 0
+    fade_in_total = 0
 
     transport.send(encode_auth())
     while not transport.done and snd_frames < config.max_frames:
@@ -161,11 +242,26 @@ def play_replay_snd(
             for command in commands:
                 transport.send(command)
         elif event.type == "binary" and event.payload is not None:
-            sink_started, frames, byte_count = _write_snd_to_sink(
+            if drop_samples_remaining is None:
+                drop_samples_remaining = startup_drop_samples(config, state.sample_rate)
+                fade_in_total = samples_for_ms(state.sample_rate, config.startup_fade_in_ms)
+                fade_in_remaining = fade_in_total
+            (
+                sink_started,
+                frames,
+                byte_count,
+                drop_samples_remaining,
+                fade_in_remaining,
+                _,
+                wrote_chunk,
+            ) = _write_snd_to_sink(
                 event.payload,
                 sink,
                 state,
                 sink_started,
+                startup_drop_samples=drop_samples_remaining,
+                fade_in_remaining=fade_in_remaining,
+                fade_in_total=fade_in_total,
                 status_callback=status_callback,
                 metrics_tracker=metrics_tracker,
             )
@@ -213,6 +309,12 @@ async def play_live_snd(
     total_frames = 0
     bytes_written = 0
     metrics_tracker = SndMetricsTracker()
+    drop_samples_remaining: int | None = None
+    fade_in_remaining = 0
+    fade_in_total = 0
+    fade_out_remaining = 0
+    fade_out_total = 0
+    fading_out = False
     start = time.monotonic()
     last_keepalive = start
 
@@ -224,8 +326,12 @@ async def play_live_snd(
         try:
             await websocket.send(encode_auth())
             while snd_loop_allowed(start, snd_frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
-                if stop_event is not None and stop_event.is_set():
-                    break
+                if stop_event is not None and stop_event.is_set() and not fading_out:
+                    fade_out_total = samples_for_ms(state.sample_rate, config.stop_fade_out_ms)
+                    fade_out_remaining = fade_out_total
+                    fading_out = fade_out_total > 0 and sink_started
+                    if not fading_out:
+                        break
                 now = time.monotonic()
                 if keepalive_due(now, last_keepalive, sent_setup=sent_setup):
                     await websocket.send(encode_keepalive())
@@ -254,17 +360,36 @@ async def play_live_snd(
                         raise_for_kiwi_error(params, receiver=config.receiver)
                         state = state.apply_msg_params(params)
                     else:
-                        sink_started, frames, byte_count = _write_snd_to_sink(
+                        if drop_samples_remaining is None:
+                            drop_samples_remaining = startup_drop_samples(config, state.sample_rate)
+                            fade_in_total = samples_for_ms(state.sample_rate, config.startup_fade_in_ms)
+                            fade_in_remaining = fade_in_total
+                        (
+                            sink_started,
+                            frames,
+                            byte_count,
+                            drop_samples_remaining,
+                            fade_in_remaining,
+                            fade_out_remaining,
+                            wrote_chunk,
+                        ) = _write_snd_to_sink(
                             payload,
                             sink,
                             state,
                             sink_started,
+                            startup_drop_samples=drop_samples_remaining,
+                            fade_in_remaining=fade_in_remaining,
+                            fade_in_total=fade_in_total,
+                            fade_out_remaining=fade_out_remaining,
+                            fade_out_total=fade_out_total,
                             status_callback=status_callback,
                             metrics_tracker=metrics_tracker,
                         )
                         snd_frames += 1
                         total_frames += frames
                         bytes_written += byte_count
+                        if fading_out and fade_out_remaining <= 0:
+                            break
                         continue
                 commands, sent_ar_ok, sent_setup = _commands_after_msg(state, sent_ar_ok, sent_setup, config)
                 for command in commands:
@@ -296,6 +421,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--high-cut-hz", type=int, default=5000)
     parser.add_argument("--duration-seconds", type=float, default=3.0)
     parser.add_argument("--max-frames", type=int, default=20)
+    parser.add_argument("--startup-mute-ms", type=int, default=300)
+    parser.add_argument("--startup-fade-in-ms", type=int, default=100)
+    parser.add_argument("--stop-fade-out-ms", type=int, default=100)
     parser.add_argument("--timestamp", type=int)
     parser.add_argument("--dry-run", action="store_true", help="print playback plan and do not connect")
     parser.add_argument("--null-sink", action="store_true", help="connect live but discard audio instead of using an output device")
@@ -315,6 +443,9 @@ def config_from_args(args: argparse.Namespace) -> LiveSndPlaybackConfig:
         high_cut_hz=args.high_cut_hz,
         duration_seconds=args.duration_seconds,
         max_frames=args.max_frames,
+        startup_mute_ms=args.startup_mute_ms,
+        startup_fade_in_ms=args.startup_fade_in_ms,
+        stop_fade_out_ms=args.stop_fade_out_ms,
         timestamp=args.timestamp,
     )
 

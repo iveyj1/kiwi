@@ -26,13 +26,21 @@ PYTHONPATH=src python3 -m kiwi_client.tui --config ~/.config/kiwi-client/config.
 
 TUI input has two modes:
 
+- The TUI shows which-key style context hints above the prompt.
+- In keymap mode, hints list available configured keys with short action descriptions.
+- In command mode, hints list top-level commands with aliases and short descriptions; typed text filters the list.
+- Once the active text uniquely identifies a command, hints keep that command visible and show usage/sub-options.
+- For semicolon-separated command entries, hints follow the current command segment after the last unquoted semicolon.
+- Command entries may contain multiple commands separated by semicolons, e.g. `:tu 7000; mo usb 300 2700; fi 100 2400`.
+- Semicolons inside quoted arguments are preserved.
+- Batches containing only radio/state commands are validated before state is changed; if one command is invalid the earlier commands in that batch are not applied. Mixed batches containing live start/stop operations execute sequentially and stop at the first error.
 - Keymap mode is the default.
 - `:` enters command mode.
 - In command mode, `Enter` executes the command and returns to keymap mode.
 - In command mode, `Esc` clears the command and returns to keymap mode.
 - In command mode, up/down arrows browse command history; the selected command is placed in the prompt for editing.
 - In keymap mode, `q` requests cooperative stop of any background operation before exiting the TUI.
-- In keymap mode, digit sequences manage presets: `<n>s` stores receiver/frequency/mode/filter, `<n>S` stores all state, and `<n>r` recalls preset `<n>`.
+- In keymap mode, prefix sequences manage presets and receiver switching: `p <register>` recalls a preset, `s <register>` stores frequency/mode/bandwidth, `S <register>` stores all radio parameters, and `r <receiver>` switches to a stored or configured receiver while preserving radio parameters. Registers are `0..9` or `a..z`; receiver registers come from `add-receiver` entries first, then `[receivers].allowed` order. After pressing a prefix key, hints show defined preset registers with frequency/mode or receiver registers with addresses/descriptions.
 
 Default TUI keymap/step configuration shape:
 
@@ -44,6 +52,12 @@ large_hz = 5000
 
 [volume]
 step_percent = 10
+
+[audio]
+# Drop/fade decoded live playback audio to hide receiver/audio startup transients.
+startup_mute_ms = 100
+startup_fade_in_ms = 50
+stop_fade_out_ms = 50
 
 [live]
 # Default is false. Set true only for trusted local interactive use.
@@ -62,6 +76,8 @@ allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 mode = "last"
 preset = 1
 state_file = "~/.local/state/kiwi-client/state.json"
+# Start background playback when [live].allow_live is true.
+playback = true
 
 [default_state]
 host = "10.0.0.40"
@@ -101,7 +117,7 @@ If you want TUI command aliases like `:pb` to start live operations without typi
 allow_live = true
 ```
 
-With that setting, `:pb --null-sink` is accepted as `play-bg --null-sink` using the configured live opt-in. Without it, live operations still require `--allow-live` on each command.
+With that setting, `:pb --null-sink` is accepted as `play-bg --null-sink` using the configured live opt-in. Without it, live operations still require `--allow-live` on each command. If `[startup] playback = true` is also set, the TUI starts background playback automatically at startup using the restored/default radio state.
 
 Configured live limits can be made unlimited by setting either value to `0`:
 
@@ -129,6 +145,8 @@ restricted = false
 Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed.
 
 For long-running live playback/record/capture, the client sends periodic SND keepalives after initial setup. If a session still stops unexpectedly, check the TUI operation result/error and confirm both `duration_seconds` and `max_frames` are `0` if you intend no client-side limit.
+
+Live playback drops the first `[audio].startup_mute_ms` of decoded PCM after each playback start while still updating SND metrics, then fades in over `[audio].startup_fade_in_ms`. Cooperative playback stops fade out over `[audio].stop_fade_out_ms` when frames are still arriving. This is intended to hide short receiver/audio startup and switch transients.
 
 If playback appears active but you hear no audio, check the local output volume because `volume` / `volume-step` now operate on the system mixer. From command mode you can try `:volume 50`, and outside the app check the selected output device/mute state with your desktop audio controls or `wpctl`/`pactl`.
 
@@ -167,6 +185,7 @@ Supported commands:
 - `status`
 - `connect` / `disconnect` (state only; no persistent receiver session yet)
 - `receiver <host>[:port]`
+- `add-receiver <receiver-register> <ip/url[:port]> <description>`
 - `tune <frequency_khz>`
 - `mode <mode> [low_cut_hz high_cut_hz]`
 - `filter <low_cut_hz> <high_cut_hz>`
@@ -199,6 +218,7 @@ Command aliases:
 
 - `?` -> `status`
 - `re` -> `receiver`
+- `ad` -> `add-receiver`
 - `tu` -> `tune`
 - `mo` -> `mode`
 - `fi` -> `filter`
@@ -230,11 +250,11 @@ Presets:
 
 ```text
 store 1        # receiver/frequency/mode/filter only
-store all 2    # full client/radio state
-recall 1
+store all a    # full client/radio state in letter register a
+recall a
 ```
 
-In keymap mode, press `1s`, `2S`, or `1r` for the same operations. The TUI persists the last full state and presets to `[startup].state_file` on safe exit. On restart, `[startup].mode` controls whether to use `last`, `default`, or a configured `preset`.
+In keymap mode, press `s1`, `Sa`, or `pa` for the same store/store-all/recall operations. After `p`, `s`, or `S`, defined preset registers are shown with frequency and mode. Add stored receiver registers with `add-receiver a 10.0.0.42:8073 Backup receiver` or alias `ad a 10.0.0.42:8073 Backup receiver`. Receiver prefix `r <receiver>` switches to a stored receiver if the register is defined, otherwise to `[receivers].allowed` using register order `0..9,a..z`, while preserving frequency/mode/filter and other radio parameters; after `r`, hints show defined receiver registers and addresses/descriptions. If background playback is active, the TUI stops it and restarts playback on the selected receiver. If the new receiver fails immediately, such as reporting busy, the TUI restores the previous receiver, restarts playback there when possible, and shows the failure message. The TUI persists the last full state, presets, and stored receivers to `[startup].state_file` on safe exit. On restart, `[startup].mode` controls whether to use `last`, `default`, or a configured `preset`.
 
 Current limitations:
 
@@ -292,7 +312,13 @@ mode usb 300 2700
 filter 100 2400
 ```
 
-The dashboard response includes `Applied to active stream: ...` when a control command is queued.
+A semicolon-separated radio batch queues active playback control commands only after the whole batch validates. For modulation-related changes, the active stream receives one final `SET mod=...` for the final state; AGC changes receive a final `SET agc=...` when included.
+
+```text
+:tu 7000; mo usb 300 2700; fi 100 2400; agc gain 35
+```
+
+The dashboard response includes `Applied to active stream: ...` for each queued control command.
 
 Expected next operations:
 

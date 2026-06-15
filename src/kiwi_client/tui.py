@@ -14,7 +14,14 @@ from typing import Any
 
 from pathlib import Path
 
-from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, available_commands
+from kiwi_client.client_app import (
+    REGISTER_KEYS,
+    ClientCommandError,
+    ClientController,
+    ClientState,
+    available_commands,
+    command_aliases,
+)
 from kiwi_client.config import KiwiClientConfig, load_config
 from kiwi_client.state_store import apply_preset, load_state_file, save_state_file
 
@@ -34,7 +41,7 @@ class TuiInputState:
     command: str = ""
     history: list[str] = field(default_factory=list)
     history_index: int | None = None
-    pending_preset_digit: str | None = None
+    pending_key_action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +51,260 @@ class DashboardModel:
     state: ClientState
     last_response: dict[str, Any] | None = None
     message: str = ""
+
+
+@dataclass(frozen=True)
+class CommandHint:
+    """Short command help used by command-mode hints."""
+
+    name: str
+    description: str
+    usage: str
+    detail: str = ""
+
+
+COMMAND_HINTS = [
+    CommandHint("status", "show state", "status"),
+    CommandHint("connect", "mark connected", "connect"),
+    CommandHint("disconnect", "mark disconnected", "disconnect"),
+    CommandHint("receiver", "set receiver", "receiver <host>[:port]"),
+    CommandHint("add-receiver", "save receiver", "add-receiver <receiver-register> <ip/url[:port]> <description>"),
+    CommandHint("tune", "set frequency", "tune <frequency_khz>"),
+    CommandHint("mode", "set demod mode", "mode <mode> [low_cut_hz high_cut_hz]"),
+    CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>"),
+    CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>"),
+    CommandHint("volume", "set local volume", "volume <percent>"),
+    CommandHint("volume-step", "step local volume", "volume-step <delta_percent>"),
+    CommandHint(
+        "agc",
+        "AGC settings",
+        "agc [sub-option]",
+        "sub-options: on, off, hang on|off, threshold <value>, slope <value>, decay <ms>, gain <value>, set key=value ...",
+    ),
+    CommandHint("store", "save preset", "store <n> | store all <n>"),
+    CommandHint("recall", "load preset", "recall <n>"),
+    CommandHint("duration", "set live limit", "duration <seconds>"),
+    CommandHint("frames", "set frame limit", "frames <max_snd_frames>"),
+    CommandHint("dashboard", "show dashboard", "dashboard"),
+    CommandHint("play-plan", "show play plan", "play-plan"),
+    CommandHint("play", "play now", "play --allow-live [--null-sink]"),
+    CommandHint("play-bg", "start playback worker", "play-bg --allow-live [--null-sink]"),
+    CommandHint("stop", "stop worker", "stop"),
+    CommandHint("wait", "wait for worker", "wait [seconds]"),
+    CommandHint("operation-status", "worker status", "operation-status"),
+    CommandHint("record-plan", "show record plan", "record-plan <output.wav>"),
+    CommandHint("record", "record now", "record <output.wav> --allow-live [--overwrite]"),
+    CommandHint("record-bg", "start record worker", "record-bg <output.wav> --allow-live [--overwrite]"),
+    CommandHint("capture-plan", "show capture plan", "capture-plan <output.jsonl>"),
+    CommandHint("capture", "capture now", "capture <output.jsonl> --allow-live [--overwrite]"),
+    CommandHint("capture-bg", "start capture worker", "capture-bg <output.jsonl> --allow-live [--overwrite]"),
+    CommandHint("help", "list commands", "help"),
+    CommandHint("quit", "quit TUI", "quit"),
+]
+
+
+def render_tui_hints(
+    input_state: TuiInputState,
+    config: KiwiClientConfig,
+    controller: ClientController | None = None,
+) -> str:
+    """Render context-sensitive key/command hints for the current input mode."""
+    if input_state.mode == InputMode.COMMAND:
+        return render_command_hints(input_state.command)
+    if input_state.pending_key_action is not None:
+        return render_pending_keymap_hints(input_state.pending_key_action, config, controller)
+    return render_keymap_hints(config)
+
+
+def render_pending_keymap_hints(
+    pending_key_action: str,
+    config: KiwiClientConfig,
+    controller: ClientController | None = None,
+) -> str:
+    """Render hints after a keymap prefix has been pressed."""
+    labels = {
+        "recall-preset": "Recall preset",
+        "store-preset": "Store preset (frequency, mode and bandwidth only)",
+        "store-all-preset": "Store preset (all radio parameters)",
+        "receiver": "Receiver",
+    }
+    lines = ["Key hints", labels.get(pending_key_action, pending_key_action)]
+    if pending_key_action == "receiver":
+        if controller is not None:
+            for register, preset in sorted_receiver_registers(controller.receiver_presets):
+                lines.append(f"{register} — {preset['receiver']} {preset['description']}")
+        for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
+            register = REGISTER_KEYS[index]
+            if controller is not None and register in {str(key) for key in controller.receiver_presets}:
+                continue
+            lines.append(f"{register} — {receiver}")
+        lines.append("Radio parameters are transferred to new receiver")
+    else:
+        lines.append("<register> is [0..9] or [a..z]")
+        if controller is not None:
+            for register, preset in sorted_preset_registers(controller.presets):
+                frequency = preset.get("frequency_khz")
+                mode = preset.get("mode")
+                if frequency is not None and mode is not None:
+                    lines.append(f"{register} — {float(frequency):.3f} kHz {mode}")
+    return "\n".join(lines)
+
+
+def sorted_receiver_registers(receiver_presets: dict[Any, dict[str, str]]) -> list[tuple[str, dict[str, str]]]:
+    """Return receiver registers sorted in keymap register order."""
+    def register_index(item: tuple[Any, dict[str, str]]) -> int:
+        key = str(item[0]).lower()
+        return REGISTER_KEYS.index(key) if len(key) == 1 and key in REGISTER_KEYS else len(REGISTER_KEYS)
+
+    return [(str(key), value) for key, value in sorted(receiver_presets.items(), key=register_index)]
+
+
+def sorted_preset_registers(presets: dict[Any, dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
+    """Return preset registers sorted in keymap register order."""
+    def register_index(item: tuple[Any, dict[str, Any]]) -> int:
+        key = str(item[0]).lower()
+        return REGISTER_KEYS.index(key) if len(key) == 1 and key in REGISTER_KEYS else len(REGISTER_KEYS)
+
+    return [(str(key), value) for key, value in sorted(presets.items(), key=register_index)]
+
+
+def render_keymap_hints(config: KiwiClientConfig) -> str:
+    """Render requested which-key style hints for keymap mode."""
+    return "\n".join(
+        [
+            "Key hints",
+            "    : — command mode",
+            "Tuning",
+            "    h — tune down",
+            "    l — tune up",
+            "Tuning modifiers",
+            "    <shift> and h or l — small step",
+            "    <ctrl> and h or l — large step",
+            "Volume",
+            "    k — volume up",
+            "    j — volume down",
+            "Presets",
+            "    p <register> — recall preset",
+            "    s <register> — store preset (frequency, mode and bandwidth only)",
+            "    S <register> — store preset (all radio parameters)",
+            "                   <register> is [0..9] or [a..z]",
+            "    r <receiver> — switch to specified receiver",
+            "                   <receiver> is [0..9] or [a..z] from list of receivers",
+            "                   Radio parameters are transferred to new receiver",
+            "Other",
+            "    : — command mode",
+            "    q — quit",
+        ]
+    )
+
+
+def render_command_hints(command_text: str) -> str:
+    """Render command-mode hints filtered by the active semicolon segment."""
+    segment = active_command_segment(command_text)
+    token = segment.split(maxsplit=1)[0].lower() if segment.split(maxsplit=1) else ""
+    matches = matching_command_hints(token)
+    lines = ["Command hints"]
+    if segment:
+        lines.append(f"active: {segment}")
+    if not matches:
+        lines.append("no matching commands")
+        return "\n".join(lines)
+    unique = unique_command_hint(token, matches)
+    if unique is not None:
+        lines.append(format_command_hint(unique))
+        lines.append(f"args: {unique.usage}")
+        if unique.detail:
+            lines.append(unique.detail)
+        return "\n".join(lines)
+    for hint in matches:
+        lines.append(format_command_hint(hint))
+    return "\n".join(lines)
+
+
+def active_command_segment(command_text: str) -> str:
+    """Return text after the last unquoted semicolon."""
+    quote: str | None = None
+    escaped = False
+    start = 0
+    for index, char in enumerate(command_text):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            continue
+        if char == ";" and quote is None:
+            start = index + 1
+    return command_text[start:].strip()
+
+
+def matching_command_hints(token: str) -> list[CommandHint]:
+    """Return command hints matching a full-name or alias prefix."""
+    aliases = command_aliases()
+    reverse_aliases = aliases_by_command()
+    if not token:
+        return list(COMMAND_HINTS)
+    matches: list[CommandHint] = []
+    for hint in COMMAND_HINTS:
+        if hint.name.startswith(token) or any(alias.startswith(token) for alias in reverse_aliases.get(hint.name, [])):
+            matches.append(hint)
+    return matches
+
+
+def unique_command_hint(token: str, matches: list[CommandHint]) -> CommandHint | None:
+    """Return a uniquely specified command hint, if any."""
+    if not token:
+        return None
+    aliases = aliases_by_command()
+    exact = [hint for hint in matches if hint.name == token or token in aliases.get(hint.name, [])]
+    if len(exact) == 1:
+        return exact[0]
+    return matches[0] if len(matches) == 1 else None
+
+
+def aliases_by_command() -> dict[str, list[str]]:
+    """Return aliases grouped by canonical command."""
+    grouped: dict[str, list[str]] = {}
+    for alias, command in command_aliases().items():
+        grouped.setdefault(command, []).append(alias)
+    return grouped
+
+
+def format_command_hint(hint: CommandHint) -> str:
+    """Format one command hint line."""
+    aliases = aliases_by_command().get(hint.name, [])
+    alias_text = f" ({', '.join(sorted(aliases))})" if aliases else ""
+    return f"{hint.name}{alias_text} — {hint.description}"
+
+
+def describe_key_action(action: str) -> str:
+    """Return a short description for a configured key action."""
+    if action == "command-mode":
+        return "command mode"
+    if action == "quit":
+        return "quit"
+    if action.startswith("tune-step "):
+        step = action.split(maxsplit=1)[1]
+        direction = "down" if step.startswith("-") else "up"
+        name = step.lstrip("+-")
+        return f"tune {direction} {name}"
+    if action.startswith("volume-step "):
+        step = action.split(maxsplit=1)[1]
+        direction = "down" if step.startswith("-") else "up"
+        return f"volume {direction}"
+    if action.startswith("store all"):
+        return "store full preset"
+    if action.startswith("store"):
+        return "store preset"
+    if action.startswith("recall"):
+        return "recall preset"
+    return action
 
 
 def render_dashboard(
@@ -100,6 +361,9 @@ def render_dashboard(
         lines.extend(["", f"Last response: {last_response.get('type', 'unknown')}"])
         if "active_command" in last_response:
             lines.append(f"Applied to active stream: {last_response['active_command']}")
+        if "active_commands" in last_response:
+            for active_command in last_response["active_commands"]:
+                lines.append(f"Applied to active stream: {active_command}")
         if "result" in last_response:
             lines.append(f"Result: {last_response['result']}")
         if "plan" in last_response:
@@ -174,6 +438,83 @@ def request_tui_quit(
     return {"type": "quit"}, ""
 
 
+def handle_pending_keymap_register(
+    key_name: str | None,
+    input_state: TuiInputState,
+    controller: ClientController,
+    config: KiwiClientConfig,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Handle the register following a keymap prefix command."""
+    pending = input_state.pending_key_action
+    input_state.pending_key_action = None
+    if key_name is None or len(key_name) != 1 or key_name not in REGISTER_KEYS:
+        return None, "error: expected register [0..9] or [a..z]"
+    try:
+        if pending == "recall-preset":
+            return controller.execute(f"recall {key_name}"), ""
+        if pending == "store-preset":
+            return controller.execute(f"store {key_name}"), ""
+        if pending == "store-all-preset":
+            return controller.execute(f"store all {key_name}"), ""
+        if pending == "receiver":
+            receiver = receiver_for_register(key_name, config, controller)
+            return switch_receiver_from_keymap(controller, receiver)
+    except ClientCommandError as exc:
+        return None, f"error: {exc}"
+    return None, None
+
+
+def switch_receiver_from_keymap(
+    controller: ClientController,
+    receiver: str,
+    *,
+    join_timeout: float = 2.0,
+    startup_grace_seconds: float = 0.1,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Switch receiver from keymap mode, restarting active playback if needed."""
+    status = controller.background.status()
+    if not status.running or status.name != "play":
+        return controller.execute(f"receiver {receiver}"), f"Receiver: {receiver}"
+
+    previous_receiver = controller.state.receiver
+    null_sink = controller.last_play_bg_null_sink
+    controller.background.stop()
+    stopped = controller.background.join(timeout=join_timeout)
+    if stopped.running:
+        return {"type": "operation-status", "operation": stopped.as_dict()}, "Stopping playback before receiver switch..."
+
+    state_response = controller.execute(f"receiver {receiver}")
+    start_response = controller.execute(play_bg_command(null_sink))
+    startup_status = controller.background.join(timeout=startup_grace_seconds)
+    if startup_status.error and not startup_status.running:
+        error = startup_status.error
+        controller.execute(f"receiver {previous_receiver}")
+        restore_response = controller.execute(play_bg_command(null_sink))
+        return (
+            {"type": "operation-status", "operation": startup_status.as_dict(), "restore": restore_response},
+            f"Receiver switch failed: {error}; restored receiver: {previous_receiver}",
+        )
+    return {"type": "batch", "responses": [state_response, start_response]}, f"Receiver: {receiver}; restarted playback"
+
+
+def play_bg_command(null_sink: bool) -> str:
+    """Return a guarded play-bg command matching previous sink choice."""
+    command = "play-bg --allow-live"
+    if null_sink:
+        command += " --null-sink"
+    return command
+
+
+def receiver_for_register(register: str, config: KiwiClientConfig, controller: ClientController | None = None) -> str:
+    """Return a stored or configured receiver address for a register key."""
+    if controller is not None and register in controller.receiver_presets:
+        return controller.receiver_presets[register]["receiver"]
+    index = REGISTER_KEYS.index(register)
+    if index >= len(config.receivers.allowed):
+        raise ClientCommandError(f"unknown receiver register: {register}")
+    return config.receivers.allowed[index]
+
+
 def handle_tui_key(
     ch: int,
     input_state: TuiInputState,
@@ -184,18 +525,20 @@ def handle_tui_key(
     config = config or load_config()
     if input_state.mode == InputMode.KEYMAP:
         key_name = normalize_key_name(ch)
-        if key_name is not None and key_name.isdigit():
-            input_state.pending_preset_digit = key_name
-            return None, f"Preset {key_name}: press s=store, S=store all, r=recall"
-        if input_state.pending_preset_digit is not None and key_name in {"s", "shift-s", "r"}:
-            digit = input_state.pending_preset_digit
-            input_state.pending_preset_digit = None
-            command = {"s": f"store {digit}", "shift-s": f"store all {digit}", "r": f"recall {digit}"}[key_name]
-            try:
-                return controller.execute(command), ""
-            except ClientCommandError as exc:
-                return None, f"error: {exc}"
-        input_state.pending_preset_digit = None
+        if input_state.pending_key_action is not None:
+            return handle_pending_keymap_register(key_name, input_state, controller, config)
+        if key_name == "p":
+            input_state.pending_key_action = "recall-preset"
+            return None, "Recall preset: press register [0..9] or [a..z]"
+        if key_name == "s":
+            input_state.pending_key_action = "store-preset"
+            return None, "Store preset: press register [0..9] or [a..z]"
+        if key_name == "shift-s":
+            input_state.pending_key_action = "store-all-preset"
+            return None, "Store all preset: press register [0..9] or [a..z]"
+        if key_name == "r":
+            input_state.pending_key_action = "receiver"
+            return None, "Receiver: press register [0..9] or [a..z]"
         action = config.keys.get(key_name) if key_name is not None else None
         if action == "command-mode" or ch == ord(":"):
             input_state.mode = InputMode.COMMAND
@@ -265,6 +608,9 @@ def runtime_state_from_config(config: KiwiClientConfig, state: ClientState) -> C
         state,
         duration_seconds=config.live.duration_seconds,
         max_frames=config.live.max_frames,
+        audio_startup_mute_ms=config.audio.startup_mute_ms,
+        audio_startup_fade_in_ms=config.audio.startup_fade_in_ms,
+        audio_stop_fade_out_ms=config.audio.stop_fade_out_ms,
         receivers_restricted=config.receivers.restricted,
         allowed_receivers=config.receivers.allowed,
     )
@@ -281,7 +627,7 @@ def state_from_config(config: KiwiClientConfig, state: ClientState | None = None
 def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, dict[int, dict[str, Any]]]:
     """Resolve startup state and presets from config/state file."""
     persisted = load_state_file(config.startup.state_file)
-    presets = {int(key): value for key, value in persisted.get("presets", {}).items()}
+    presets = {int(key) if str(key).isdigit() else str(key): value for key, value in persisted.get("presets", {}).items()}
     state = state_from_config(config)
     mode = config.startup.mode.lower()
     if mode == "last" and persisted.get("last_state"):
@@ -293,28 +639,53 @@ def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, di
     return state, presets
 
 
+def startup_receiver_presets(config: KiwiClientConfig) -> dict[Any, dict[str, str]]:
+    """Resolve stored receiver registers from the state file."""
+    persisted = load_state_file(config.startup.state_file)
+    return {int(key) if str(key).isdigit() else str(key): value for key, value in persisted.get("receiver_presets", {}).items()}
+
+
 def persist_tui_state(controller: ClientController, config: KiwiClientConfig | None) -> None:
     """Persist last state and presets for future TUI startup."""
     if config is None:
         return
-    save_state_file(config.startup.state_file, last_state=controller.state, presets=controller.presets)
+    save_state_file(
+        config.startup.state_file,
+        last_state=controller.state,
+        presets=controller.presets,
+        receiver_presets=controller.receiver_presets,
+    )
 
 
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
     config = config or load_config()
     startup_state, presets = startup_state_and_presets(config)
+    receiver_presets = startup_receiver_presets(config)
     controller = controller or ClientController(
         state=startup_state,
         allow_live_default=config.live.allow_live,
         presets=presets,
+        receiver_presets=receiver_presets,
     )
     if controller is not None:
         controller.allow_live_default = config.live.allow_live
-        controller.state = state_from_config(config, controller.state)
+        controller.state = runtime_state_from_config(config, controller.state)
         if not controller.presets:
             controller.presets.update(presets)
+        if not controller.receiver_presets:
+            controller.receiver_presets.update(receiver_presets)
+    start_startup_playback(controller, config)
     curses.wrapper(_run_curses, controller, config)
+
+
+def start_startup_playback(controller: ClientController, config: KiwiClientConfig) -> dict[str, Any] | None:
+    """Start background playback at TUI startup when configured and allowed."""
+    if not config.startup.playback or not config.live.allow_live:
+        return None
+    if controller.background.status().running:
+        return None
+    return controller.execute("play-bg --allow-live")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -330,7 +701,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     config = load_config(args.config)
     startup_state, presets = startup_state_and_presets(config)
-    run_tui(ClientController(state=startup_state, allow_live_default=config.live.allow_live, presets=presets), config=config)
+    receiver_presets = startup_receiver_presets(config)
+    run_tui(
+        ClientController(
+            state=startup_state,
+            allow_live_default=config.live.allow_live,
+            presets=presets,
+            receiver_presets=receiver_presets,
+        ),
+        config=config,
+    )
     return 0
 
 
@@ -349,9 +729,19 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
             message=message,
             operation=controller.background.status().as_dict(),
         )
+        hints = render_tui_hints(input_state, config, controller)
         height, width = stdscr.getmaxyx()
-        for row, line in enumerate(dashboard.splitlines()[: max(0, height - 3)]):
+        hint_lines = hints.splitlines()
+        dashboard_limit = max(0, height - len(hint_lines) - 4)
+        row = 0
+        for line in dashboard.splitlines()[:dashboard_limit]:
             stdscr.addnstr(row, 0, line, max(0, width - 1))
+            row += 1
+        if row < height - 3:
+            row += 1
+        for line in hint_lines[: max(0, height - row - 2)]:
+            stdscr.addnstr(row, 0, line, max(0, width - 1))
+            row += 1
         prompt = ":" if input_state.mode == InputMode.COMMAND else "keymap (: command)> "
         stdscr.addnstr(height - 2, 0, prompt + input_state.command, max(0, width - 1))
         stdscr.refresh()
