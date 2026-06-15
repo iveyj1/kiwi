@@ -1,0 +1,1 @@
+PYTHONPATH=src python3 -m kiwi_client.tui --config config.toml
