@@ -179,6 +179,8 @@ Added `src/kiwi_client/waterfall_render.py` with deterministic fixed-scale dBm-t
 
 Added offline fixture-to-text preview command `python3 -m kiwi_client.waterfall_preview` / `kiwi-wf-preview`. It renders W/F binary events from JSONL fixtures as deterministic ASCII waterfall rows without network access.
 
+Added `WaterfallSequenceTracker` for W/F sequence continuity. Tests cover in-order frames, missing-frame gaps, out-of-order frames, and uint32 wraparound.
+
 ## YYYY-MM-DD
 
 ### Finding

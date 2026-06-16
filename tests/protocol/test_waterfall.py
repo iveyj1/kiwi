@@ -4,7 +4,7 @@ import pytest
 
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import KiwiProtocolError
-from kiwi_client.waterfall import parse_waterfall_uncompressed, raw_sample_to_dbm
+from kiwi_client.waterfall import WaterfallFrame, WaterfallSequenceTracker, parse_waterfall_uncompressed, raw_sample_to_dbm
 
 
 FIXTURE = Path("tests/fixtures/kiwi/wf-basic.jsonl")
@@ -53,3 +53,39 @@ def test_wf_rejects_empty_bins():
 def test_wf_rejects_raw_sample_out_of_range():
     with pytest.raises(ValueError, match="raw waterfall sample"):
         raw_sample_to_dbm(256)
+
+
+def test_wf_sequence_tracker_detects_gap():
+    tracker = WaterfallSequenceTracker()
+
+    first = tracker.observe(WaterfallFrame(sequence=1, bins=(0,), dbm=(-255,)))
+    second = tracker.observe(WaterfallFrame(sequence=3, bins=(0,), dbm=(-255,)))
+
+    assert first.ok is True
+    assert first.expected_seq is None
+    assert second.ok is False
+    assert second.expected_seq == 2
+    assert second.missing_count == 1
+
+
+def test_wf_sequence_tracker_handles_wraparound():
+    tracker = WaterfallSequenceTracker()
+
+    first = tracker.observe(WaterfallFrame(sequence=0xFFFFFFFF, bins=(0,), dbm=(-255,)))
+    second = tracker.observe(WaterfallFrame(sequence=0, bins=(0,), dbm=(-255,)))
+
+    assert first.ok is True
+    assert second.ok is True
+    assert second.expected_seq == 0
+
+
+def test_wf_sequence_tracker_marks_out_of_order():
+    tracker = WaterfallSequenceTracker()
+    tracker.observe(WaterfallFrame(sequence=10, bins=(0,), dbm=(-255,)))
+
+    status = tracker.observe(WaterfallFrame(sequence=9, bins=(0,), dbm=(-255,)))
+
+    assert status.ok is False
+    assert status.expected_seq == 11
+    assert status.out_of_order is True
+    assert status.missing_count == 0

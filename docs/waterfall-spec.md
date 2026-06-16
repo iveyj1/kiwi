@@ -137,9 +137,9 @@ Implemented first parser scope in `src/kiwi_client/waterfall.py`:
 - For `wf_comp=0`, expose remaining bytes as unsigned raw bins.
 - Convert raw bin values to approximate uncalibrated dBm with `sample - 255`.
 
-Still pending:
+Also implemented:
 
-- Track sequence gaps using the same philosophy as SND sequence tracking.
+- `WaterfallSequenceTracker` tracks in-order frames, gaps, out-of-order frames, and uint32 wraparound using the same philosophy as SND sequence tracking.
 
 Explicitly out of first scope:
 

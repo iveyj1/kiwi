@@ -224,7 +224,7 @@ Shape notes:
 
 ## Milestone 7 — Waterfall
 
-Status: **In progress; spec, synthetic parser fixture, ASCII row renderer, and fixture preview command added**
+Status: **In progress; spec, synthetic parser fixture, ASCII row renderer, fixture preview command, and W/F sequence tracking added**
 
 Goal:
 
