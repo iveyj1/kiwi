@@ -183,6 +183,8 @@ Added `WaterfallSequenceTracker` for W/F sequence continuity. Tests cover in-ord
 
 Added guarded W/F live capture module `python3 -m kiwi_client.live_waterfall` / `kiwi-wf-capture`. Harness tests use an injected fake websocket to verify dry-run plans, guardrails, command sequence, W/F JSONL writing, parsing, sequence metrics, and ASCII row metrics without network access.
 
+Attempted short local W/F capture after harness coverage: `10.0.0.40:8073` returned repeated `MSG redirect=...` to a non-local proxy, so the client did not follow it; `10.0.0.41:8073` reported all four client slots busy. Added `MSG redirect` as a user-facing terminal server response so future capture attempts fail fast instead of collecting redirect chatter.
+
 ## YYYY-MM-DD
 
 ### Finding

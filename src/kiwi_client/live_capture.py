@@ -45,6 +45,8 @@ def kiwi_error_from_msg_params(params: dict[str, str | None], *, receiver: str) 
         return f"server busy or bad password: all no-password channels may be busy on {receiver}"
     if "down" in params:
         return f"server down: {receiver}"
+    if "redirect" in params:
+        return f"server redirected {receiver} to {params.get('redirect')}"
     return None
 
 

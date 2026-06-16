@@ -44,6 +44,13 @@ Live local capture observations:
 - After `audio_rate=12000`, sending `SET AR OK in=12000 out=44100` was needed before the remaining SND setup sequence.
 - The first successful uncompressed AM capture used: `SET squelch=0 max=0`, `SET genattn=0`, `SET gen=0 mix=-1`, identity, modulation, AGC, `SET compression=0`, and keepalive.
 
+Known guarded client MSG error handling:
+
+- `MSG too_busy=<n>` -> `server busy: all <n> client slots are taken on <receiver>`.
+- `MSG badp=1` -> `server busy or bad password: all no-password channels may be busy on <receiver>`.
+- `MSG down` -> `server down: <receiver>`.
+- `MSG redirect=<url>` -> `server redirected <receiver> to <url>`; local guarded tests do not follow redirects to non-local receivers.
+
 Still to record after more fixture-backed live captures exist:
 
 - WebSocket endpoint paths

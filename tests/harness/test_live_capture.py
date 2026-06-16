@@ -21,6 +21,9 @@ def test_kiwi_busy_error_messages_are_user_facing():
         "server busy or bad password: all no-password channels may be busy on 10.0.0.40:8073"
     )
     assert kiwi_error_from_msg_params({"down": None}, receiver="10.0.0.40:8073") == "server down: 10.0.0.40:8073"
+    assert kiwi_error_from_msg_params({"redirect": "http://example.test:8073"}, receiver="10.0.0.40:8073") == (
+        "server redirected 10.0.0.40:8073 to http://example.test:8073"
+    )
     assert kiwi_error_from_msg_params({"sample_rate": "12000"}, receiver="10.0.0.40:8073") is None
 
 
