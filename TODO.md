@@ -18,8 +18,9 @@ Docs to update: `docs/waterfall-spec.md`, `docs/dev-log.md`.
 
 ## Next
 
-- Add fixture-to-text preview command. (Done)
-- Capture a short local W/F fixture only after parser/render harness coverage exists.
+- Retry short local W/F capture when a local receiver is available and not redirecting/busy.
+- Update protocol notes with local fixture-backed W/F frame layout once a real W/F frame fixture is captured.
+- Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
 
 ## Later
 

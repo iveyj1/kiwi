@@ -185,6 +185,8 @@ Added guarded W/F live capture module `python3 -m kiwi_client.live_waterfall` / 
 
 Attempted short local W/F capture after harness coverage: `10.0.0.40:8073` returned repeated `MSG redirect=...` to a non-local proxy, so the client did not follow it; `10.0.0.41:8073` reported all four client slots busy. Added `MSG redirect` as a user-facing terminal server response so future capture attempts fail fast instead of collecting redirect chatter.
 
+Added standalone guarded live W/F ASCII preview `python3 -m kiwi_client.live_waterfall_preview` / `kiwi-wf-live`. It reuses guarded W/F capture and prints ASCII rows from status callbacks; tests use a fake websocket and do not require live radio.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -359,9 +359,25 @@ PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
   --output tests/fixtures/kiwi/local-wf-capture.jsonl
 ```
 
+A standalone guarded live ASCII preview is also available:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_waterfall_preview \
+  --allow-live \
+  --host 10.0.0.40 \
+  --max-frames 5
+```
+
+Installed script names:
+
+```bash
+kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local-wf-capture.jsonl
+kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 5
+```
+
 Expected future operations:
 
-- Show live waterfall
+- Show live waterfall inside the TUI or richer UI
 - Tune by cursor or control input
 - Adjust span/zoom if supported
 

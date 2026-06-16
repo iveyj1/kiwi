@@ -239,7 +239,7 @@ Cons:
 
 ## Live waterfall considerations
 
-Guarded W/F capture is implemented as `python3 -m kiwi_client.live_waterfall` / `kiwi-wf-capture`. Live work should still wait until parser and offline renderer tests pass.
+Guarded W/F capture is implemented as `python3 -m kiwi_client.live_waterfall` / `kiwi-wf-capture`. Standalone guarded ASCII live preview is implemented as `python3 -m kiwi_client.live_waterfall_preview` / `kiwi-wf-live`. Live work should still wait until parser and offline renderer tests pass.
 
 Before live capture:
 
