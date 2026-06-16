@@ -327,11 +327,23 @@ Expected next operations:
 
 ## Waterfall
 
-TBD.
+The current waterfall path is offline and harness-first. Synthetic or captured W/F JSONL fixtures can be rendered as deterministic ASCII rows:
 
-Expected operations:
+```bash
+PYTHONPATH=src python3 -m kiwi_client.waterfall_preview tests/fixtures/kiwi/wf-basic.jsonl
+```
 
-- Show waterfall
+Installed script name:
+
+```bash
+kiwi-wf-preview tests/fixtures/kiwi/wf-basic.jsonl
+```
+
+This preview command does not connect to a receiver.
+
+Expected future operations:
+
+- Show live waterfall
 - Tune by cursor or control input
 - Adjust span/zoom if supported
 

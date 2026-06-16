@@ -162,10 +162,14 @@ Implemented first renderer in `src/kiwi_client/waterfall_render.py`:
 
 2. Fixed-scale dBm-to-ramp mapping with clamp behavior.
 
+Implemented user-visible offline preview:
+
+- `python3 -m kiwi_client.waterfall_preview tests/fixtures/kiwi/wf-basic.jsonl`
+- console script: `kiwi-wf-preview`
+
 Recommended next renderers:
 
-1. Fixture-to-text preview command.
-2. Optional ANSI 256-color terminal preview after ASCII tests exist.
+1. Optional ANSI 256-color terminal preview after ASCII tests exist.
 3. PNG export later if dependency policy is acceptable or if using only optional dependencies.
 
 Deterministic scaling modes:

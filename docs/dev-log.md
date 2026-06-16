@@ -177,6 +177,8 @@ Added the first synthetic waterfall fixture, `tests/fixtures/kiwi/wf-basic.jsonl
 
 Added `src/kiwi_client/waterfall_render.py` with deterministic fixed-scale dBm-to-ramp mapping and ASCII row rendering for one `WaterfallFrame`. Harness tests render the synthetic W/F fixture with clamp behavior, keeping the renderer independent from curses, sounddevice, and live radio.
 
+Added offline fixture-to-text preview command `python3 -m kiwi_client.waterfall_preview` / `kiwi-wf-preview`. It renders W/F binary events from JSONL fixtures as deterministic ASCII waterfall rows without network access.
+
 ## YYYY-MM-DD
 
 ### Finding
