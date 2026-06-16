@@ -214,16 +214,28 @@ Good first user-visible waterfall view.
 
 ### PNG/image renderer
 
+A test-rig matplotlib renderer exists at `tools/waterfall_image.py`. It is intentionally outside the production package and console scripts. It loads W/F JSONL fixtures into a dBm row matrix and, when matplotlib is available, writes a static PNG.
+
+Example:
+
+```bash
+PYTHONPATH=src python3 tools/waterfall_image.py \
+  tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl \
+  artifacts/local-wf-5000-zoom0.png \
+  --summary \
+  --title "Local W/F 5000 kHz zoom 0"
+```
+
 Pros:
 
-- Good visual regression artifact.
-- Easy to inspect and compare.
+- Good visual inspection artifact.
+- Easy to inspect and compare manually.
 - Renderer independent from terminal constraints.
 
 Cons:
 
-- May introduce dependency questions.
-- Not interactive.
+- Requires optional local matplotlib installation.
+- Not production code and not interactive.
 
 ### Future GUI/browser display
 

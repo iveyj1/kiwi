@@ -341,6 +341,16 @@ kiwi-wf-preview tests/fixtures/kiwi/wf-basic.jsonl
 
 This preview command does not connect to a receiver.
 
+For test-rig visual inspection, a non-production matplotlib helper can render a static PNG from a fixture:
+
+```bash
+PYTHONPATH=src python3 tools/waterfall_image.py \
+  tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl \
+  artifacts/local-wf-5000-zoom0.png \
+  --summary \
+  --title "Local W/F 5000 kHz zoom 0"
+```
+
 Guarded short local W/F capture is available behind `--allow-live`:
 
 ```bash
