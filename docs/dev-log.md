@@ -171,6 +171,12 @@ Documented the receiver/playback lifecycle architecture in `docs/radio-session-s
 
 Added controller-owned `RadioSessionState` and `ClientController.switch_receiver()`. Receiver-register switching now delegates lifecycle policy to the controller, which handles idle receiver changes, active playback restart, failed-playback recovery, and immediate busy rollback while exposing session snapshots in status/operation responses.
 
+Drafted `docs/waterfall-spec.md` for the W/F display path. The plan starts with synthetic W/F fixtures, uncompressed parser tests, a deterministic `WaterfallFrame` model, and an offline ASCII/terminal renderer before local live W/F capture or TUI integration. Updated roadmap, rendering notes, architecture notes, and protocol notes with reference-backed but not-yet-fixture-verified W/F facts.
+
+Added the first synthetic waterfall fixture, `tests/fixtures/kiwi/wf-basic.jsonl`, plus `src/kiwi_client/waterfall.py` with `WaterfallFrame`, `parse_waterfall_uncompressed()`, and raw byte to uncalibrated dBm conversion. Protocol tests now cover W/F tag/header/bin parsing and malformed frame errors without live radio.
+
+Added `src/kiwi_client/waterfall_render.py` with deterministic fixed-scale dBm-to-ramp mapping and ASCII row rendering for one `WaterfallFrame`. Harness tests render the synthetic W/F fixture with clamp behavior, keeping the renderer independent from curses, sounddevice, and live radio.
+
 ## YYYY-MM-DD
 
 ### Finding

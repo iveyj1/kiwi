@@ -4,6 +4,8 @@
 
 Decode KiwiSDR waterfall frames into a deterministic display model and later a desktop renderer.
 
+See [Waterfall display specification](waterfall-spec.md) for the current fixture-first implementation plan, parser/model boundaries, display options, and open protocol questions.
+
 ## Questions to resolve
 
 - Frame dimensions

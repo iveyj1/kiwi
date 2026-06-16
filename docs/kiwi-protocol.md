@@ -95,17 +95,41 @@ Remaining SND questions:
 
 ## Waterfall stream
 
-TBD.
+Synthetic fixture-backed behavior:
 
-Record:
+- Stream type is `W/F`.
+- WebSocket binary messages begin with 3-byte ASCII tag `W/F`.
+- The first parser target treats the byte after the tag as `raw_flags`, then decodes a 12-byte W/F body header as three little-endian uint32 values: `x_bin_server`, `flags_x_zoom_server`, and `seq`, followed by bin payload bytes.
+- Uncompressed W/F frames expose remaining payload bytes as uint8 bins.
+- Raw-byte intensity mapping uses `dBm = sample - 255` before calibration.
 
-- Frame prefix/type
-- Frame dimensions
-- Bin mapping
-- Frequency span
-- Intensity scaling
-- Timing/update rate
-- Fixture coverage
+Fixture/test coverage:
+
+- `tests/fixtures/kiwi/wf-basic.jsonl` contains one synthetic uncompressed W/F frame.
+- `tests/protocol/test_waterfall.py` covers tag, header, bin, dBm mapping, and malformed frame handling.
+
+Reference-backed planning facts, not yet locally fixture-verified:
+
+- Reference default bin count is `WF_BINS = 1024`.
+- Uncompressed W/F setup uses `SET wf_comp=0`.
+- Reference setup commands include `SET zoom=<zoom> cf=<center_khz>`, `SET maxdb=<maxdb> mindb=<mindb>`, `SET wf_speed=<1..4>`, `SET wf_comp=<0|1>`, and `SET interp=<value>`.
+
+Evidence:
+
+- `kiwiclient/kiwi/client.py`
+- `kiwiclient/kiwirecorder.py`
+- `kiwiclient/microkiwi_waterfall.py`
+- Planning spec: `docs/waterfall-spec.md`
+
+Still to verify with project fixtures:
+
+- Exact complete-message byte layout from local receivers.
+- `x_bin_server` and `flags_x_zoom_server` semantics.
+- Frequency span/bin mapping for local receiver versions.
+- Calibration and display scaling policy.
+- Timing/update behavior for each `wf_speed` value.
+- Compressed W/F payload behavior.
+- Fixture coverage under `tests/fixtures/kiwi/wf-basic.jsonl` and later a local captured W/F fixture.
 
 ## Commands
 

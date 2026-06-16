@@ -224,24 +224,33 @@ Shape notes:
 
 ## Milestone 7 — Waterfall
 
-Status: **Planned**
+Status: **In progress; spec, synthetic parser fixture, and ASCII row renderer added**
 
 Goal:
 
-Decode and display KiwiSDR waterfall frames.
+Decode and display KiwiSDR waterfall frames using a fixture-first parser/model and a deterministic offline renderer before live display work.
+
+Specification:
+
+- `docs/waterfall-spec.md`
+- `docs/waterfall-rendering.md`
 
 Suggested order:
 
-1. Inspect `kiwiclient/` W/F parser and fake server behavior.
-2. Add synthetic W/F fixture.
-3. Add W/F parser tests.
-4. Capture a short local W/F fixture.
-5. Build deterministic waterfall model.
-6. Add a simple standalone waterfall view.
+1. Done: add synthetic W/F fixture with known uncompressed bins.
+2. Done: add W/F parser tests for tag/header/bin decoding.
+3. Done: implement `WaterfallFrame` and raw-bin-to-dBm conversion.
+4. Done: add fixed-scale ASCII row renderer tests.
+5. Add fixture-to-text preview command.
+6. Capture a short local W/F fixture after parser/render tests pass.
+7. Update protocol notes with fixture-backed W/F facts.
+8. Add a standalone live W/F preview.
+9. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer.
 
-Note:
+Notes:
 
-The waterfall view may initially be separate from the TUI/control surface.
+- The waterfall view may initially be separate from the TUI/control surface.
+- Current `BackgroundOperation` supports one operation at a time, so live audio plus live waterfall should wait for a multi-operation/session design or use a standalone waterfall process first.
 
 ## Milestone 8 — Beacon detection
 

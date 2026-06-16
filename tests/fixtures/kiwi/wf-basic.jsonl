@@ -1,1 +1,4 @@
-{"note":"placeholder; replace with synthetic or captured waterfall fixture data"}
+{"t":0.000,"dir":"tx","stream":"wf","type":"cmd","text":"SET auth t=kiwi p="}
+{"t":0.010,"dir":"tx","stream":"wf","type":"cmd","text":"SET zoom=0 cf=15000"}
+{"t":0.020,"dir":"tx","stream":"wf","type":"cmd","text":"SET wf_comp=0"}
+{"t":0.050,"dir":"rx","stream":"wf","type":"binary","encoding":"base64","data":"Vy9GAAcAAAADAAIAKgAAAAA3gMj/"}

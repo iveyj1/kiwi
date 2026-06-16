@@ -2,26 +2,26 @@
 
 ## Current slice
 
-Goal: Move receiver/playback switch orchestration out of TUI helpers and into controller-owned radio session methods.
+Goal: Add a deterministic fixed-scale ASCII waterfall row renderer.
 
 Done criteria:
 
-- Add an explicit controller-side radio session state snapshot for desired receiver, active receiver, playback intent, lifecycle mode, and current session error.
-- Add `ClientController.switch_receiver(..., preserve_playback=True)` to own idle, active-playback, failed-playback, and busy-rollback transitions.
-- Simplify TUI receiver-register handling so it delegates receiver-switch policy to the controller.
-- Preserve harness coverage for idle switch, active switch restart, busy rollback, failed-playback recovery, and stale-error clearing.
-- Update architecture/session docs, roadmap, and dev-log.
+- Add renderer tests using the synthetic W/F fixture and known dBm values.
+- Implement fixed-scale dBm-to-ramp mapping with clamp behavior.
+- Implement a UI-independent ASCII row renderer for one `WaterfallFrame`.
+- Update waterfall spec, roadmap, and dev-log.
 
-Test command: `python3 -m pytest tests/harness/test_client_app.py tests/harness/test_tui.py && python3 -m pytest`
+Test command: `python3 -m pytest tests/harness/test_waterfall_render.py tests/protocol/test_waterfall.py && python3 -m pytest`
 
-Live-radio needed: no; use controller/TUI harness tests first.
+Live-radio needed: no; use synthetic fixture and parser/model tests.
 
-Docs to update: `docs/radio-session-state.md`, `docs/roadmap.md`, `docs/dev-log.md`.
+Docs to update: `docs/waterfall-spec.md`, `docs/roadmap.md`, `docs/dev-log.md`.
 
 ## Next
 
-- Consider displaying desired vs active receiver/session mode in the TUI dashboard.
-- Consider adding operation generation ids if stale-error handling grows beyond single playback worker recovery.
+- Add fixture-to-text preview command.
+- Add W/F sequence gap tracking.
+- Capture a short local W/F fixture only after parser/render harness coverage exists.
 
 ## Later
 
