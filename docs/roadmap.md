@@ -242,8 +242,8 @@ Suggested order:
 3. Done: implement `WaterfallFrame` and raw-bin-to-dBm conversion.
 4. Done: add fixed-scale ASCII row renderer tests.
 5. Done: add fixture-to-text preview command.
-6. Blocked by local receiver availability: capture a short local W/F fixture after parser/render tests pass.
-7. Partially done: update protocol notes with synthetic fixture-backed W/F facts and local redirect/busy observations.
+6. Done: capture a short local W/F fixture after parser/render tests pass.
+7. Partially done: update protocol notes with synthetic and local fixture-backed W/F facts; W/F sequence semantics still need investigation.
 8. Done: add a standalone live W/F preview.
 9. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer.
 

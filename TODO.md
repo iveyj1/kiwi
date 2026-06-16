@@ -18,8 +18,8 @@ Docs to update: `docs/waterfall-spec.md`, `docs/dev-log.md`.
 
 ## Next
 
-- Retry short local W/F capture when a local receiver is available and not redirecting/busy.
-- Update protocol notes with local fixture-backed W/F frame layout once a real W/F frame fixture is captured.
+- Investigate W/F sequence semantics: local fixture repeated `seq=0` for two frames despite valid 1024-bin payloads.
+- Add frequency/bin mapping from local W/F metadata (`center_freq`, `bandwidth`, `wf_fft_size`, zoom/start).
 - Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
 
 ## Later

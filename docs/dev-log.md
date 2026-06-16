@@ -187,6 +187,8 @@ Attempted short local W/F capture after harness coverage: `10.0.0.40:8073` retur
 
 Added standalone guarded live W/F ASCII preview `python3 -m kiwi_client.live_waterfall_preview` / `kiwi-wf-live`. It reuses guarded W/F capture and prints ASCII rows from status callbacks; tests use a fake websocket and do not require live radio.
 
+Retried short local W/F capture on `10.0.0.40:8073` at 2026-06-16 01:50 UTC / 2026-06-15 21:50 local, center 5000 kHz, zoom 0, speed 1, `wf_comp=0`, max 2 frames. Capture succeeded and produced `tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl` with two 1024-bin W/F frames. Both frames decoded with `raw_flags=32`, `x_bin_server=0`, `flags_x_zoom_server=0`, and repeated `seq=0`; sequence semantics need follow-up before treating repeated zero sequence as a real dropout.
+
 ## YYYY-MM-DD
 
 ### Finding
