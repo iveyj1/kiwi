@@ -8,8 +8,14 @@ offline diagnostic for captured or synthetic fixtures.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.waterfall import parse_waterfall_uncompressed

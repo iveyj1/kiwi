@@ -1,4 +1,6 @@
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -50,3 +52,24 @@ def test_waterfall_image_tool_rejects_non_rectangular_rows():
 
     with pytest.raises(ValueError, match="not rectangular"):
         tool.matrix_shape([[1, 2], [3]])
+
+
+def test_waterfall_image_tool_runs_without_pythonpath(tmp_path: Path):
+    output = tmp_path / "wf.png"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(TOOL_PATH),
+            str(SYNTHETIC_FIXTURE),
+            str(output),
+            "--summary",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "rows=1 bins=5" in result.stdout
+    assert output.exists()
