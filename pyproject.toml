@@ -25,6 +25,7 @@ kiwi-snd-play = "kiwi_client.live_play:main"
 kiwi-fixture-to-wav = "kiwi_client.recorder:main"
 kiwi-play-wav = "kiwi_client.playback:main"
 kiwi-wf-preview = "kiwi_client.waterfall_preview:main"
+kiwi-wf-capture = "kiwi_client.live_waterfall:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

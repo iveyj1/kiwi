@@ -181,6 +181,8 @@ Added offline fixture-to-text preview command `python3 -m kiwi_client.waterfall_
 
 Added `WaterfallSequenceTracker` for W/F sequence continuity. Tests cover in-order frames, missing-frame gaps, out-of-order frames, and uint32 wraparound.
 
+Added guarded W/F live capture module `python3 -m kiwi_client.live_waterfall` / `kiwi-wf-capture`. Harness tests use an injected fake websocket to verify dry-run plans, guardrails, command sequence, W/F JSONL writing, parsing, sequence metrics, and ASCII row metrics without network access.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -224,7 +224,7 @@ Shape notes:
 
 ## Milestone 7 — Waterfall
 
-Status: **In progress; spec, synthetic parser fixture, ASCII row renderer, fixture preview command, and W/F sequence tracking added**
+Status: **In progress; spec, synthetic parser fixture, ASCII row renderer, fixture preview command, W/F sequence tracking, and guarded W/F capture harness added**
 
 Goal:
 
@@ -242,7 +242,7 @@ Suggested order:
 3. Done: implement `WaterfallFrame` and raw-bin-to-dBm conversion.
 4. Done: add fixed-scale ASCII row renderer tests.
 5. Done: add fixture-to-text preview command.
-6. Capture a short local W/F fixture after parser/render tests pass.
+6. In progress: capture a short local W/F fixture after parser/render tests pass.
 7. Update protocol notes with fixture-backed W/F facts.
 8. Add a standalone live W/F preview.
 9. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer.

@@ -341,6 +341,24 @@ kiwi-wf-preview tests/fixtures/kiwi/wf-basic.jsonl
 
 This preview command does not connect to a receiver.
 
+Guarded short local W/F capture is available behind `--allow-live`:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
+  --dry-run \
+  --host 10.0.0.40 \
+  --output tests/fixtures/kiwi/local-wf-capture.jsonl
+```
+
+Actual short capture, only when explicitly intended:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
+  --allow-live \
+  --host 10.0.0.40 \
+  --output tests/fixtures/kiwi/local-wf-capture.jsonl
+```
+
 Expected future operations:
 
 - Show live waterfall

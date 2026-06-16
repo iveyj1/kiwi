@@ -239,7 +239,7 @@ Cons:
 
 ## Live waterfall considerations
 
-Live work should wait until parser and offline renderer tests pass.
+Guarded W/F capture is implemented as `python3 -m kiwi_client.live_waterfall` / `kiwi-wf-capture`. Live work should still wait until parser and offline renderer tests pass.
 
 Before live capture:
 
@@ -249,7 +249,7 @@ Before live capture:
 - Keep duration short.
 - Capture useful W/F frames as fixtures.
 
-Initial live W/F capture should use safe, non-admin setup commands only:
+Initial live W/F capture uses safe, non-admin setup commands only:
 
 ```text
 SET auth t=kiwi p=

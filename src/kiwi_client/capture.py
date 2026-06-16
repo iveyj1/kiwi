@@ -46,11 +46,46 @@ class SndCaptureMetadata:
         )
 
 
+@dataclass(frozen=True)
+class WaterfallCaptureMetadata:
+    """Metadata required for short W/F live-to-fixture captures."""
+
+    receiver: str
+    utc_time: str
+    local_time: str
+    center_khz: float
+    zoom: int
+    maxdb: int
+    mindb: int
+    speed: int
+    compression: bool
+    notes: str = ""
+
+    def as_fixture_event(self) -> dict[str, Any]:
+        """Return this metadata as a fixture meta event."""
+        return fixture_event(
+            t=0.0,
+            dir="meta",
+            stream="wf",
+            type="capture",
+            receiver=self.receiver,
+            utc_time=self.utc_time,
+            local_time=self.local_time,
+            center_khz=self.center_khz,
+            zoom=self.zoom,
+            maxdb=self.maxdb,
+            mindb=self.mindb,
+            speed=self.speed,
+            compression=self.compression,
+            notes=self.notes,
+        )
+
+
 @dataclass
 class JsonlCaptureWriter:
     """Accumulate and write KiwiSDR JSONL capture events offline."""
 
-    metadata: SndCaptureMetadata
+    metadata: Any
     events: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
