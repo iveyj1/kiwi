@@ -174,32 +174,25 @@ def sorted_preset_registers(presets: dict[Any, dict[str, Any]]) -> list[tuple[st
 
 def render_keymap_hints(config: KiwiClientConfig) -> str:
     """Render requested which-key style hints for keymap mode."""
-    return "\n".join(
-        [
-            "Key hints",
-            "    : — command mode",
-            "Tuning",
-            "    h — tune down",
-            "    l — tune up",
-            "Tuning modifiers",
-            "    <shift> and h or l — small step",
-            "    <ctrl> and h or l — large step",
-            "Volume",
-            "    k — volume up",
-            "    j — volume down",
+    rows = [
+        ("Tuning", ["h — tune down", "l — tune up"]),
+        ("Tuning modifiers", ["<shift> h/l — small step", "<ctrl> h/l — large step"]),
+        ("Volume", ["k — volume up", "j — volume down"]),
+        (
             "Presets",
-            "    p <register> — recall preset",
-            "    s <register> — store preset (frequency, mode and bandwidth only)",
-            "    S <register> — store preset (all radio parameters)",
-            "                   <register> is [0..9] or [a..z]",
-            "    r <receiver> — switch to specified receiver",
-            "                   <receiver> is [0..9] or [a..z] from list of receivers",
-            "                   Radio parameters are transferred to new receiver",
-            "Other",
-            "    : — command mode",
-            "    q — quit",
-        ]
-    )
+            [
+                "p <register> — recall preset",
+                "s <register> — store preset (frequency, mode and bandwidth only)",
+                "S <register> — store preset (all radio parameters)",
+                "<register> is [0..9] or [a..z]",
+                "r <receiver> — switch to specified receiver",
+                "<receiver> is [0..9] or [a..z] from list of receivers",
+                "Radio parameters are transferred to new receiver",
+            ],
+        ),
+        ("Other", [": — command mode", "q — quit"]),
+    ]
+    return "\n".join(["Key hints", *format_hint_categories_two_columns(rows)])
 
 
 def render_command_hints(command_text: str) -> str:
@@ -220,11 +213,32 @@ def render_command_hints(command_text: str) -> str:
         if unique.detail:
             lines.append(unique.detail)
         return "\n".join(lines)
-    for category, category_hints in grouped_command_hints(matches):
-        lines.append(category)
-        for hint in category_hints:
-            lines.append(f"    {format_command_hint(hint)}")
+    rows = [(category, [format_command_hint(hint) for hint in category_hints]) for category, category_hints in grouped_command_hints(matches)]
+    lines.extend(format_hint_categories_two_columns(rows))
     return "\n".join(lines)
+
+
+def format_hint_categories_two_columns(categories: list[tuple[str, list[str]]], *, column_width: int = 52) -> list[str]:
+    """Format categorized hints into two compact text columns."""
+    blocks: list[list[str]] = []
+    for category, items in categories:
+        block = [category, *[f"    {item}" for item in items]]
+        blocks.append(block)
+    left_blocks = blocks[0::2]
+    right_blocks = blocks[1::2]
+    lines: list[str] = []
+    for index in range(max(len(left_blocks), len(right_blocks))):
+        left = left_blocks[index] if index < len(left_blocks) else []
+        right = right_blocks[index] if index < len(right_blocks) else []
+        height = max(len(left), len(right))
+        for row in range(height):
+            left_text = left[row] if row < len(left) else ""
+            right_text = right[row] if row < len(right) else ""
+            if right_text:
+                lines.append(f"{left_text:<{column_width}}{right_text}")
+            else:
+                lines.append(left_text.rstrip())
+    return lines
 
 
 def active_command_segment(command_text: str) -> str:

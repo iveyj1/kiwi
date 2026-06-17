@@ -7,6 +7,7 @@ Goal: Reorganize TUI command hints into categories and show shortcuts before ful
 Done criteria:
 
 - Group command hints into categories similar to key hints.
+- Render key and command overview hints in two columns to preserve dashboard/status space.
 - Format aliases/shortcuts before canonical command names, e.g. `tu (tune)`.
 - Preserve filtering, unique-command argument hints, aliases, and semicolon segment context.
 - Update TUI harness tests and dev-log.

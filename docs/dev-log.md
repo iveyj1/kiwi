@@ -191,7 +191,7 @@ Retried short local W/F capture on `10.0.0.40:8073` at 2026-06-16 01:50 UTC / 20
 
 Added non-production test-rig helper `tools/waterfall_image.py` to render static PNG images from W/F fixtures using optional matplotlib. It keeps PNG/image experimentation outside production package entrypoints; tests cover the pure fixture-to-dBm-matrix path. Generated local inspection artifact `artifacts/local-wf-5000-zoom0.png` from the real local W/F fixture.
 
-Reorganized TUI command-mode hints into categories similar to keymap hints. Command aliases/shortcuts are now displayed before full command names, e.g. `tu (tune)`, while preserving filtering, unique-command usage hints, and semicolon current-segment context.
+Reorganized TUI command-mode hints into categories similar to keymap hints. Command aliases/shortcuts are now displayed before full command names, e.g. `tu (tune)`, while preserving filtering, unique-command usage hints, and semicolon current-segment context. Key and command hint overviews now use two columns so they consume less vertical space and leave more dashboard/status visible.
 
 ## YYYY-MM-DD
 

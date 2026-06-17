@@ -33,8 +33,8 @@ def test_render_keymap_hints_show_requested_grouped_help():
     assert "h — tune down" in text
     assert "l — tune up" in text
     assert "Tuning modifiers" in text
-    assert "<shift> and h or l — small step" in text
-    assert "<ctrl> and h or l — large step" in text
+    assert "<shift> h/l — small step" in text
+    assert "<ctrl> h/l — large step" in text
     assert "Volume" in text
     assert "k — volume up" in text
     assert "j — volume down" in text
@@ -47,6 +47,7 @@ def test_render_keymap_hints_show_requested_grouped_help():
     assert "<receiver> is [0..9] or [a..z] from list of receivers" in text
     assert "Radio parameters are transferred to new receiver" in text
     assert "q — quit" in text
+    assert len(text.splitlines()) <= 15
 
 
 def test_render_command_hints_show_grouped_top_level_shortcuts_and_descriptions():
@@ -61,6 +62,7 @@ def test_render_command_hints_show_grouped_top_level_shortcuts_and_descriptions(
     assert "    tu (tune) — set frequency" in text
     assert "    mo (mode) — set demod mode" in text
     assert "    pb (play-bg) — start playback worker" in text
+    assert len(text.splitlines()) <= 25
 
 
 def test_render_command_hints_filter_by_typed_prefix():
