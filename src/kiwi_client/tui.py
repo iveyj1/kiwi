@@ -61,46 +61,48 @@ class CommandHint:
     name: str
     description: str
     usage: str
+    category: str
     detail: str = ""
 
 
 COMMAND_HINTS = [
-    CommandHint("status", "show state", "status"),
-    CommandHint("connect", "mark connected", "connect"),
-    CommandHint("disconnect", "mark disconnected", "disconnect"),
-    CommandHint("receiver", "set receiver", "receiver <host>[:port]"),
-    CommandHint("add-receiver", "save receiver", "add-receiver <receiver-register> <ip/url[:port]> <description>"),
-    CommandHint("tune", "set frequency", "tune <frequency_khz>"),
-    CommandHint("mode", "set demod mode", "mode <mode> [low_cut_hz high_cut_hz]"),
-    CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>"),
-    CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>"),
-    CommandHint("volume", "set local volume", "volume <percent>"),
-    CommandHint("volume-step", "step local volume", "volume-step <delta_percent>"),
+    CommandHint("status", "show state", "status", "Status"),
+    CommandHint("dashboard", "show dashboard", "dashboard", "Status"),
+    CommandHint("operation-status", "worker status", "operation-status", "Status"),
+    CommandHint("connect", "mark connected", "connect", "Connection"),
+    CommandHint("disconnect", "mark disconnected", "disconnect", "Connection"),
+    CommandHint("receiver", "set receiver", "receiver <host>[:port]", "Connection"),
+    CommandHint("add-receiver", "save receiver", "add-receiver <receiver-register> <ip/url[:port]> <description>", "Connection"),
+    CommandHint("tune", "set frequency", "tune <frequency_khz>", "Tuning"),
+    CommandHint("mode", "set demod mode", "mode <mode> [low_cut_hz high_cut_hz]", "Tuning"),
+    CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>", "Tuning"),
+    CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>", "Tuning"),
+    CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
+    CommandHint("volume-step", "step local volume", "volume-step <delta_percent>", "Audio controls"),
     CommandHint(
         "agc",
         "AGC settings",
         "agc [sub-option]",
+        "Audio controls",
         "sub-options: on, off, hang on|off, threshold <value>, slope <value>, decay <ms>, gain <value>, set key=value ...",
     ),
-    CommandHint("store", "save preset", "store <n> | store all <n>"),
-    CommandHint("recall", "load preset", "recall <n>"),
-    CommandHint("duration", "set live limit", "duration <seconds>"),
-    CommandHint("frames", "set frame limit", "frames <max_snd_frames>"),
-    CommandHint("dashboard", "show dashboard", "dashboard"),
-    CommandHint("play-plan", "show play plan", "play-plan"),
-    CommandHint("play", "play now", "play --allow-live [--null-sink]"),
-    CommandHint("play-bg", "start playback worker", "play-bg --allow-live [--null-sink]"),
-    CommandHint("stop", "stop worker", "stop"),
-    CommandHint("wait", "wait for worker", "wait [seconds]"),
-    CommandHint("operation-status", "worker status", "operation-status"),
-    CommandHint("record-plan", "show record plan", "record-plan <output.wav>"),
-    CommandHint("record", "record now", "record <output.wav> --allow-live [--overwrite]"),
-    CommandHint("record-bg", "start record worker", "record-bg <output.wav> --allow-live [--overwrite]"),
-    CommandHint("capture-plan", "show capture plan", "capture-plan <output.jsonl>"),
-    CommandHint("capture", "capture now", "capture <output.jsonl> --allow-live [--overwrite]"),
-    CommandHint("capture-bg", "start capture worker", "capture-bg <output.jsonl> --allow-live [--overwrite]"),
-    CommandHint("help", "list commands", "help"),
-    CommandHint("quit", "quit TUI", "quit"),
+    CommandHint("store", "save preset", "store <n> | store all <n>", "Presets"),
+    CommandHint("recall", "load preset", "recall <n>", "Presets"),
+    CommandHint("duration", "set live limit", "duration <seconds>", "Live limits"),
+    CommandHint("frames", "set frame limit", "frames <max_snd_frames>", "Live limits"),
+    CommandHint("play-plan", "show play plan", "play-plan", "Playback"),
+    CommandHint("play", "play now", "play --allow-live [--null-sink]", "Playback"),
+    CommandHint("play-bg", "start playback worker", "play-bg --allow-live [--null-sink]", "Playback"),
+    CommandHint("record-plan", "show record plan", "record-plan <output.wav>", "Recording/capture"),
+    CommandHint("record", "record now", "record <output.wav> --allow-live [--overwrite]", "Recording/capture"),
+    CommandHint("record-bg", "start record worker", "record-bg <output.wav> --allow-live [--overwrite]", "Recording/capture"),
+    CommandHint("capture-plan", "show capture plan", "capture-plan <output.jsonl>", "Recording/capture"),
+    CommandHint("capture", "capture now", "capture <output.jsonl> --allow-live [--overwrite]", "Recording/capture"),
+    CommandHint("capture-bg", "start capture worker", "capture-bg <output.jsonl> --allow-live [--overwrite]", "Recording/capture"),
+    CommandHint("stop", "stop worker", "stop", "Worker"),
+    CommandHint("wait", "wait for worker", "wait [seconds]", "Worker"),
+    CommandHint("help", "list commands", "help", "Other"),
+    CommandHint("quit", "quit TUI", "quit", "Other"),
 ]
 
 
@@ -218,8 +220,10 @@ def render_command_hints(command_text: str) -> str:
         if unique.detail:
             lines.append(unique.detail)
         return "\n".join(lines)
-    for hint in matches:
-        lines.append(format_command_hint(hint))
+    for category, category_hints in grouped_command_hints(matches):
+        lines.append(category)
+        for hint in category_hints:
+            lines.append(f"    {format_command_hint(hint)}")
     return "\n".join(lines)
 
 
@@ -244,6 +248,18 @@ def active_command_segment(command_text: str) -> str:
         if char == ";" and quote is None:
             start = index + 1
     return command_text[start:].strip()
+
+
+def grouped_command_hints(hints: list[CommandHint]) -> list[tuple[str, list[CommandHint]]]:
+    """Return command hints grouped by category while preserving command order."""
+    groups: list[tuple[str, list[CommandHint]]] = []
+    by_category: dict[str, list[CommandHint]] = {}
+    for hint in hints:
+        if hint.category not in by_category:
+            by_category[hint.category] = []
+            groups.append((hint.category, by_category[hint.category]))
+        by_category[hint.category].append(hint)
+    return groups
 
 
 def matching_command_hints(token: str) -> list[CommandHint]:
@@ -279,10 +295,11 @@ def aliases_by_command() -> dict[str, list[str]]:
 
 
 def format_command_hint(hint: CommandHint) -> str:
-    """Format one command hint line."""
-    aliases = aliases_by_command().get(hint.name, [])
-    alias_text = f" ({', '.join(sorted(aliases))})" if aliases else ""
-    return f"{hint.name}{alias_text} — {hint.description}"
+    """Format one command hint line with shortcuts before full command names."""
+    aliases = sorted(aliases_by_command().get(hint.name, []))
+    if aliases:
+        return f"{', '.join(aliases)} ({hint.name}) — {hint.description}"
+    return f"{hint.name} — {hint.description}"
 
 
 def describe_key_action(action: str) -> str:

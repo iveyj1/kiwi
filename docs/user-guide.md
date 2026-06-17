@@ -28,7 +28,7 @@ TUI input has two modes:
 
 - The TUI shows which-key style context hints above the prompt.
 - In keymap mode, hints list available configured keys with short action descriptions.
-- In command mode, hints list top-level commands with aliases and short descriptions; typed text filters the list.
+- In command mode, hints group top-level commands by category with shortcuts before full command names, e.g. `tu (tune)`; typed text filters the list.
 - Once the active text uniquely identifies a command, hints keep that command visible and show usage/sub-options.
 - For semicolon-separated command entries, hints follow the current command segment after the last unquoted semicolon.
 - Command entries may contain multiple commands separated by semicolons, e.g. `:tu 7000; mo usb 300 2700; fi 100 2400`.

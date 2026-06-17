@@ -49,27 +49,32 @@ def test_render_keymap_hints_show_requested_grouped_help():
     assert "q — quit" in text
 
 
-def test_render_command_hints_show_top_level_names_aliases_and_descriptions():
+def test_render_command_hints_show_grouped_top_level_shortcuts_and_descriptions():
     text = render_command_hints("")
 
     assert "Command hints" in text
-    assert "tune (tu) — set frequency" in text
-    assert "mode (mo) — set demod mode" in text
-    assert "play-bg (pb) — start playback worker" in text
+    assert "Status" in text
+    assert "Connection" in text
+    assert "Tuning" in text
+    assert "Playback" in text
+    assert "Recording/capture" in text
+    assert "    tu (tune) — set frequency" in text
+    assert "    mo (mode) — set demod mode" in text
+    assert "    pb (play-bg) — start playback worker" in text
 
 
 def test_render_command_hints_filter_by_typed_prefix():
     text = render_command_hints("mo")
 
-    assert "mode (mo) — set demod mode" in text
+    assert "mo (mode) — set demod mode" in text
     assert "args: mode <mode> [low_cut_hz high_cut_hz]" in text
-    assert "tune (tu)" not in text
+    assert "tu (tune)" not in text
 
 
 def test_render_command_hints_show_unique_command_arguments():
     text = render_command_hints("agc g")
 
-    assert "agc (ag) — AGC settings" in text
+    assert "ag (agc) — AGC settings" in text
     assert "sub-options: on, off, hang on|off, threshold <value>, slope <value>, decay <ms>, gain <value>, set key=value ..." in text
 
 
@@ -77,8 +82,8 @@ def test_render_command_hints_use_current_semicolon_segment():
     text = render_command_hints("tu 7000; mo")
 
     assert "active: mo" in text
-    assert "mode (mo) — set demod mode" in text
-    assert "tune (tu)" not in text
+    assert "mo (mode) — set demod mode" in text
+    assert "tu (tune)" not in text
 
 
 def test_render_tui_hints_switches_by_input_mode():

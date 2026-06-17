@@ -2,21 +2,20 @@
 
 ## Current slice
 
-Goal: Add a test-rig matplotlib renderer for static W/F fixture images.
+Goal: Reorganize TUI command hints into categories and show shortcuts before full command names.
 
 Done criteria:
 
-- Add an offline tool under `tools/` that loads W/F JSONL fixtures into a dBm row matrix.
-- Optionally render the matrix to PNG with matplotlib when available.
-- Keep the tool out of production console scripts/core dependencies.
-- Test the pure fixture-to-matrix data path with synthetic and local W/F fixtures.
-- Update waterfall docs and dev-log with test-rig usage.
+- Group command hints into categories similar to key hints.
+- Format aliases/shortcuts before canonical command names, e.g. `tu (tune)`.
+- Preserve filtering, unique-command argument hints, aliases, and semicolon segment context.
+- Update TUI harness tests and dev-log.
 
-Test command: `python3 -m pytest tests/harness/test_waterfall_image_tool.py && python3 -m pytest`
+Test command: `python3 -m pytest tests/harness/test_tui.py && python3 -m pytest`
 
-Live-radio needed: no; use existing fixtures.
+Live-radio needed: no; TUI rendering only.
 
-Docs to update: `docs/waterfall-spec.md`, `docs/user-guide.md`, `docs/dev-log.md`.
+Docs to update: `docs/dev-log.md`.
 
 ## Next
 
