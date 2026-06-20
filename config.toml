@@ -49,8 +49,8 @@ high_cut_hz = 5000
 # Direct key actions remain configurable. Built-in prefix keymaps are:
 # p <register> = recall preset; s <register> = store minimal preset;
 # S <register> = store full preset; r <receiver-register> = switch receiver.
-# Registers are 0..9 and a..z. Receiver registers first use stored add-receiver entries,
-# then map to [receivers].allowed order.
+# Registers are 0..9 and a..z. Receiver registers use stored add-receiver entries
+# when any exist; otherwise they map to [receivers].allowed order.
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
 "left" = "tune-step -medium"

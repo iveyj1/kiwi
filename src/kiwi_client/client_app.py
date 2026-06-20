@@ -62,7 +62,7 @@ class ClientState:
     user: str = "kiwi-client"
     duration_seconds: float = 60.0
     max_frames: int = 1500
-    volume_percent: int = 100
+    volume_percent: int = 10
     audio_startup_mute_ms: int = 300
     audio_startup_fade_in_ms: int = 100
     audio_stop_fade_out_ms: int = 100

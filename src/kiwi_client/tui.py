@@ -141,13 +141,15 @@ def render_pending_keymap_hints(
     lines = ["Key hints", labels.get(pending_key_action, pending_key_action)]
     if pending_key_action == "receiver":
         receiver_lines: dict[str, str] = {}
-        for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
-            register = REGISTER_KEYS[index]
-            receiver_lines[register] = f"{register} — {receiver}"
-        if controller is not None:
-            for register, preset in sorted_receiver_registers(controller.receiver_presets):
+        receiver_presets = controller.receiver_presets if controller is not None else {}
+        if receiver_presets:
+            for register, preset in sorted_receiver_registers(receiver_presets):
                 host, port = normalize_receiver_address(preset["receiver"], default_port=8073)
                 receiver_lines[register] = f"{register} — {host}:{port} {preset['description']}"
+        else:
+            for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
+                register = REGISTER_KEYS[index]
+                receiver_lines[register] = f"{register} — {receiver}"
         for register in REGISTER_KEYS:
             if register in receiver_lines:
                 lines.append(receiver_lines[register])

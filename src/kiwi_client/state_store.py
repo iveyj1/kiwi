@@ -9,6 +9,20 @@ from pathlib import Path
 from typing import Any
 
 MINIMAL_PRESET_FIELDS = ("host", "port", "frequency_khz", "mode", "low_cut_hz", "high_cut_hz")
+FULL_PRESET_EXCLUDED_FIELDS = frozenset(
+    {
+        "allowed_receivers",
+        "audio_startup_mute_ms",
+        "audio_startup_fade_in_ms",
+        "audio_stop_fade_out_ms",
+        "receivers_restricted",
+        "user",
+        "volume_percent",
+        "duration_seconds",
+        "max_frames",
+        "connected",
+    }
+)
 LAST_STATE_FIELDS = (
     "host",
     "port",
@@ -36,7 +50,11 @@ def minimal_preset(state: Any) -> dict[str, Any]:
 
 
 def full_preset(state: Any) -> dict[str, Any]:
-    return {field: _json_value(getattr(state, field)) for field in state_field_names(state)}
+    return {
+        field: _json_value(getattr(state, field))
+        for field in state_field_names(state)
+        if field not in FULL_PRESET_EXCLUDED_FIELDS
+    }
 
 
 def last_state_preset(state: Any) -> dict[str, Any]:

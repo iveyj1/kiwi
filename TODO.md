@@ -2,22 +2,21 @@
 
 ## Current slice
 
-Goal: Split durable config/presets from ephemeral TUI state.
+Goal: Clean preset/state ownership and receiver-register hints.
 
 Done criteria:
 
-- Discover config path from explicit `--config`, `./config.toml`, `~/.config/kiwi-client/config.toml`, or built-in defaults.
-- Add `[presets].file` config, resolving relative paths against the config directory.
-- Store radio presets and receiver register presets in a TOML presets file.
-- Keep `state.json` limited to ephemeral `last_state` only.
-- Keep `[receivers].allowed` in config and avoid duplicating receivers.
-- Update root `config.toml`, docs, and harness tests.
+- When explicit receiver presets exist, receiver prefix hints show those registers only and do not add fallback config receiver `0`.
+- Full radio presets exclude config/state-owned fields: `allowed_receivers`, audio fade/mute settings, `receivers_restricted`, `user`, and `volume_percent`.
+- Last state keeps `volume_percent`; missing last-state volume defaults to 10%.
+- Update pwd `config.toml`, `presets.toml`, and local ignored `state.json` to the current layout.
+- Update docs and harness tests.
 
-Test command: `python3 -m pytest tests/harness/test_config.py tests/harness/test_state_store.py tests/harness/test_tui.py && python3 -m pytest`
+Test command: `python3 -m pytest tests/harness/test_state_store.py tests/harness/test_tui.py && python3 -m pytest`
 
-Live-radio needed: no; persistence/config only.
+Live-radio needed: no; TUI/persistence only.
 
-Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/dev-log.md`, `docs/roadmap.md`.
+Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/dev-log.md`.
 
 ## Next
 

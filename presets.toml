@@ -1,7 +1,38 @@
-# Kiwi client durable presets.
-#
-# Radio presets are written as [radio_presets.<register>].
-# Receiver registers are written as [receiver_presets.<register>].
+[radio_presets.a]
+frequency_khz = 760.0
+high_cut_hz = 5000
+host = "10.0.0.41"
+low_cut_hz = -5000
+mode = "am"
+port = 8073
+
+[radio_presets.b]
+agc_decay_ms = 1000
+agc_gain = 50
+agc_hang = false
+agc_on = true
+agc_slope = 6
+agc_threshold = -100
+frequency_khz = 9999.5
+high_cut_hz = 700
+host = "10.0.0.42"
+low_cut_hz = 300
+mode = "cw"
+port = 8073
+
+[radio_presets.d]
+agc_decay_ms = 1000
+agc_gain = 50
+agc_hang = false
+agc_on = false
+agc_slope = 6
+agc_threshold = -100
+frequency_khz = 9999.5
+high_cut_hz = 700
+host = "10.0.0.42"
+low_cut_hz = 300
+mode = "cw"
+port = 8073
 
 [receiver_presets."1"]
 description = "misdr"

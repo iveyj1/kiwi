@@ -201,6 +201,8 @@ Split durable and ephemeral TUI persistence. Config discovery now uses explicit 
 
 Updated the working-directory config files to the new layout: `config.toml` owns the receiver allowlist including `10.0.0.42:8073`, `presets.toml` owns receiver register presets, and root `state.json` contains only last-state fields. Removed tolerance for old state-file durable keys by rejecting `presets` or `receiver_presets` in `state.json`.
 
+Cleaned preset/state ownership: full radio presets now exclude config/state-owned fields (`allowed_receivers`, audio startup/fade settings, receiver restriction, live limits, user, volume, connected). Receiver prefix hints now show stored receiver registers only when any receiver presets exist, avoiding misleading fallback register `0` for configs whose receivers are explicitly stored as `1`, `2`, `3`. The default local volume state is now 10% when no state file supplies a volume.
+
 ## YYYY-MM-DD
 
 ### Finding

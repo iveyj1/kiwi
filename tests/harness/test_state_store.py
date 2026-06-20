@@ -27,7 +27,23 @@ def test_minimal_and_full_presets():
         "high_cut_hz": 2700,
     }
     assert full["agc_gain"] == 25
-    assert full["allowed_receivers"] == ["10.0.0.40:8073", "10.0.0.41:8073"]
+    assert "allowed_receivers" not in full
+    assert "audio_startup_mute_ms" not in full
+    assert "audio_startup_fade_in_ms" not in full
+    assert "audio_stop_fade_out_ms" not in full
+    assert "receivers_restricted" not in full
+    assert "user" not in full
+    assert "volume_percent" not in full
+    assert "duration_seconds" not in full
+    assert "max_frames" not in full
+
+
+def test_apply_preset_uses_state_default_volume_when_missing():
+    state = ClientState()
+
+    applied = apply_preset(state, {"frequency_khz": 7000.0, "mode": "usb"})
+
+    assert applied.volume_percent == 10
 
 
 def test_apply_preset_preserves_unspecified_fields():

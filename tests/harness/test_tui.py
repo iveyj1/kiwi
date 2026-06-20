@@ -120,6 +120,28 @@ def test_render_tui_hints_show_stored_receiver_register_descriptions(tmp_path):
     assert "a — 10.0.0.42:8073 Backup receiver" in text
 
 
+def test_render_tui_hints_hide_config_fallback_when_receiver_presets_exist(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[receivers]
+allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+    controller = ClientController()
+    controller.execute("add-receiver 1 10.0.0.40:8073 misdr")
+    controller.execute("add-receiver 2 10.0.0.41:8073 misdr2")
+    controller.execute("add-receiver 3 10.0.0.42:8073 misdr3")
+
+    text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), controller)
+
+    assert "0 —" not in text
+    assert "1 — 10.0.0.40:8073 misdr" in text
+    assert "2 — 10.0.0.41:8073 misdr2" in text
+    assert "3 — 10.0.0.42:8073 misdr3" in text
+
+
 def test_render_tui_hints_show_receiver_registers_sorted_by_register(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -134,8 +156,9 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
 
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), controller)
 
-    assert text.index("0 — 10.0.0.41:8073") < text.index("1 — 10.0.0.40:8073")
-    assert text.index("1 — 10.0.0.40:8073") < text.index("2 — 10.0.0.42:8073 Backup receiver")
+    assert "0 —" not in text
+    assert "1 —" not in text
+    assert "2 — 10.0.0.42:8073 Backup receiver" in text
 
 
 def test_render_tui_hints_show_receiver_register_addresses(tmp_path):
@@ -201,7 +224,7 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Connected: yes" in text
     assert "Frequency: 10000.000 kHz" in text
     assert "Mode/filter: usb 300..2700 Hz" in text
-    assert "Volume: 100%" in text
+    assert "Volume: 10%" in text
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Operation: play" in text
     assert "Running: yes" in text

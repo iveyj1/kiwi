@@ -77,10 +77,10 @@ Minimal preset currently stores:
 - `low_cut_hz`
 - `high_cut_hz`
 
-Full preset currently stores all `ClientState` fields, including runtime/client settings.
+Full preset stores receiver/tuning/filter/AGC fields. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `user`, `volume_percent`, and `connected`.
 
 Persistence layout:
 
 - `config.toml` holds durable configuration, including `[receivers].allowed` and `[presets].file`.
 - `presets.toml` holds durable `[radio_presets.<register>]` and `[receiver_presets.<register>]` tables.
-- `state.json` holds ephemeral `last_state` only. It does not hold presets, receiver presets, or config-owned fields such as `allowed_receivers`, audio fade settings, or live limits.
+- `state.json` holds ephemeral `last_state` only. It does not hold presets, receiver presets, or config-owned fields such as `allowed_receivers`, audio fade settings, or live limits. Local `volume_percent` is state-owned and defaults to `10` when absent.
