@@ -35,7 +35,7 @@ def test_render_keymap_hints_show_requested_grouped_help():
     assert "l — tune up" in text
     assert "Tuning modifiers" in text
     assert "<shift> h/l — small step" in text
-    assert "<ctrl> h/l — large step" in text
+    assert "t/T — larger/smaller step pair" in text
     assert "Volume" in text
     assert "k — volume up" in text
     assert "j — volume down" in text
@@ -48,7 +48,7 @@ def test_render_keymap_hints_show_requested_grouped_help():
     assert "<receiver> is [0..9] or [a..z] from list of receivers" in text
     assert "Radio parameters are transferred to new receiver" in text
     assert "q — quit" in text
-    assert len(text.splitlines()) <= 15
+    assert len(text.splitlines()) <= 16
 
 
 def test_render_command_hints_show_grouped_top_level_shortcuts_and_descriptions():
@@ -225,6 +225,7 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Frequency: 10000.000 kHz" in text
     assert "Mode/filter: usb 300..2700 Hz" in text
     assert "Volume: 10%" in text
+    assert "Step: 1000/100 Hz" in text
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Operation: play" in text
     assert "Running: yes" in text
@@ -341,8 +342,8 @@ def test_tui_keymap_mode_executes_configured_tune_and_volume_actions(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
         """
-[steps]
-medium_hz = 2500
+[tuning.mode_steps.am]
+pairs = [[2500, 250]]
 
 [volume]
 step_percent = 5
@@ -351,7 +352,7 @@ step_percent = 5
     )
     config = load_config(config_path)
     volume = TuiFakeVolumeControl()
-    controller = ClientController(volume_control=volume)
+    controller = ClientController(state=state_from_config(config), volume_control=volume)
     state = TuiInputState()
 
     response, message = handle_tui_key(ord("l"), state, controller, config)
@@ -364,6 +365,29 @@ step_percent = 5
     assert response["volume"] == {"backend": "fake", "percent": 15}
     assert message == ""
     assert volume.values == [15]
+
+
+def test_tui_expand_key_action_uses_mode_step_pairs(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[tuning.mode_steps.usb]
+pairs = [[1000, 100], [2500, 250]]
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController()
+    controller.state = state_from_config(config, controller.state)
+    controller.execute("mode usb")
+
+    assert expand_key_action("tune-step +mode", controller, config) == "tune 5001.000"
+    assert expand_key_action("tune-step -mode-small", controller, config) == "tune 4999.900"
+    response, message = handle_tui_key(ord("t"), TuiInputState(), controller, config)
+    assert response["state"]["current_step_hz"] == 2500
+    assert expand_key_action("tune-step +mode", controller, config) == "tune 5002.500"
+    response, message = handle_tui_key(ord("T"), TuiInputState(), controller, config)
+    assert response["state"]["current_step_hz"] == 1000
 
 
 def test_tui_expand_key_action_uses_configured_steps(tmp_path):
@@ -381,7 +405,7 @@ def test_tui_modified_and_unknown_keys_are_safe_in_keymap_mode():
     if getattr(curses, "KEY_SRIGHT", None) is not None:
         assert normalize_key_name(curses.KEY_SRIGHT) == "shift-right"
         response, message = handle_tui_key(curses.KEY_SRIGHT, state, controller, load_config())
-        assert response["state"]["frequency_khz"] == 5000.1
+        assert response["state"]["frequency_khz"] == 5001.0
         assert message == ""
 
     response, message = handle_tui_key(27, state, controller, load_config())

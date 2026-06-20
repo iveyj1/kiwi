@@ -20,6 +20,9 @@ Concise list of radio/client parameters currently settable or persisted by this 
 - `high_cut_hz` — active mode high passband edge in Hz.
 - `mode_passbands` — per-mode low/high passbands carried separately while switching modes.
 - `cw_offset_hz` — signed CW heterodyne offset. With `frequency_khz = 335.000` and `cw_offset_hz = -800`, `radio_frequency_khz = 334.200`.
+- `mode_step_pairs` — configured per-mode tuning step pairs as `(normal_hz, small_hz)`.
+- `mode_step_indices` — current selected step-pair index per mode.
+- `current_step_hz` / `current_small_step_hz` — active normal/small tuning steps for the current mode.
 
 Kiwi command shape:
 
@@ -80,7 +83,7 @@ Minimal preset currently stores:
 - `low_cut_hz`
 - `high_cut_hz`
 
-Full preset stores receiver/tuning/filter/AGC fields, including per-mode passbands. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `cw_offset_hz`, `user`, `volume_percent`, and `connected`.
+Full preset stores receiver/tuning/filter/AGC fields, including per-mode passbands. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `cw_offset_hz`, mode step settings/indices, `user`, `volume_percent`, and `connected`.
 
 Persistence layout:
 

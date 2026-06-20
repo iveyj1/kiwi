@@ -1,5 +1,6 @@
 import json
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -453,6 +454,28 @@ def test_client_store_and_recall_presets():
     recalled_all = controller.execute("recall 2")
     assert recalled_all["state"]["agc_gain"] == 25
     assert recalled_all["state"]["volume_percent"] == 15
+
+
+def test_client_mode_step_pairs_and_clamped_cycling():
+    controller = ClientController()
+    controller.state = replace(
+        controller.state,
+        mode_step_pairs={**controller.state.mode_step_pairs, "am": ((5000, 1000), (10000, 1000))},
+    )
+
+    assert controller.state.current_step_hz == 5000
+    assert controller.state.current_small_step_hz == 1000
+    up = controller.execute("step-pair +1")
+    clamped_up = controller.execute("step-pair +1")
+    down = controller.execute("step-pair -1")
+    controller.execute("mode cw")
+
+    assert up["state"]["current_step_hz"] == 10000
+    assert up["state"]["current_small_step_hz"] == 1000
+    assert clamped_up["state"]["current_step_hz"] == 10000
+    assert down["state"]["current_step_hz"] == 5000
+    assert controller.state.current_step_hz == 100
+    assert controller.state.current_small_step_hz == 10
 
 
 def test_client_tune_step_and_volume_commands():

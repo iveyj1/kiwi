@@ -38,6 +38,12 @@ DEFAULT_MODE_PASSBANDS: dict[str, tuple[int, int]] = {
 DEFAULT_LOW_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][0]
 DEFAULT_HIGH_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][1]
 DEFAULT_CW_OFFSET_HZ = -800
+DEFAULT_MODE_STEP_PAIRS: dict[str, tuple[tuple[int, int], ...]] = {
+    "am": ((5000, 1000),),
+    "usb": ((1000, 100),),
+    "lsb": ((1000, 100),),
+    "cw": ((100, 10),),
+}
 
 
 @dataclass(frozen=True)
@@ -68,6 +74,8 @@ class ClientState:
     high_cut_hz: int = DEFAULT_HIGH_CUT_HZ
     mode_passbands: dict[str, tuple[int, int]] = field(default_factory=lambda: dict(DEFAULT_MODE_PASSBANDS))
     cw_offset_hz: int = DEFAULT_CW_OFFSET_HZ
+    mode_step_pairs: dict[str, tuple[tuple[int, int], ...]] = field(default_factory=lambda: dict(DEFAULT_MODE_STEP_PAIRS))
+    mode_step_indices: dict[str, int] = field(default_factory=dict)
     user: str = "kiwi-client"
     duration_seconds: float = 60.0
     max_frames: int = 1500
@@ -90,6 +98,20 @@ class ClientState:
         return f"{self.host}:{self.port}"
 
     @property
+    def current_step_pair(self) -> tuple[int, int]:
+        pairs = self.mode_step_pairs.get(self.mode.lower()) or DEFAULT_MODE_STEP_PAIRS.get(self.mode.lower()) or ((1000, 100),)
+        index = max(0, min(self.mode_step_indices.get(self.mode.lower(), 0), len(pairs) - 1))
+        return int(pairs[index][0]), int(pairs[index][1])
+
+    @property
+    def current_step_hz(self) -> int:
+        return self.current_step_pair[0]
+
+    @property
+    def current_small_step_hz(self) -> int:
+        return self.current_step_pair[1]
+
+    @property
     def radio_frequency_khz(self) -> float:
         if self.mode.lower() == "cw":
             return self.frequency_khz + self.cw_offset_hz / 1000.0
@@ -99,6 +121,8 @@ class ClientState:
         data = asdict(self)
         data["receiver"] = self.receiver
         data["radio_frequency_khz"] = self.radio_frequency_khz
+        data["current_step_hz"] = self.current_step_hz
+        data["current_small_step_hz"] = self.current_small_step_hz
         return data
 
 
@@ -133,6 +157,19 @@ def switch_mode(state: ClientState, mode: str, passband: tuple[int, int] | None 
         passbands[mode] = (int(passband[0]), int(passband[1]))
     low, high = passbands.get(mode, DEFAULT_MODE_PASSBANDS.get(mode, (state.low_cut_hz, state.high_cut_hz)))
     return replace(state, mode=mode, low_cut_hz=int(low), high_cut_hz=int(high), mode_passbands=passbands)
+
+
+def step_pair_index(state: ClientState, mode: str) -> int:
+    mode = normalized_mode(mode)
+    pairs = state.mode_step_pairs.get(mode) or DEFAULT_MODE_STEP_PAIRS.get(mode) or ((1000, 100),)
+    return max(0, min(state.mode_step_indices.get(mode, 0), len(pairs) - 1))
+
+
+def step_mode_pair(state: ClientState, mode: str, delta: int) -> ClientState:
+    mode = normalized_mode(mode)
+    pairs = state.mode_step_pairs.get(mode) or DEFAULT_MODE_STEP_PAIRS.get(mode) or ((1000, 100),)
+    index = max(0, min(step_pair_index(state, mode) + delta, len(pairs) - 1))
+    return replace(state, mode_step_indices={**state.mode_step_indices, mode: index})
 
 
 class ClientOperations(Protocol):
@@ -358,6 +395,10 @@ class ClientController:
             delta_hz = self._parse_tune_step_hz(args[0])
             self.state = replace(self.state, frequency_khz=self.state.frequency_khz + delta_hz / 1000.0)
             return self._state_response()
+        if command == "step-pair":
+            self._require_arg_count(args, 1, "step-pair <+/-n>")
+            self.state = step_mode_pair(self.state, self.state.mode, int(args[0]))
+            return {"type": "state", "state": self.state.as_dict()}
         if command == "volume":
             self._require_arg_count(args, 1, "volume <percent>")
             return self._set_volume(self._clamp_volume(int(args[0])))
@@ -863,6 +904,7 @@ ATOMIC_STATE_COMMANDS = {
     "mode",
     "filter",
     "tune-step",
+    "step-pair",
     "agc",
     "duration",
     "frames",
@@ -993,6 +1035,7 @@ def available_commands() -> list[str]:
         "mode <mode> [low_cut_hz high_cut_hz]",
         "filter <low_cut_hz> <high_cut_hz>",
         "tune-step <+/-hz|small|medium|large>",
+        "step-pair <+/-n>",
         "volume <percent>",
         "volume-step <delta_percent>",
         "agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]",

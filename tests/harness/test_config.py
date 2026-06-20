@@ -25,13 +25,20 @@ def test_default_config_has_keymaps_and_steps():
     assert config.tuning.mode_passbands["usb"] == (0, 3000)
     assert config.tuning.mode_passbands["lsb"] == (-3000, 0)
     assert config.tuning.mode_passbands["cw"] == (650, 1050)
+    assert config.tuning.mode_step_pairs["am"] == ((5000, 1000),)
+    assert config.tuning.mode_step_pairs["usb"] == ((1000, 100),)
+    assert config.tuning.mode_step_pairs["lsb"] == ((1000, 100),)
+    assert config.tuning.mode_step_pairs["cw"] == ((100, 10),)
     assert config.startup.mode == "last"
     assert config.startup.preset == 1
     assert config.startup.playback is False
     assert config.startup.state_file.endswith("kiwi-client/state.json")
     assert config.default_state["frequency_khz"] == 5000.0
-    assert config.keys["right"] == "tune-step +medium"
-    assert config.keys["l"] == "tune-step +medium"
+    assert config.keys["right"] == "tune-step +mode"
+    assert config.keys["l"] == "tune-step +mode"
+    assert config.keys["shift-l"] == "tune-step +mode-small"
+    assert config.keys["t"] == "step-pair +1"
+    assert config.keys["shift-t"] == "step-pair -1"
     assert config.keys["up"] == "volume-step +10"
     assert config.keys[":"] == "command-mode"
 
@@ -70,6 +77,9 @@ cw_offset_hz = -700
 low_cut_hz = 100
 high_cut_hz = 2400
 
+[tuning.mode_steps.usb]
+pairs = [[1000, 100], [2500, 250]]
+
 [startup]
 mode = "preset"
 preset = 7
@@ -105,6 +115,8 @@ mode = "usb"
     assert config.tuning.cw_offset_hz == -700
     assert config.tuning.mode_passbands["usb"] == (100, 2400)
     assert config.tuning.mode_passbands["am"] == (-5000, 5000)
+    assert config.tuning.mode_step_pairs["usb"] == ((1000, 100), (2500, 250))
+    assert config.tuning.mode_step_pairs["am"] == ((5000, 1000),)
     assert resolve_presets_path(config) == tmp_path / "my-presets.toml"
     assert resolve_state_path(config) == tmp_path / "state.json"
     assert config.startup.mode == "preset"
@@ -113,7 +125,7 @@ mode = "usb"
     assert config.startup.state_file == "state.json"
     assert config.default_state["frequency_khz"] == 1234.5
     assert config.default_state["mode"] == "usb"
-    assert config.keys["right"] == "tune-step +medium"
+    assert config.keys["right"] == "tune-step +mode"
     assert config.keys["l"] == "tune-step +large"
     assert config.keys["x"] == "stop"
 

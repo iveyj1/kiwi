@@ -86,6 +86,7 @@ COMMAND_HINTS = [
     CommandHint("mode", "set demod mode", "mode <mode> [low_cut_hz high_cut_hz]", "Tuning"),
     CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>", "Tuning"),
     CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>", "Tuning"),
+    CommandHint("step-pair", "cycle step pair", "step-pair <+/-n>", "Tuning"),
     CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
     CommandHint("volume-step", "step local volume", "volume-step <delta_percent>", "Audio controls"),
     CommandHint(
@@ -188,8 +189,8 @@ def sorted_preset_registers(presets: dict[Any, dict[str, Any]]) -> list[tuple[st
 def render_keymap_hints(config: KiwiClientConfig) -> str:
     """Render requested which-key style hints for keymap mode."""
     rows = [
-        ("Tuning", ["h — tune down", "l — tune up"]),
-        ("Tuning modifiers", ["<shift> h/l — small step", "<ctrl> h/l — large step"]),
+        ("Tuning", ["h — tune down", "l — tune up", "t/T — larger/smaller step pair"]),
+        ("Tuning modifiers", ["<shift> h/l — small step"]),
         ("Volume", ["k — volume up", "j — volume down"]),
         (
             "Presets",
@@ -368,6 +369,7 @@ def render_dashboard(
         f"Connected: {'yes' if state.connected or (operation is not None and operation.get('running')) else 'no'}",
         f"Frequency: {state.frequency_khz:.3f} kHz",
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
+        f"Step: {state.current_step_hz}/{state.current_small_step_hz} Hz",
         f"Volume: {state.volume_percent}%",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
@@ -453,10 +455,14 @@ def expand_key_action(action: str, controller: ClientController, config: KiwiCli
             "small": config.steps.small_hz,
             "medium": config.steps.medium_hz,
             "large": config.steps.large_hz,
+            "mode": controller.state.current_step_hz,
+            "mode-small": controller.state.current_small_step_hz,
         }.get(token)
         if step_hz is not None:
             new_frequency = controller.state.frequency_khz + sign * step_hz / 1000.0
             return f"tune {new_frequency:.3f}"
+    if len(parts) == 2 and parts[0] == "step-pair":
+        return action
     if len(parts) == 2 and parts[0] == "volume-step" and parts[1] in {"+10", "-10"}:
         sign = -1 if parts[1].startswith("-") else 1
         return f"volume-step {sign * config.volume.step_percent}"
@@ -655,7 +661,12 @@ def runtime_state_from_config(config: KiwiClientConfig, state: ClientState) -> C
 def state_from_config(config: KiwiClientConfig, state: ClientState | None = None) -> ClientState:
     """Return client state with default radio state plus runtime config."""
     state = state or ClientState()
-    state = replace(state, mode_passbands=dict(config.tuning.mode_passbands), cw_offset_hz=config.tuning.cw_offset_hz)
+    state = replace(
+        state,
+        mode_passbands=dict(config.tuning.mode_passbands),
+        mode_step_pairs=dict(config.tuning.mode_step_pairs),
+        cw_offset_hz=config.tuning.cw_offset_hz,
+    )
     if config.default_state:
         state = apply_preset(state, config.default_state)
     if "low_cut_hz" not in config.default_state and "high_cut_hz" not in config.default_state:

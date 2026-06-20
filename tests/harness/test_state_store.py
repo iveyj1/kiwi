@@ -37,6 +37,8 @@ def test_minimal_and_full_presets():
     assert "duration_seconds" not in full
     assert "max_frames" not in full
     assert "cw_offset_hz" not in full
+    assert "mode_step_pairs" not in full
+    assert "mode_step_indices" not in full
     assert full["mode_passbands"]["cw"] == [650, 1050]
 
 

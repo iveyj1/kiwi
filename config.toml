@@ -49,6 +49,18 @@ high_cut_hz = 0
 low_cut_hz = 650
 high_cut_hz = 1050
 
+[tuning.mode_steps.am]
+pairs = [[5000, 1000], [10000, 1000]]
+
+[tuning.mode_steps.usb]
+pairs = [[1000, 100], [2500, 250], [5000, 500]]
+
+[tuning.mode_steps.lsb]
+pairs = [[1000, 100], [2500, 250], [5000, 500]]
+
+[tuning.mode_steps.cw]
+pairs = [[100, 10], [500, 50], [1000, 100]]
+
 [startup]
 # mode can be "last", "default", or "preset".
 mode = "last"
@@ -71,18 +83,16 @@ high_cut_hz = 5000
 # S <register> = store full preset; r <receiver-register> = switch receiver.
 # Registers are 0..9 and a..z. Receiver registers use stored add-receiver entries
 # when any exist; otherwise they map to [receivers].allowed order.
-"right" = "tune-step +medium"
-"l" = "tune-step +medium"
-"left" = "tune-step -medium"
-"h" = "tune-step -medium"
-"shift-right" = "tune-step +small"
-"shift-l" = "tune-step +small"
-"shift-left" = "tune-step -small"
-"shift-h" = "tune-step -small"
-"ctrl-right" = "tune-step +large"
-"ctrl-l" = "tune-step +large"
-"ctrl-left" = "tune-step -large"
-"ctrl-h" = "tune-step -large"
+"right" = "tune-step +mode"
+"l" = "tune-step +mode"
+"left" = "tune-step -mode"
+"h" = "tune-step -mode"
+"shift-right" = "tune-step +mode-small"
+"shift-l" = "tune-step +mode-small"
+"shift-left" = "tune-step -mode-small"
+"shift-h" = "tune-step -mode-small"
+"t" = "step-pair +1"
+"shift-t" = "step-pair -1"
 "up" = "volume-step +10"
 "k" = "volume-step +10"
 "down" = "volume-step -10"

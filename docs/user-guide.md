@@ -102,6 +102,18 @@ high_cut_hz = 0
 low_cut_hz = 650
 high_cut_hz = 1050
 
+[tuning.mode_steps.am]
+pairs = [[5000, 1000]]
+
+[tuning.mode_steps.usb]
+pairs = [[1000, 100]]
+
+[tuning.mode_steps.lsb]
+pairs = [[1000, 100]]
+
+[tuning.mode_steps.cw]
+pairs = [[100, 10]]
+
 [startup]
 # mode can be "last", "default", or "preset".
 mode = "last"
@@ -119,10 +131,16 @@ low_cut_hz = -5000
 high_cut_hz = 5000
 
 [keys]
-"right" = "tune-step +medium"
-"l" = "tune-step +medium"
-"left" = "tune-step -medium"
-"h" = "tune-step -medium"
+"right" = "tune-step +mode"
+"l" = "tune-step +mode"
+"left" = "tune-step -mode"
+"h" = "tune-step -mode"
+"shift-right" = "tune-step +mode-small"
+"shift-l" = "tune-step +mode-small"
+"shift-left" = "tune-step -mode-small"
+"shift-h" = "tune-step -mode-small"
+"t" = "step-pair +1"
+"shift-t" = "step-pair -1"
 "up" = "volume-step +10"
 "k" = "volume-step +10"
 "down" = "volume-step -10"
@@ -132,9 +150,10 @@ high_cut_hz = 5000
 
 In keymap mode, the default bindings are:
 
-- right arrow or `l`: increase frequency by the configured medium step.
-- left arrow or `h`: decrease frequency by the configured medium step.
-- uppercase `L` / `H`: increase/decrease by the configured small step.
+- right arrow or `l`: increase frequency by the current mode normal step.
+- left arrow or `h`: decrease frequency by the current mode normal step.
+- uppercase `L` / `H`: increase/decrease by the current mode small step.
+- `t` / `T`: move to the next/previous configured step pair for the current mode.
 - Ctrl+`l` / Ctrl+`h`: increase/decrease by the configured large step where the terminal reports those control keys distinctly.
 - up arrow or `k`: increase volume by the configured volume step.
 - down arrow or `j`: decrease volume by the configured volume step.
@@ -282,6 +301,10 @@ Tuning/filter behavior:
 - AM, USB, LSB, and CW carry separate low/high passbands.
 - `filter <low> <high>` changes only the current mode’s saved passband.
 - `mode <mode>` without cuts restores that mode’s saved/default passband.
+- Each mode has one or more configured step pairs: `[normal_hz, small_hz]`.
+- Normal `h/l` and left/right arrows use the current normal step; shifted `H/L` and shifted arrows use the current small step.
+- `t` advances to the next configured step pair for the current mode; `T` moves to the previous pair. Both stop at the ends of the list.
+- The dashboard/status line shows the active pair, e.g. `Step: 1000/100 Hz`.
 - CW `frequency_khz` is the user-facing passband-center frequency. The radio command frequency adds signed `[tuning].cw_offset_hz`; for example, `tune 335` in CW with `cw_offset_hz = -800` sends `freq=334.200` while keeping the UI frequency at `335.000 kHz`.
 
 Presets:

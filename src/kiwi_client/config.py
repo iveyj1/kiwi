@@ -53,6 +53,18 @@ high_cut_hz = 0
 low_cut_hz = 650
 high_cut_hz = 1050
 
+[tuning.mode_steps.am]
+pairs = [[5000, 1000]]
+
+[tuning.mode_steps.usb]
+pairs = [[1000, 100]]
+
+[tuning.mode_steps.lsb]
+pairs = [[1000, 100]]
+
+[tuning.mode_steps.cw]
+pairs = [[100, 10]]
+
 [startup]
 state_file = "~/.local/state/kiwi-client/state.json"
 mode = "last"
@@ -73,18 +85,16 @@ high_cut_hz = 5000
 # S <register> = store full preset; r <receiver-register> = switch receiver.
 # Registers are 0..9 and a..z. Receiver registers use stored add-receiver entries
 # when any exist; otherwise they map to [receivers].allowed order.
-"right" = "tune-step +medium"
-"l" = "tune-step +medium"
-"left" = "tune-step -medium"
-"h" = "tune-step -medium"
-"shift-right" = "tune-step +small"
-"shift-l" = "tune-step +small"
-"shift-left" = "tune-step -small"
-"shift-h" = "tune-step -small"
-"ctrl-right" = "tune-step +large"
-"ctrl-l" = "tune-step +large"
-"ctrl-left" = "tune-step -large"
-"ctrl-h" = "tune-step -large"
+"right" = "tune-step +mode"
+"l" = "tune-step +mode"
+"left" = "tune-step -mode"
+"h" = "tune-step -mode"
+"shift-right" = "tune-step +mode-small"
+"shift-l" = "tune-step +mode-small"
+"shift-left" = "tune-step -mode-small"
+"shift-h" = "tune-step -mode-small"
+"t" = "step-pair +1"
+"shift-t" = "step-pair -1"
 "up" = "volume-step +10"
 "k" = "volume-step +10"
 "down" = "volume-step -10"
@@ -154,6 +164,14 @@ class TuningConfig:
             "usb": (0, 3000),
             "lsb": (-3000, 0),
             "cw": (650, 1050),
+        }
+    )
+    mode_step_pairs: dict[str, tuple[tuple[int, int], ...]] = field(
+        default_factory=lambda: {
+            "am": ((5000, 1000),),
+            "usb": ((1000, 100),),
+            "lsb": ((1000, 100),),
+            "cw": ((100, 10),),
         }
     )
 
@@ -287,6 +305,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     if isinstance(data.get("tuning"), dict):
         tuning_data = data["tuning"]
         mode_passbands = dict(tuning.mode_passbands)
+        mode_step_pairs = dict(tuning.mode_step_pairs)
         raw_passbands = tuning_data.get("mode_passbands", {})
         if isinstance(raw_passbands, dict):
             for mode, passband_data in raw_passbands.items():
@@ -296,10 +315,18 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
                         int(passband_data.get("low_cut_hz", current_low)),
                         int(passband_data.get("high_cut_hz", current_high)),
                     )
+        raw_steps = tuning_data.get("mode_steps", {})
+        if isinstance(raw_steps, dict):
+            for mode, step_data in raw_steps.items():
+                if isinstance(step_data, dict):
+                    pairs = step_data.get("pairs")
+                    if isinstance(pairs, list) and pairs:
+                        mode_step_pairs[str(mode).lower()] = tuple((int(pair[0]), int(pair[1])) for pair in pairs)
         tuning = replace(
             tuning,
             cw_offset_hz=int(tuning_data.get("cw_offset_hz", tuning.cw_offset_hz)),
             mode_passbands=mode_passbands,
+            mode_step_pairs=mode_step_pairs,
         )
     if isinstance(data.get("startup"), dict):
         startup_data = data["startup"]

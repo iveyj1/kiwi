@@ -205,6 +205,8 @@ Cleaned preset/state ownership: full radio presets now exclude config/state-owne
 
 Added per-mode passband tuning and CW heterodyne offset handling. AM/USB/LSB/CW now carry separate passbands; `filter` updates the current mode only and bare `mode` restores the mode-specific saved/default passband. In CW, the displayed/user frequency remains passband center while the Kiwi command frequency adds configured `cw_offset_hz` (default `-800`, so `335.000 kHz` sends `334.200 kHz`). Live plans expose both `frequency_khz` and `radio_frequency_khz`.
 
+Added per-mode tuning step pairs and TUI step cycling. Defaults are AM `5000/1000`, USB/LSB `1000/100`, and CW `100/10`; config may define additional `[normal_hz, small_hz]` pairs per mode. Normal tune keys use the current normal step, shifted tune keys use the current small step, and `t`/`T` move between configured pairs with end clamping. Dashboard/status now shows the active pair as `Step: normal/small Hz`.
+
 ## YYYY-MM-DD
 
 ### Finding
