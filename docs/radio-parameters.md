@@ -83,4 +83,4 @@ Persistence layout:
 
 - `config.toml` holds durable configuration, including `[receivers].allowed` and `[presets].file`.
 - `presets.toml` holds durable `[radio_presets.<register>]` and `[receiver_presets.<register>]` tables.
-- `state.json` holds ephemeral `last_state` only.
+- `state.json` holds ephemeral `last_state` only. It does not hold presets, receiver presets, or config-owned fields such as `allowed_receivers`, audio fade settings, or live limits.

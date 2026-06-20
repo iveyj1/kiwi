@@ -2,3 +2,15 @@
 #
 # Radio presets are written as [radio_presets.<register>].
 # Receiver registers are written as [receiver_presets.<register>].
+
+[receiver_presets."1"]
+description = "misdr"
+receiver = "10.0.0.40:8073"
+
+[receiver_presets."2"]
+description = "misdr2"
+receiver = "10.0.0.41:8073"
+
+[receiver_presets."3"]
+description = "misdr3"
+receiver = "10.0.0.42:8073"

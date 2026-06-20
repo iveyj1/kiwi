@@ -23,7 +23,7 @@ max_frames = 0
 # Keep restricted=true for normal local-radio work.
 # Set restricted=false only when you explicitly want unrestricted receiver addresses.
 restricted = false
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073"]
 
 [presets]
 # Durable radio and receiver-register presets live here.
@@ -33,7 +33,7 @@ file = "presets.toml"
 # mode can be "last", "default", or "preset".
 mode = "last"
 preset = 1
-state_file = "~/.local/state/kiwi-client/state.json"
+state_file = "state.json"
 # Start background playback automatically when [live].allow_live is true.
 playback = true
 

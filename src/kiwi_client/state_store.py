@@ -9,6 +9,22 @@ from pathlib import Path
 from typing import Any
 
 MINIMAL_PRESET_FIELDS = ("host", "port", "frequency_khz", "mode", "low_cut_hz", "high_cut_hz")
+LAST_STATE_FIELDS = (
+    "host",
+    "port",
+    "frequency_khz",
+    "mode",
+    "low_cut_hz",
+    "high_cut_hz",
+    "user",
+    "volume_percent",
+    "agc_on",
+    "agc_hang",
+    "agc_threshold",
+    "agc_slope",
+    "agc_decay_ms",
+    "agc_gain",
+)
 
 
 def state_field_names(state: Any) -> tuple[str, ...]:
@@ -21,6 +37,11 @@ def minimal_preset(state: Any) -> dict[str, Any]:
 
 def full_preset(state: Any) -> dict[str, Any]:
     return {field: _json_value(getattr(state, field)) for field in state_field_names(state)}
+
+
+def last_state_preset(state: Any) -> dict[str, Any]:
+    """Return only ephemeral last-state fields, excluding config-owned settings."""
+    return {field: _json_value(getattr(state, field)) for field in LAST_STATE_FIELDS if hasattr(state, field)}
 
 
 def apply_preset(state: Any, preset: dict[str, Any]) -> Any:
@@ -37,6 +58,9 @@ def load_state_file(path: str | Path) -> dict[str, Any]:
     if not path.exists():
         return {"last_state": None}
     data = json.loads(path.read_text(encoding="utf-8"))
+    unknown = set(data) - {"last_state"}
+    if unknown:
+        raise ValueError(f"unsupported state file keys: {', '.join(sorted(unknown))}")
     return {"last_state": data.get("last_state")}
 
 
@@ -44,7 +68,7 @@ def save_state_file(path: str | Path, *, last_state: Any) -> None:
     """Save ephemeral TUI state only."""
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {"last_state": full_preset(last_state)}
+    data = {"last_state": last_state_preset(last_state)}
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 

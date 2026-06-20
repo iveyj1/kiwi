@@ -9,6 +9,8 @@ from kiwi_client.state_store import (
     save_state_file,
 )
 
+import pytest
+
 
 def test_minimal_and_full_presets():
     state = ClientState(host="10.0.0.41", frequency_khz=7000.0, mode="usb", low_cut_hz=300, high_cut_hz=2700, agc_gain=25)
@@ -73,5 +75,16 @@ def test_save_and_load_state_file_only_persists_last_state(tmp_path):
     loaded = load_state_file(path)
 
     assert loaded["last_state"]["frequency_khz"] == 7000.0
+    assert loaded["last_state"]["agc_gain"] == 25
+    assert "allowed_receivers" not in loaded["last_state"]
+    assert "audio_startup_mute_ms" not in loaded["last_state"]
     assert "presets" not in path.read_text(encoding="utf-8")
     assert loaded == {"last_state": loaded["last_state"]}
+
+
+def test_load_state_file_rejects_old_durable_keys(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text('{"last_state": null, "presets": {}, "receiver_presets": {}}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unsupported state file keys"):
+        load_state_file(path)
