@@ -195,6 +195,8 @@ Reorganized TUI command-mode hints into categories similar to keymap hints. Comm
 
 Fixed stored numeric receiver registers. `add-receiver 2 ...` stores an integer register internally, and `r2` now resolves it correctly instead of falling through to `[receivers].allowed` and reporting unknown receiver register. Receiver-register hints now merge stored and configured receivers and sort by register. TUI command-mode `add-receiver` appends the normalized receiver to `[receivers].allowed` in the active config file when not already present.
 
+Added `docs/radio-parameters.md`, a concise inventory of currently settable receiver/session, tuning, AGC, local audio, waterfall, and preset-scope parameters.
+
 ## YYYY-MM-DD
 
 ### Finding
