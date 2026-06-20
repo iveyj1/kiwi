@@ -203,6 +203,8 @@ Updated the working-directory config files to the new layout: `config.toml` owns
 
 Cleaned preset/state ownership: full radio presets now exclude config/state-owned fields (`allowed_receivers`, audio startup/fade settings, receiver restriction, live limits, user, volume, connected). Receiver prefix hints now show stored receiver registers only when any receiver presets exist, avoiding misleading fallback register `0` for configs whose receivers are explicitly stored as `1`, `2`, `3`. The default local volume state is now 10% when no state file supplies a volume.
 
+Added per-mode passband tuning and CW heterodyne offset handling. AM/USB/LSB/CW now carry separate passbands; `filter` updates the current mode only and bare `mode` restores the mode-specific saved/default passband. In CW, the displayed/user frequency remains passband center while the Kiwi command frequency adds configured `cw_offset_hz` (default `-800`, so `335.000 kHz` sends `334.200 kHz`). Live plans expose both `frequency_khz` and `radio_frequency_khz`.
+
 ## YYYY-MM-DD
 
 ### Finding

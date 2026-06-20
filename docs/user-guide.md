@@ -47,7 +47,7 @@ TUI input has two modes:
 - In command mode, `Esc` clears the command and returns to keymap mode.
 - In command mode, up/down arrows browse command history; the selected command is placed in the prompt for editing.
 - In keymap mode, `q` requests cooperative stop of any background operation before exiting the TUI.
-- In keymap mode, prefix sequences manage presets and receiver switching: `p <register>` recalls a preset, `s <register>` stores frequency/mode/bandwidth, `S <register>` stores all radio parameters, and `r <receiver>` switches to a stored or configured receiver while preserving radio parameters. Registers are `0..9` or `a..z`; receiver registers come from `add-receiver` entries first, then `[receivers].allowed` order. After pressing a prefix key, hints show defined preset registers with frequency/mode or receiver registers with addresses/descriptions.
+- In keymap mode, prefix sequences manage presets and receiver switching: `p <register>` recalls a preset, `s <register>` stores frequency/mode/bandwidth, `S <register>` stores all radio parameters, and `r <receiver>` switches to a stored or configured receiver while preserving radio parameters. Registers are `0..9` or `a..z`; receiver registers use stored `add-receiver` entries when any exist, otherwise `[receivers].allowed` order. After pressing a prefix key, hints show defined preset registers with frequency/mode or receiver registers with addresses/descriptions.
 
 Default TUI keymap/step configuration shape:
 
@@ -81,6 +81,26 @@ allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 [presets]
 # Durable radio and receiver-register presets live here.
 file = "presets.toml"
+
+[tuning]
+# CW user frequency is passband center; radio frequency adds this signed offset.
+cw_offset_hz = -800
+
+[tuning.mode_passbands.am]
+low_cut_hz = -5000
+high_cut_hz = 5000
+
+[tuning.mode_passbands.usb]
+low_cut_hz = 0
+high_cut_hz = 3000
+
+[tuning.mode_passbands.lsb]
+low_cut_hz = -3000
+high_cut_hz = 0
+
+[tuning.mode_passbands.cw]
+low_cut_hz = 650
+high_cut_hz = 1050
 
 [startup]
 # mode can be "last", "default", or "preset".
@@ -256,6 +276,13 @@ agc set on=true hang=false thresh=-100 slope=6 decay=1000 gain=50
 ```
 
 During active background playback, AGC changes are queued to the active SND WebSocket.
+
+Tuning/filter behavior:
+
+- AM, USB, LSB, and CW carry separate low/high passbands.
+- `filter <low> <high>` changes only the current mode’s saved passband.
+- `mode <mode>` without cuts restores that mode’s saved/default passband.
+- CW `frequency_khz` is the user-facing passband-center frequency. The radio command frequency adds signed `[tuning].cw_offset_hz`; for example, `tune 335` in CW with `cw_offset_hz = -800` sends `freq=334.200` while keeping the UI frequency at `335.000 kHz`.
 
 Presets:
 

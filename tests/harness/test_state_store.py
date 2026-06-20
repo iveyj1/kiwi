@@ -36,6 +36,8 @@ def test_minimal_and_full_presets():
     assert "volume_percent" not in full
     assert "duration_seconds" not in full
     assert "max_frames" not in full
+    assert "cw_offset_hz" not in full
+    assert full["mode_passbands"]["cw"] == [650, 1050]
 
 
 def test_apply_preset_uses_state_default_volume_when_missing():
@@ -64,6 +66,7 @@ def test_save_and_load_letter_register_presets(tmp_path):
     loaded = load_presets_file(path)
 
     assert loaded["presets"]["a"]["frequency_khz"] == 7100.0
+    assert loaded["presets"]["a"]["mode_passbands"]["cw"] == [650, 1050]
     assert loaded["presets"]["1"]["frequency_khz"] == 7100.0
 
 

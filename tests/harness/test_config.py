@@ -20,6 +20,11 @@ def test_default_config_has_keymaps_and_steps():
     assert config.receivers.restricted is True
     assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
     assert config.presets.file == "presets.toml"
+    assert config.tuning.cw_offset_hz == -800
+    assert config.tuning.mode_passbands["am"] == (-5000, 5000)
+    assert config.tuning.mode_passbands["usb"] == (0, 3000)
+    assert config.tuning.mode_passbands["lsb"] == (-3000, 0)
+    assert config.tuning.mode_passbands["cw"] == (650, 1050)
     assert config.startup.mode == "last"
     assert config.startup.preset == 1
     assert config.startup.playback is False
@@ -58,6 +63,13 @@ allowed = ["example.com:8073"]
 [presets]
 file = "my-presets.toml"
 
+[tuning]
+cw_offset_hz = -700
+
+[tuning.mode_passbands.usb]
+low_cut_hz = 100
+high_cut_hz = 2400
+
 [startup]
 mode = "preset"
 preset = 7
@@ -90,6 +102,9 @@ mode = "usb"
     assert config.receivers.restricted is False
     assert config.receivers.allowed == ("example.com:8073",)
     assert config.presets.file == "my-presets.toml"
+    assert config.tuning.cw_offset_hz == -700
+    assert config.tuning.mode_passbands["usb"] == (100, 2400)
+    assert config.tuning.mode_passbands["am"] == (-5000, 5000)
     assert resolve_presets_path(config) == tmp_path / "my-presets.toml"
     assert resolve_state_path(config) == tmp_path / "state.json"
     assert config.startup.mode == "preset"

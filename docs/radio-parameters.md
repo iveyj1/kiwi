@@ -13,10 +13,13 @@ Concise list of radio/client parameters currently settable or persisted by this 
 
 ## Tuning and demodulation
 
-- `frequency_khz` — tuned frequency in kHz.
+- `frequency_khz` — user-facing tuned frequency in kHz. In CW this is the desired passband-center frequency.
+- `radio_frequency_khz` — actual frequency sent to the KiwiSDR. It equals `frequency_khz` except in CW, where the configured signed `cw_offset_hz` is added.
 - `mode` — demodulation mode, e.g. `am`, `usb`, `lsb`, `cw`, `iq` as supported by KiwiSDR.
-- `low_cut_hz` — low passband edge in Hz.
-- `high_cut_hz` — high passband edge in Hz.
+- `low_cut_hz` — active mode low passband edge in Hz.
+- `high_cut_hz` — active mode high passband edge in Hz.
+- `mode_passbands` — per-mode low/high passbands carried separately while switching modes.
+- `cw_offset_hz` — signed CW heterodyne offset. With `frequency_khz = 335.000` and `cw_offset_hz = -800`, `radio_frequency_khz = 334.200`.
 
 Kiwi command shape:
 
@@ -77,7 +80,7 @@ Minimal preset currently stores:
 - `low_cut_hz`
 - `high_cut_hz`
 
-Full preset stores receiver/tuning/filter/AGC fields. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `user`, `volume_percent`, and `connected`.
+Full preset stores receiver/tuning/filter/AGC fields, including per-mode passbands. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `cw_offset_hz`, `user`, `volume_percent`, and `connected`.
 
 Persistence layout:
 

@@ -44,6 +44,7 @@ class LiveSndPlaybackConfig:
     port: int = 8073
     user: str = "kiwi-client"
     frequency_khz: float = 5000.0
+    radio_frequency_khz: float | None = None
     mode: str = "am"
     low_cut_hz: int = -5000
     high_cut_hz: int = 5000
@@ -81,10 +82,14 @@ class LiveSndPlaybackConfig:
         timestamp = self.timestamp if self.timestamp is not None else int(time.time())
         return f"ws://{self.host}:{self.port}/{timestamp}/SND"
 
+    @property
+    def effective_radio_frequency_khz(self) -> float:
+        return self.frequency_khz if self.radio_frequency_khz is None else self.radio_frequency_khz
+
     def setup_commands(self) -> list[str]:
         return encode_basic_snd_setup(
             user=self.user,
-            frequency_khz=self.frequency_khz,
+            frequency_khz=self.effective_radio_frequency_khz,
             modulation=self.mode,
             low_cut=self.low_cut_hz,
             high_cut=self.high_cut_hz,
@@ -96,6 +101,7 @@ class LiveSndPlaybackConfig:
             "receiver": self.receiver,
             "websocket_uri": self.websocket_uri(),
             "frequency_khz": self.frequency_khz,
+            "radio_frequency_khz": self.effective_radio_frequency_khz,
             "mode": self.mode,
             "low_cut_hz": self.low_cut_hz,
             "high_cut_hz": self.high_cut_hz,

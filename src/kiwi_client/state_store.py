@@ -20,6 +20,7 @@ FULL_PRESET_EXCLUDED_FIELDS = frozenset(
         "volume_percent",
         "duration_seconds",
         "max_frames",
+        "cw_offset_hz",
         "connected",
     }
 )
@@ -30,6 +31,7 @@ LAST_STATE_FIELDS = (
     "mode",
     "low_cut_hz",
     "high_cut_hz",
+    "mode_passbands",
     "user",
     "volume_percent",
     "agc_on",
@@ -138,16 +140,24 @@ def _toml_value(value: Any) -> str:
         return repr(value)
     if isinstance(value, (tuple, list)):
         return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{_toml_key(str(key))} = {_toml_value(item)}" for key, item in sorted(value.items())) + " }"
     return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
 def _json_value(value: Any) -> Any:
     if isinstance(value, tuple):
-        return list(value)
+        return [_json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_value(item) for item in value]
     return value
 
 
 def _state_value(key: str, value: Any) -> Any:
     if key == "allowed_receivers":
         return tuple(value)
+    if key == "mode_passbands":
+        return {str(mode): (int(cuts[0]), int(cuts[1])) for mode, cuts in dict(value).items()}
     return value

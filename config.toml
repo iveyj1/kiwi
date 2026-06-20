@@ -29,6 +29,26 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073"]
 # Durable radio and receiver-register presets live here.
 file = "presets.toml"
 
+[tuning]
+# CW user frequency is passband center; radio frequency adds this signed offset.
+cw_offset_hz = -800
+
+[tuning.mode_passbands.am]
+low_cut_hz = -5000
+high_cut_hz = 5000
+
+[tuning.mode_passbands.usb]
+low_cut_hz = 0
+high_cut_hz = 3000
+
+[tuning.mode_passbands.lsb]
+low_cut_hz = -3000
+high_cut_hz = 0
+
+[tuning.mode_passbands.cw]
+low_cut_hz = 650
+high_cut_hz = 1050
+
 [startup]
 # mode can be "last", "default", or "preset".
 mode = "last"

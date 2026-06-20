@@ -34,6 +34,25 @@ allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 [presets]
 file = "presets.toml"
 
+[tuning]
+cw_offset_hz = -800
+
+[tuning.mode_passbands.am]
+low_cut_hz = -5000
+high_cut_hz = 5000
+
+[tuning.mode_passbands.usb]
+low_cut_hz = 0
+high_cut_hz = 3000
+
+[tuning.mode_passbands.lsb]
+low_cut_hz = -3000
+high_cut_hz = 0
+
+[tuning.mode_passbands.cw]
+low_cut_hz = 650
+high_cut_hz = 1050
+
 [startup]
 state_file = "~/.local/state/kiwi-client/state.json"
 mode = "last"
@@ -52,8 +71,8 @@ high_cut_hz = 5000
 # Direct key actions remain configurable. Built-in prefix keymaps are:
 # p <register> = recall preset; s <register> = store minimal preset;
 # S <register> = store full preset; r <receiver-register> = switch receiver.
-# Registers are 0..9 and a..z. Receiver registers first use stored add-receiver entries,
-# then map to [receivers].allowed order.
+# Registers are 0..9 and a..z. Receiver registers use stored add-receiver entries
+# when any exist; otherwise they map to [receivers].allowed order.
 "right" = "tune-step +medium"
 "l" = "tune-step +medium"
 "left" = "tune-step -medium"
@@ -125,6 +144,21 @@ class PresetsConfig:
 
 
 @dataclass(frozen=True)
+class TuningConfig:
+    """Tuning and per-mode passband settings."""
+
+    cw_offset_hz: int = -800
+    mode_passbands: dict[str, tuple[int, int]] = field(
+        default_factory=lambda: {
+            "am": (-5000, 5000),
+            "usb": (0, 3000),
+            "lsb": (-3000, 0),
+            "cw": (650, 1050),
+        }
+    )
+
+
+@dataclass(frozen=True)
 class StartupConfig:
     """TUI startup/restore settings."""
 
@@ -145,6 +179,7 @@ class KiwiClientConfig:
     live: LiveConfig = field(default_factory=LiveConfig)
     receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
     presets: PresetsConfig = field(default_factory=PresetsConfig)
+    tuning: TuningConfig = field(default_factory=TuningConfig)
     startup: StartupConfig = field(default_factory=StartupConfig)
     default_state: dict[str, Any] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
@@ -206,6 +241,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     live = config.live
     receivers = config.receivers
     presets = config.presets
+    tuning = config.tuning
     startup = config.startup
     default_state = dict(config.default_state)
     keys = dict(config.keys)
@@ -248,6 +284,23 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     if isinstance(data.get("presets"), dict):
         presets_data = data["presets"]
         presets = replace(presets, file=str(presets_data.get("file", presets.file)))
+    if isinstance(data.get("tuning"), dict):
+        tuning_data = data["tuning"]
+        mode_passbands = dict(tuning.mode_passbands)
+        raw_passbands = tuning_data.get("mode_passbands", {})
+        if isinstance(raw_passbands, dict):
+            for mode, passband_data in raw_passbands.items():
+                if isinstance(passband_data, dict):
+                    current_low, current_high = mode_passbands.get(str(mode).lower(), (-5000, 5000))
+                    mode_passbands[str(mode).lower()] = (
+                        int(passband_data.get("low_cut_hz", current_low)),
+                        int(passband_data.get("high_cut_hz", current_high)),
+                    )
+        tuning = replace(
+            tuning,
+            cw_offset_hz=int(tuning_data.get("cw_offset_hz", tuning.cw_offset_hz)),
+            mode_passbands=mode_passbands,
+        )
     if isinstance(data.get("startup"), dict):
         startup_data = data["startup"]
         startup = replace(
@@ -270,6 +323,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         live=live,
         receivers=receivers,
         presets=presets,
+        tuning=tuning,
         startup=startup,
         default_state=default_state,
         keys=keys,

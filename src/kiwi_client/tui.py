@@ -20,6 +20,8 @@ from kiwi_client.client_app import (
     ClientController,
     ClientState,
     available_commands,
+    passband_for_mode,
+    switch_mode,
     normalize_receiver_address,
     command_aliases,
 )
@@ -653,8 +655,18 @@ def runtime_state_from_config(config: KiwiClientConfig, state: ClientState) -> C
 def state_from_config(config: KiwiClientConfig, state: ClientState | None = None) -> ClientState:
     """Return client state with default radio state plus runtime config."""
     state = state or ClientState()
+    state = replace(state, mode_passbands=dict(config.tuning.mode_passbands), cw_offset_hz=config.tuning.cw_offset_hz)
     if config.default_state:
         state = apply_preset(state, config.default_state)
+    if "low_cut_hz" not in config.default_state and "high_cut_hz" not in config.default_state:
+        state = switch_mode(state, state.mode)
+    else:
+        low, high = passband_for_mode(state, state.mode)
+        if (state.low_cut_hz, state.high_cut_hz) != (low, high):
+            state = replace(
+                state,
+                mode_passbands={**state.mode_passbands, state.mode.lower(): (state.low_cut_hz, state.high_cut_hz)},
+            )
     return runtime_state_from_config(config, state)
 
 

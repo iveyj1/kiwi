@@ -13,7 +13,7 @@ import asyncio
 import json
 import queue
 import shlex
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from urllib.parse import urlsplit
 from pathlib import Path
 from threading import Event
@@ -29,8 +29,15 @@ from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
 
-DEFAULT_LOW_CUT_HZ = -5000
-DEFAULT_HIGH_CUT_HZ = 5000
+DEFAULT_MODE_PASSBANDS: dict[str, tuple[int, int]] = {
+    "am": (-5000, 5000),
+    "usb": (0, 3000),
+    "lsb": (-3000, 0),
+    "cw": (650, 1050),
+}
+DEFAULT_LOW_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][0]
+DEFAULT_HIGH_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][1]
+DEFAULT_CW_OFFSET_HZ = -800
 
 
 @dataclass(frozen=True)
@@ -59,6 +66,8 @@ class ClientState:
     mode: str = "am"
     low_cut_hz: int = DEFAULT_LOW_CUT_HZ
     high_cut_hz: int = DEFAULT_HIGH_CUT_HZ
+    mode_passbands: dict[str, tuple[int, int]] = field(default_factory=lambda: dict(DEFAULT_MODE_PASSBANDS))
+    cw_offset_hz: int = DEFAULT_CW_OFFSET_HZ
     user: str = "kiwi-client"
     duration_seconds: float = 60.0
     max_frames: int = 1500
@@ -80,14 +89,50 @@ class ClientState:
     def receiver(self) -> str:
         return f"{self.host}:{self.port}"
 
+    @property
+    def radio_frequency_khz(self) -> float:
+        if self.mode.lower() == "cw":
+            return self.frequency_khz + self.cw_offset_hz / 1000.0
+        return self.frequency_khz
+
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["receiver"] = self.receiver
+        data["radio_frequency_khz"] = self.radio_frequency_khz
         return data
 
 
 class ClientCommandError(ValueError):
     """Raised for invalid client shell commands."""
+
+
+def normalized_mode(mode: str) -> str:
+    return mode.lower()
+
+
+def passband_for_mode(state: ClientState, mode: str) -> tuple[int, int]:
+    mode = normalized_mode(mode)
+    if mode in state.mode_passbands:
+        low, high = state.mode_passbands[mode]
+        return int(low), int(high)
+    return DEFAULT_MODE_PASSBANDS.get(mode, (state.low_cut_hz, state.high_cut_hz))
+
+
+def set_mode_passband(state: ClientState, mode: str, low_cut_hz: int, high_cut_hz: int) -> ClientState:
+    mode = normalized_mode(mode)
+    passbands = dict(state.mode_passbands)
+    passbands[mode] = (int(low_cut_hz), int(high_cut_hz))
+    active_low, active_high = (int(low_cut_hz), int(high_cut_hz)) if normalized_mode(state.mode) == mode else (state.low_cut_hz, state.high_cut_hz)
+    return replace(state, mode_passbands=passbands, low_cut_hz=active_low, high_cut_hz=active_high)
+
+
+def switch_mode(state: ClientState, mode: str, passband: tuple[int, int] | None = None) -> ClientState:
+    mode = normalized_mode(mode)
+    passbands = dict(state.mode_passbands)
+    if passband is not None:
+        passbands[mode] = (int(passband[0]), int(passband[1]))
+    low, high = passbands.get(mode, DEFAULT_MODE_PASSBANDS.get(mode, (state.low_cut_hz, state.high_cut_hz)))
+    return replace(state, mode=mode, low_cut_hz=int(low), high_cut_hz=int(high), mode_passbands=passbands)
 
 
 class ClientOperations(Protocol):
@@ -245,12 +290,7 @@ class ClientController:
         active_commands: list[str] = []
         if touched_modulation:
             active_commands.append(
-                encode_modulation(
-                    self.state.mode,
-                    self.state.low_cut_hz,
-                    self.state.high_cut_hz,
-                    self.state.frequency_khz,
-                )
+                self._modulation_command()
             )
         if touched_agc:
             active_commands.append(self._agc_command())
@@ -305,13 +345,13 @@ class ClientController:
                 raise ClientCommandError("usage: mode <mode> [low_cut_hz high_cut_hz]")
             mode = args[0].lower()
             if len(args) == 3:
-                self.state = replace(self.state, mode=mode, low_cut_hz=int(args[1]), high_cut_hz=int(args[2]))
+                self.state = switch_mode(self.state, mode, (int(args[1]), int(args[2])))
             else:
-                self.state = replace(self.state, mode=mode)
+                self.state = switch_mode(self.state, mode)
             return self._state_response()
         if command == "filter":
             self._require_arg_count(args, 2, "filter <low_cut_hz> <high_cut_hz>")
-            self.state = replace(self.state, low_cut_hz=int(args[0]), high_cut_hz=int(args[1]))
+            self.state = set_mode_passband(self.state, self.state.mode, int(args[0]), int(args[1]))
             return self._state_response()
         if command == "tune-step":
             self._require_arg_count(args, 1, "tune-step <+/-hz|small|medium|large>")
@@ -556,13 +596,16 @@ class ClientController:
                 self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
-    def _state_response(self) -> dict[str, Any]:
-        command = encode_modulation(
+    def _modulation_command(self) -> str:
+        return encode_modulation(
             self.state.mode,
             self.state.low_cut_hz,
             self.state.high_cut_hz,
-            self.state.frequency_khz,
+            self.state.radio_frequency_khz,
         )
+
+    def _state_response(self) -> dict[str, Any]:
+        command = self._modulation_command()
         return self._state_response_with_active_command(command)
 
     def _state_response_with_active_command(self, command: str) -> dict[str, Any]:
@@ -764,6 +807,7 @@ class ClientController:
             port=self.state.port,
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
+            radio_frequency_khz=self.state.radio_frequency_khz,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -783,6 +827,7 @@ class ClientController:
             output=output,
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
+            radio_frequency_khz=self.state.radio_frequency_khz,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -800,6 +845,7 @@ class ClientController:
             output=output,
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
+            radio_frequency_khz=self.state.radio_frequency_khz,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,

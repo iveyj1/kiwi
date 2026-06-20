@@ -108,6 +108,46 @@ def test_client_controller_status_and_state_changes():
     assert state["high_cut_hz"] == 2700
 
 
+def test_client_mode_switch_restores_per_mode_passbands():
+    controller = ClientController()
+
+    usb = controller.execute("mode usb")
+    controller.execute("filter 100 2400")
+    am = controller.execute("mode am")
+    usb_again = controller.execute("mode usb")
+    lsb = controller.execute("mode lsb")
+
+    assert usb["state"]["low_cut_hz"] == 0
+    assert usb["state"]["high_cut_hz"] == 3000
+    assert am["state"]["low_cut_hz"] == -5000
+    assert am["state"]["high_cut_hz"] == 5000
+    assert usb_again["state"]["low_cut_hz"] == 100
+    assert usb_again["state"]["high_cut_hz"] == 2400
+    assert lsb["state"]["low_cut_hz"] == -3000
+    assert lsb["state"]["high_cut_hz"] == 0
+
+
+def test_client_cw_tunes_radio_frequency_by_configured_offset():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+    controller.execute("play-bg --allow-live --null-sink")
+
+    mode = controller.execute("mode cw")
+    tuned = controller.execute("tune 335")
+    stepped = controller.execute("tune-step +1000")
+    plan = controller.execute("play-plan")["plan"]
+
+    assert mode["active_command"] == "SET mod=cw low_cut=650 high_cut=1050 freq=4999.200"
+    assert tuned["state"]["frequency_khz"] == 335.0
+    assert tuned["active_command"] == "SET mod=cw low_cut=650 high_cut=1050 freq=334.200"
+    assert stepped["state"]["frequency_khz"] == 336.0
+    assert stepped["active_command"] == "SET mod=cw low_cut=650 high_cut=1050 freq=335.200"
+    assert plan["frequency_khz"] == 336.0
+    assert plan["radio_frequency_khz"] == 335.2
+    assert "SET mod=cw low_cut=650 high_cut=1050 freq=335.200" in plan["dynamic_commands"]
+    controller.execute("stop")
+
+
 def test_client_executes_semicolon_command_batch():
     controller = ClientController()
 
