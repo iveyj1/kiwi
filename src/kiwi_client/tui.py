@@ -23,8 +23,15 @@ from kiwi_client.client_app import (
     normalize_receiver_address,
     command_aliases,
 )
-from kiwi_client.config import KiwiClientConfig, add_allowed_receiver_to_config, load_config
-from kiwi_client.state_store import apply_preset, load_state_file, save_state_file
+from kiwi_client.config import (
+    KiwiClientConfig,
+    add_allowed_receiver_to_config,
+    discover_config_path,
+    load_config,
+    resolve_presets_path,
+    resolve_state_path,
+)
+from kiwi_client.state_store import apply_preset, load_presets_file, load_state_file, save_presets_file, save_state_file
 
 
 class InputMode(Enum):
@@ -676,8 +683,9 @@ def receiver_addresses_from_response(response: dict[str, Any]) -> list[str]:
 
 def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, dict[int, dict[str, Any]]]:
     """Resolve startup state and presets from config/state file."""
-    persisted = load_state_file(config.startup.state_file)
-    presets = {int(key) if str(key).isdigit() else str(key): value for key, value in persisted.get("presets", {}).items()}
+    persisted = load_state_file(resolve_state_path(config))
+    preset_data = load_presets_file(resolve_presets_path(config))
+    presets = {int(key) if str(key).isdigit() else str(key): value for key, value in preset_data.get("presets", {}).items()}
     state = state_from_config(config)
     mode = config.startup.mode.lower()
     if mode == "last" and persisted.get("last_state"):
@@ -690,21 +698,17 @@ def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, di
 
 
 def startup_receiver_presets(config: KiwiClientConfig) -> dict[Any, dict[str, str]]:
-    """Resolve stored receiver registers from the state file."""
-    persisted = load_state_file(config.startup.state_file)
-    return {int(key) if str(key).isdigit() else str(key): value for key, value in persisted.get("receiver_presets", {}).items()}
+    """Resolve stored receiver registers from the presets file."""
+    preset_data = load_presets_file(resolve_presets_path(config))
+    return {int(key) if str(key).isdigit() else str(key): value for key, value in preset_data.get("receiver_presets", {}).items()}
 
 
 def persist_tui_state(controller: ClientController, config: KiwiClientConfig | None) -> None:
     """Persist last state and presets for future TUI startup."""
     if config is None:
         return
-    save_state_file(
-        config.startup.state_file,
-        last_state=controller.state,
-        presets=controller.presets,
-        receiver_presets=controller.receiver_presets,
-    )
+    save_state_file(resolve_state_path(config), last_state=controller.state)
+    save_presets_file(resolve_presets_path(config), presets=controller.presets, receiver_presets=controller.receiver_presets)
 
 
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
@@ -749,7 +753,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for the curses TUI."""
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    config = load_config(args.config)
+    config = load_config(discover_config_path(args.config))
     startup_state, presets = startup_state_and_presets(config)
     receiver_presets = startup_receiver_presets(config)
     run_tui(

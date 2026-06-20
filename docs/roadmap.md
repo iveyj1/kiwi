@@ -203,7 +203,7 @@ Current capabilities:
 - TUI displays context-sensitive which-key style hints for normal keymaps and command-mode commands/arguments. Normal-mode presets use `p/s/S <register>` with `0..9,a..z`, and `r <receiver-register>` switches stored or configured receivers while preserving radio parameters. Stored receiver registers can be added with `add-receiver` / `ad`. Receiver/playback switch policy is delegated to controller-owned radio session methods.
 - TUI can start background playback automatically at startup via `[startup] playback = true` when live use is allowed.
 - Live playback can drop an initial `[audio] startup_mute_ms` window to reduce startup/switch transients; fuller bumpless transfer remains future playback-manager work.
-- Presets and last-state persistence support restoring startup state from last run, default config, or a configured preset.
+- Presets and last-state persistence support restoring startup state from last run, default config, or a configured preset; durable presets live in `presets.toml` while `state.json` stores ephemeral `last_state` only.
 - Interactive AGC controls are available and can be queued to active background playback.
 - TUI config can set live duration/max-frame limits, with `0` meaning unlimited, and can configure or disable receiver restrictions.
 - `tune`, `mode`, and `filter` changes during active background playback queue `SET mod=...` commands to the live playback WebSocket after initial setup.

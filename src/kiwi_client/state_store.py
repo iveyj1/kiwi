@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -31,34 +32,71 @@ def apply_preset(state: Any, preset: dict[str, Any]) -> Any:
 
 
 def load_state_file(path: str | Path) -> dict[str, Any]:
+    """Load ephemeral TUI state. Durable presets live in presets TOML."""
     path = Path(path).expanduser()
     if not path.exists():
-        return {"last_state": None, "presets": {}, "receiver_presets": {}}
+        return {"last_state": None}
     data = json.loads(path.read_text(encoding="utf-8"))
+    return {"last_state": data.get("last_state")}
+
+
+def save_state_file(path: str | Path, *, last_state: Any) -> None:
+    """Save ephemeral TUI state only."""
+    path = Path(path).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {"last_state": full_preset(last_state)}
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def load_presets_file(path: str | Path) -> dict[str, Any]:
+    """Load durable radio and receiver presets from TOML."""
+    path = Path(path).expanduser()
+    if not path.exists():
+        return {"presets": {}, "receiver_presets": {}}
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
     return {
-        "last_state": data.get("last_state"),
-        "presets": {str(key): value for key, value in data.get("presets", {}).items()},
+        "presets": {str(key): value for key, value in data.get("radio_presets", {}).items()},
         "receiver_presets": {str(key): value for key, value in data.get("receiver_presets", {}).items()},
     }
 
 
-def save_state_file(
+def save_presets_file(
     path: str | Path,
     *,
-    last_state: Any,
     presets: dict[Any, dict[str, Any]],
     receiver_presets: dict[Any, dict[str, str]] | None = None,
 ) -> None:
+    """Save durable radio and receiver presets to TOML."""
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {
-        "last_state": full_preset(last_state),
-        "presets": {str(key): value for key, value in sorted(presets.items(), key=lambda item: str(item[0]))},
-        "receiver_presets": {
-            str(key): value for key, value in sorted((receiver_presets or {}).items(), key=lambda item: str(item[0]))
-        },
-    }
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    lines: list[str] = []
+    for key, preset in sorted(presets.items(), key=lambda item: str(item[0])):
+        lines.append(f"[radio_presets.{_toml_key(str(key))}]")
+        for field, value in sorted(preset.items()):
+            lines.append(f"{field} = {_toml_value(value)}")
+        lines.append("")
+    for key, preset in sorted((receiver_presets or {}).items(), key=lambda item: str(item[0])):
+        lines.append(f"[receiver_presets.{_toml_key(str(key))}]")
+        for field, value in sorted(preset.items()):
+            lines.append(f"{field} = {_toml_value(value)}")
+        lines.append("")
+    path.write_text("\n".join(lines).rstrip() + ("\n" if lines else ""), encoding="utf-8")
+
+
+def _toml_key(key: str) -> str:
+    if key.replace("_", "").replace("-", "").isalnum() and not key[0].isdigit():
+        return key
+    return '"' + key.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, (tuple, list)):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
 def _json_value(value: Any) -> Any:

@@ -77,4 +77,10 @@ Minimal preset currently stores:
 - `low_cut_hz`
 - `high_cut_hz`
 
-Full preset currently stores all `ClientState` fields, including runtime/client settings. Planned cleanup: keep presets in a dedicated TOML file and keep ephemeral last-state in `state.json`.
+Full preset currently stores all `ClientState` fields, including runtime/client settings.
+
+Persistence layout:
+
+- `config.toml` holds durable configuration, including `[receivers].allowed` and `[presets].file`.
+- `presets.toml` holds durable `[radio_presets.<register>]` and `[receiver_presets.<register>]` tables.
+- `state.json` holds ephemeral `last_state` only.

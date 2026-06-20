@@ -1,0 +1,4 @@
+# Kiwi client durable presets.
+#
+# Radio presets are written as [radio_presets.<register>].
+# Receiver registers are written as [receiver_presets.<register>].

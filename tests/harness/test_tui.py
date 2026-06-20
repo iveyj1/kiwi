@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import curses
+import json
 import time
 
 from kiwi_client.client_app import ClientController, ClientState
@@ -758,6 +759,8 @@ state_file = "{state_path}"
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), config, restarted)
 
     assert "a — 10.0.0.42:8073 Backup receiver" in text
+    assert "receiver_presets" not in state_path.read_text(encoding="utf-8")
+    assert "[receiver_presets.a]" in (tmp_path / "presets.toml").read_text(encoding="utf-8")
 
 
 def test_tui_startup_state_and_safe_quit_persist_state(tmp_path):
@@ -786,6 +789,9 @@ frequency_khz = 6000.0
     assert response["type"] == "quit"
     assert restored_state.frequency_khz == 7100.0
     assert restored_presets[3]["frequency_khz"] == 7100.0
+    state_json = json.loads(state_path.read_text(encoding="utf-8"))
+    assert set(state_json) == {"last_state"}
+    assert "[radio_presets.\"3\"]" in (tmp_path / "presets.toml").read_text(encoding="utf-8")
 
 
 def test_run_tui_does_not_overwrite_restored_last_state(tmp_path, monkeypatch):

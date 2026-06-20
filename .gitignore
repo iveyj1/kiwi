@@ -2,5 +2,6 @@ __pycache__/
 kiwiclient/
 recordings/
 artifacts/
+state.json
 
 kiwisdr_pi_project_scaffold.zip

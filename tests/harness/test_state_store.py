@@ -1,5 +1,13 @@
 from kiwi_client.client_app import ClientState
-from kiwi_client.state_store import apply_preset, full_preset, load_state_file, minimal_preset, save_state_file
+from kiwi_client.state_store import (
+    apply_preset,
+    full_preset,
+    load_presets_file,
+    load_state_file,
+    minimal_preset,
+    save_presets_file,
+    save_state_file,
+)
 
 
 def test_minimal_and_full_presets():
@@ -31,39 +39,39 @@ def test_apply_preset_preserves_unspecified_fields():
 
 
 def test_save_and_load_letter_register_presets(tmp_path):
-    path = tmp_path / "state.json"
+    path = tmp_path / "presets.toml"
     state = ClientState(frequency_khz=7100.0)
 
-    save_state_file(path, last_state=state, presets={"a": full_preset(state), 1: minimal_preset(state)})
-    loaded = load_state_file(path)
+    save_presets_file(path, presets={"a": full_preset(state), 1: minimal_preset(state)}, receiver_presets={})
+    loaded = load_presets_file(path)
 
     assert loaded["presets"]["a"]["frequency_khz"] == 7100.0
     assert loaded["presets"]["1"]["frequency_khz"] == 7100.0
 
 
-def test_save_and_load_receiver_presets(tmp_path):
-    path = tmp_path / "state.json"
-    state = ClientState(frequency_khz=7100.0)
+def test_save_and_load_presets_file(tmp_path):
+    path = tmp_path / "presets.toml"
+    state = ClientState(frequency_khz=7100.0, mode="usb", agc_gain=25)
 
-    save_state_file(
+    save_presets_file(
         path,
-        last_state=state,
-        presets={},
-        receiver_presets={"a": {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}},
+        presets={"a": full_preset(state), 1: minimal_preset(state)},
+        receiver_presets={"2": {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}},
     )
-    loaded = load_state_file(path)
+    loaded = load_presets_file(path)
 
-    assert loaded["receiver_presets"]["a"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+    assert loaded["presets"]["a"]["frequency_khz"] == 7100.0
+    assert loaded["presets"]["1"]["mode"] == "usb"
+    assert loaded["receiver_presets"]["2"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
 
 
-def test_save_and_load_state_file(tmp_path):
+def test_save_and_load_state_file_only_persists_last_state(tmp_path):
     path = tmp_path / "state.json"
     state = ClientState(frequency_khz=7000.0, agc_gain=25)
-    presets = {1: minimal_preset(state), 2: full_preset(state)}
 
-    save_state_file(path, last_state=state, presets=presets)
+    save_state_file(path, last_state=state)
     loaded = load_state_file(path)
 
     assert loaded["last_state"]["frequency_khz"] == 7000.0
-    assert loaded["presets"]["1"]["frequency_khz"] == 7000.0
-    assert loaded["presets"]["2"]["agc_gain"] == 25
+    assert "presets" not in path.read_text(encoding="utf-8")
+    assert loaded == {"last_state": loaded["last_state"]}

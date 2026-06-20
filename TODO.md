@@ -2,21 +2,22 @@
 
 ## Current slice
 
-Goal: Fix stored receiver-register handling and persist added receivers to config allowlist.
+Goal: Split durable config/presets from ephemeral TUI state.
 
 Done criteria:
 
-- Make numeric stored receiver registers such as `2` work with `r2`.
-- Merge and sort receiver-register hints by register across stored and configured receivers.
-- Append newly added receiver addresses to `[receivers].allowed` in the active config file when missing.
-- Avoid duplicating existing receiver addresses in config.
-- Update TUI/config harness tests and dev-log.
+- Discover config path from explicit `--config`, `./config.toml`, `~/.config/kiwi-client/config.toml`, or built-in defaults.
+- Add `[presets].file` config, resolving relative paths against the config directory.
+- Store radio presets and receiver register presets in a TOML presets file.
+- Keep `state.json` limited to ephemeral `last_state` only.
+- Keep `[receivers].allowed` in config and avoid duplicating receivers.
+- Update root `config.toml`, docs, and harness tests.
 
-Test command: `python3 -m pytest tests/harness/test_tui.py && python3 -m pytest`
+Test command: `python3 -m pytest tests/harness/test_config.py tests/harness/test_state_store.py tests/harness/test_tui.py && python3 -m pytest`
 
-Live-radio needed: no; TUI rendering only.
+Live-radio needed: no; persistence/config only.
 
-Docs to update: `docs/dev-log.md`.
+Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/dev-log.md`, `docs/roadmap.md`.
 
 ## Next
 

@@ -197,6 +197,8 @@ Fixed stored numeric receiver registers. `add-receiver 2 ...` stores an integer 
 
 Added `docs/radio-parameters.md`, a concise inventory of currently settable receiver/session, tuning, AGC, local audio, waterfall, and preset-scope parameters.
 
+Split durable and ephemeral TUI persistence. Config discovery now uses explicit `--config`, then `./config.toml`, then `~/.config/kiwi-client/config.toml`, falling back to built-in defaults. `[receivers].allowed` remains in config. Durable radio presets and receiver-register presets now live in `[presets].file` (`presets.toml` by default, resolved relative to the config file). `state.json` now stores only ephemeral `last_state`.
+
 ## YYYY-MM-DD
 
 ### Finding

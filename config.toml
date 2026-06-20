@@ -25,6 +25,10 @@ max_frames = 0
 restricted = false
 allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
 
+[presets]
+# Durable radio and receiver-register presets live here.
+file = "presets.toml"
+
 [startup]
 # mode can be "last", "default", or "preset".
 mode = "last"

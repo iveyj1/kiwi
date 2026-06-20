@@ -31,6 +31,9 @@ max_frames = 1500
 restricted = true
 allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
 
+[presets]
+file = "presets.toml"
+
 [startup]
 state_file = "~/.local/state/kiwi-client/state.json"
 mode = "last"
@@ -115,6 +118,13 @@ class ReceiverConfig:
 
 
 @dataclass(frozen=True)
+class PresetsConfig:
+    """Preset file settings."""
+
+    file: str = "presets.toml"
+
+
+@dataclass(frozen=True)
 class StartupConfig:
     """TUI startup/restore settings."""
 
@@ -134,6 +144,7 @@ class KiwiClientConfig:
     audio: AudioConfig = field(default_factory=AudioConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
     receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
+    presets: PresetsConfig = field(default_factory=PresetsConfig)
     startup: StartupConfig = field(default_factory=StartupConfig)
     default_state: dict[str, Any] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
@@ -142,6 +153,19 @@ class KiwiClientConfig:
 def default_config() -> KiwiClientConfig:
     """Return the built-in default configuration."""
     return _config_from_dict(tomllib.loads(DEFAULT_CONFIG_TOML))
+
+
+def discover_config_path(explicit: str | Path | None = None) -> Path | None:
+    """Return the config path selected by explicit path, cwd, user config, or none."""
+    if explicit is not None:
+        return Path(explicit).expanduser()
+    cwd_config = Path.cwd() / "config.toml"
+    if cwd_config.exists():
+        return cwd_config
+    user_config = Path.home() / ".config" / "kiwi-client" / "config.toml"
+    if user_config.exists():
+        return user_config
+    return None
 
 
 def load_config(path: str | Path | None = None) -> KiwiClientConfig:
@@ -153,12 +177,35 @@ def load_config(path: str | Path | None = None) -> KiwiClientConfig:
     return replace(_merge_config(config, data), source_path=str(Path(path)))
 
 
+def resolve_config_relative_path(config: KiwiClientConfig, value: str) -> Path:
+    """Resolve a config path value, relative to config dir when applicable."""
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    if config.source_path is not None:
+        return Path(config.source_path).expanduser().resolve().parent / path
+    return path
+
+
+def resolve_presets_path(config: KiwiClientConfig) -> Path:
+    """Return the configured presets TOML path."""
+    if config.source_path is None and config.presets.file == "presets.toml":
+        return Path.home() / ".config" / "kiwi-client" / "presets.toml"
+    return resolve_config_relative_path(config, config.presets.file)
+
+
+def resolve_state_path(config: KiwiClientConfig) -> Path:
+    """Return the configured ephemeral state JSON path."""
+    return resolve_config_relative_path(config, config.startup.state_file)
+
+
 def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientConfig:
     steps = config.steps
     volume = config.volume
     audio = config.audio
     live = config.live
     receivers = config.receivers
+    presets = config.presets
     startup = config.startup
     default_state = dict(config.default_state)
     keys = dict(config.keys)
@@ -198,6 +245,9 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
             restricted=bool(receiver_data.get("restricted", receivers.restricted)),
             allowed=tuple(str(receiver) for receiver in allowed),
         )
+    if isinstance(data.get("presets"), dict):
+        presets_data = data["presets"]
+        presets = replace(presets, file=str(presets_data.get("file", presets.file)))
     if isinstance(data.get("startup"), dict):
         startup_data = data["startup"]
         startup = replace(
@@ -219,6 +269,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         audio=audio,
         live=live,
         receivers=receivers,
+        presets=presets,
         startup=startup,
         default_state=default_state,
         keys=keys,
