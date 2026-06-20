@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from kiwi_client.config import default_config, load_config
+from kiwi_client.config import add_allowed_receiver_to_config, default_config, load_config
 from kiwi_client.tui import build_arg_parser
 
 
@@ -94,6 +94,27 @@ mode = "usb"
     assert config.keys["right"] == "tune-step +medium"
     assert config.keys["l"] == "tune-step +large"
     assert config.keys["x"] == "stop"
+
+
+def test_add_allowed_receiver_to_config_appends_missing_receiver(tmp_path: Path):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        """
+[receivers]
+restricted = true
+allowed = ["10.0.0.40:8073"]
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+
+    changed = add_allowed_receiver_to_config(path, "10.0.0.42:8073")
+    unchanged = add_allowed_receiver_to_config(path, "10.0.0.42:8073")
+    config = load_config(path)
+
+    assert changed is True
+    assert unchanged is False
+    assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.42:8073")
+    assert path.read_text(encoding="utf-8").count("10.0.0.42:8073") == 1
 
 
 def test_project_root_example_config_parses():

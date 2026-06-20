@@ -128,6 +128,7 @@ class StartupConfig:
 class KiwiClientConfig:
     """Loaded client configuration."""
 
+    source_path: str | None = None
     steps: StepConfig = field(default_factory=StepConfig)
     volume: VolumeConfig = field(default_factory=VolumeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
@@ -149,7 +150,7 @@ def load_config(path: str | Path | None = None) -> KiwiClientConfig:
     if path is None:
         return config
     data = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    return _merge_config(config, data)
+    return replace(_merge_config(config, data), source_path=str(Path(path)))
 
 
 def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientConfig:
@@ -212,6 +213,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         keys.update({str(key): str(value) for key, value in data["keys"].items()})
 
     return KiwiClientConfig(
+        source_path=config.source_path,
         steps=steps,
         volume=volume,
         audio=audio,
@@ -221,6 +223,56 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         default_state=default_state,
         keys=keys,
     )
+
+
+def add_allowed_receiver_to_config(path: str | Path, receiver: str) -> bool:
+    """Add a receiver to `[receivers].allowed` in a TOML config file if missing.
+
+    Returns true when the file was changed. This small writer intentionally only
+    rewrites the `allowed = [...]` line inside the existing `[receivers]`
+    section, preserving the rest of the local example config.
+    """
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+    data = tomllib.loads(text)
+    receiver_data = data.get("receivers", {}) if isinstance(data.get("receivers"), dict) else {}
+    allowed = [str(item) for item in receiver_data.get("allowed", [])]
+    if receiver in allowed:
+        return False
+    allowed.append(receiver)
+    new_allowed = "allowed = [" + ", ".join(_toml_string(item) for item in allowed) + "]"
+    lines = text.splitlines()
+    in_receivers = False
+    allowed_line_index: int | None = None
+    insert_index: int | None = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if in_receivers:
+                insert_index = index
+                break
+            in_receivers = stripped == "[receivers]"
+            continue
+        if in_receivers and stripped.startswith("allowed") and "=" in stripped:
+            allowed_line_index = index
+            break
+    if allowed_line_index is not None:
+        lines[allowed_line_index] = new_allowed
+    elif insert_index is not None:
+        lines.insert(insert_index, new_allowed)
+    else:
+        if lines and lines[-1].strip():
+            lines.append("")
+        if not in_receivers:
+            lines.extend(["[receivers]", new_allowed])
+        else:
+            lines.append(new_allowed)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def _toml_string(value: str) -> str:
+    return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
 def _config_from_dict(data: dict[str, Any]) -> KiwiClientConfig:

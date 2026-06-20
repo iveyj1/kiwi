@@ -119,6 +119,24 @@ def test_render_tui_hints_show_stored_receiver_register_descriptions(tmp_path):
     assert "a — 10.0.0.42:8073 Backup receiver" in text
 
 
+def test_render_tui_hints_show_receiver_registers_sorted_by_register(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[receivers]
+allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+    controller = ClientController()
+    controller.execute("add-receiver 2 10.0.0.42:8073 Backup receiver")
+
+    text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), controller)
+
+    assert text.index("0 — 10.0.0.41:8073") < text.index("1 — 10.0.0.40:8073")
+    assert text.index("1 — 10.0.0.40:8073") < text.index("2 — 10.0.0.42:8073 Backup receiver")
+
+
 def test_render_tui_hints_show_receiver_register_addresses(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -478,6 +496,60 @@ def test_tui_keymap_stored_receiver_prefix_switches_receiver():
 
     assert message == "Receiver: 10.0.0.42:8073"
     assert response["state"]["receiver"] == "10.0.0.42:8073"
+
+
+def test_tui_keymap_numeric_stored_receiver_register_switches_receiver():
+    controller = ClientController(volume_control=TuiFakeVolumeControl())
+    controller.execute("add-receiver 2 http://10.0.0.42:8073/ Backup receiver")
+    state = TuiInputState()
+
+    handle_tui_key(ord("r"), state, controller, load_config())
+    response, message = handle_tui_key(ord("2"), state, controller, load_config())
+
+    assert message == "Receiver: 10.0.0.42:8073"
+    assert response["state"]["receiver"] == "10.0.0.42:8073"
+
+
+def test_tui_add_receiver_command_persists_to_config_allowlist(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[receivers]
+restricted = false
+allowed = ["10.0.0.40:8073"]
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController(volume_control=TuiFakeVolumeControl())
+    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.42:8073 Backup receiver")
+
+    response, message = handle_tui_key(10, state, controller, config)
+
+    assert response["type"] == "receiver-preset"
+    assert message == "Saved receiver(s) to config: 10.0.0.42:8073"
+    assert load_config(config_path).receivers.allowed == ("10.0.0.40:8073", "10.0.0.42:8073")
+
+
+def test_tui_add_receiver_command_does_not_duplicate_config_allowlist(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[receivers]
+restricted = false
+allowed = ["10.0.0.40:8073", "10.0.0.42:8073"]
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController(volume_control=TuiFakeVolumeControl())
+    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.42:8073 Backup receiver")
+
+    response, message = handle_tui_key(10, state, controller, config)
+
+    assert response["type"] == "receiver-preset"
+    assert message == ""
+    assert config_path.read_text(encoding="utf-8").count("10.0.0.42:8073") == 1
 
 
 def test_tui_keymap_receiver_prefix_switches_receiver_and_preserves_radio_parameters(tmp_path):

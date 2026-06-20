@@ -2,15 +2,15 @@
 
 ## Current slice
 
-Goal: Reorganize TUI command hints into categories and show shortcuts before full command names.
+Goal: Fix stored receiver-register handling and persist added receivers to config allowlist.
 
 Done criteria:
 
-- Group command hints into categories similar to key hints.
-- Render key and command overview hints in two columns to preserve dashboard/status space.
-- Format aliases/shortcuts before canonical command names, e.g. `tu (tune)`.
-- Preserve filtering, unique-command argument hints, aliases, and semicolon segment context.
-- Update TUI harness tests and dev-log.
+- Make numeric stored receiver registers such as `2` work with `r2`.
+- Merge and sort receiver-register hints by register across stored and configured receivers.
+- Append newly added receiver addresses to `[receivers].allowed` in the active config file when missing.
+- Avoid duplicating existing receiver addresses in config.
+- Update TUI/config harness tests and dev-log.
 
 Test command: `python3 -m pytest tests/harness/test_tui.py && python3 -m pytest`
 

@@ -23,7 +23,7 @@ from kiwi_client.client_app import (
     normalize_receiver_address,
     command_aliases,
 )
-from kiwi_client.config import KiwiClientConfig, load_config
+from kiwi_client.config import KiwiClientConfig, add_allowed_receiver_to_config, load_config
 from kiwi_client.state_store import apply_preset, load_state_file, save_state_file
 
 
@@ -133,15 +133,17 @@ def render_pending_keymap_hints(
     }
     lines = ["Key hints", labels.get(pending_key_action, pending_key_action)]
     if pending_key_action == "receiver":
+        receiver_lines: dict[str, str] = {}
+        for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
+            register = REGISTER_KEYS[index]
+            receiver_lines[register] = f"{register} — {receiver}"
         if controller is not None:
             for register, preset in sorted_receiver_registers(controller.receiver_presets):
                 host, port = normalize_receiver_address(preset["receiver"], default_port=8073)
-                lines.append(f"{register} — {host}:{port} {preset['description']}")
-        for index, receiver in enumerate(config.receivers.allowed[: len(REGISTER_KEYS)]):
-            register = REGISTER_KEYS[index]
-            if controller is not None and register in {str(key) for key in controller.receiver_presets}:
-                continue
-            lines.append(f"{register} — {receiver}")
+                receiver_lines[register] = f"{register} — {host}:{port} {preset['description']}"
+        for register in REGISTER_KEYS:
+            if register in receiver_lines:
+                lines.append(receiver_lines[register])
         lines.append("Radio parameters are transferred to new receiver")
     else:
         lines.append("<register> is [0..9] or [a..z]")
@@ -523,6 +525,10 @@ def play_bg_command(null_sink: bool) -> str:
 
 def receiver_for_register(register: str, config: KiwiClientConfig, controller: ClientController | None = None) -> str:
     """Return a stored or configured receiver address for a register key."""
+    parsed_register = int(register) if register.isdigit() else register
+    if controller is not None and parsed_register in controller.receiver_presets:
+        host, port = normalize_receiver_address(controller.receiver_presets[parsed_register]["receiver"], default_port=8073)
+        return f"{host}:{port}"
     if controller is not None and register in controller.receiver_presets:
         host, port = normalize_receiver_address(controller.receiver_presets[register]["receiver"], default_port=8073)
         return f"{host}:{port}"
@@ -610,7 +616,9 @@ def handle_tui_key(
         if command.lower() in {"quit", "exit", "q", "qu"}:
             return request_tui_quit(controller, config=config)
         try:
-            return controller.execute(command), ""
+            response = controller.execute(command)
+            message = persist_added_receivers_to_config(response, config)
+            return response, message
         except ClientCommandError as exc:
             return None, f"error: {exc}"
     if 0 <= ch < 256:
@@ -639,6 +647,31 @@ def state_from_config(config: KiwiClientConfig, state: ClientState | None = None
     if config.default_state:
         state = apply_preset(state, config.default_state)
     return runtime_state_from_config(config, state)
+
+
+def persist_added_receivers_to_config(response: dict[str, Any] | None, config: KiwiClientConfig) -> str:
+    """Persist added receiver addresses to the config allowlist when possible."""
+    if response is None or config.source_path is None:
+        return ""
+    receivers = receiver_addresses_from_response(response)
+    changed: list[str] = []
+    for receiver in receivers:
+        if add_allowed_receiver_to_config(config.source_path, receiver):
+            changed.append(receiver)
+    if not changed:
+        return ""
+    return f"Saved receiver(s) to config: {', '.join(changed)}"
+
+
+def receiver_addresses_from_response(response: dict[str, Any]) -> list[str]:
+    """Return receiver addresses from command responses, including batches."""
+    if response.get("type") == "receiver-preset" and isinstance(response.get("receiver"), str):
+        return [response["receiver"]]
+    addresses: list[str] = []
+    for nested in response.get("responses", []) if isinstance(response.get("responses"), list) else []:
+        if isinstance(nested, dict):
+            addresses.extend(receiver_addresses_from_response(nested))
+    return addresses
 
 
 def startup_state_and_presets(config: KiwiClientConfig) -> tuple[ClientState, dict[int, dict[str, Any]]]:
