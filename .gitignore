@@ -3,5 +3,6 @@ kiwiclient/
 recordings/
 artifacts/
 state.json
-
+*egg-info/
+build/
 kiwisdr_pi_project_scaffold.zip
