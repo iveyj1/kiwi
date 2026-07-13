@@ -55,6 +55,7 @@ def test_waterfall_image_tool_rejects_non_rectangular_rows():
 
 
 def test_waterfall_image_tool_runs_without_pythonpath(tmp_path: Path):
+    pytest.importorskip("matplotlib")
     output = tmp_path / "wf.png"
 
     result = subprocess.run(
