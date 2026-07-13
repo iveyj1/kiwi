@@ -22,6 +22,7 @@ def test_default_config_has_keymaps_and_steps():
     assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
     assert config.presets.file == "presets.toml"
     assert config.tuning.cw_offset_hz == -800
+    assert config.tuning.command_frequency_decimals == 3
     assert config.tuning.mode_passbands["am"] == (-5000, 5000)
     assert config.tuning.mode_passbands["usb"] == (0, 3000)
     assert config.tuning.mode_passbands["lsb"] == (-3000, 0)
@@ -76,6 +77,7 @@ file = "my-presets.toml"
 
 [tuning]
 cw_offset_hz = -700
+command_frequency_decimals = 4
 
 [tuning.mode_passbands.usb]
 low_cut_hz = 100
@@ -118,6 +120,7 @@ mode = "usb"
     assert config.receivers.allowed == ("example.com:8073",)
     assert config.presets.file == "my-presets.toml"
     assert config.tuning.cw_offset_hz == -700
+    assert config.tuning.command_frequency_decimals == 4
     assert config.tuning.mode_passbands["usb"] == (100, 2400)
     assert config.tuning.mode_passbands["am"] == (-5000, 5000)
     assert config.tuning.mode_step_pairs["usb"] == ((1000, 100), (2500, 250))

@@ -89,6 +89,8 @@ file = "presets.toml"
 [tuning]
 # CW user frequency is passband center; radio frequency adds this signed offset.
 cw_offset_hz = -800
+# Frequency decimals sent in SET mod ... freq= commands. Use 4+ for sub-Hz tuning.
+command_frequency_decimals = 4
 
 [tuning.mode_passbands.am]
 low_cut_hz = -5000
@@ -311,6 +313,7 @@ Tuning/filter behavior:
 - The dashboard/status line shows the active pair in kHz using `[display].frequency_decimals`, e.g. `Step: 1.000/0.100 kHz`.
 - `[display].frequency_decimals` also controls displayed frequency precision; set it to `4` or more to see sub-Hz steps.
 - CW `frequency_khz` is the user-facing passband-center frequency and is labeled `Center frequency`. The radio command frequency adds signed `[tuning].cw_offset_hz`; for example, `tune 335` in CW with `cw_offset_hz = -800` sends `freq=334.200` while keeping the UI center frequency at `335.000 kHz`. In CW mode the dashboard shows a separate radio-frequency/offset line.
+- `[tuning].command_frequency_decimals` controls the decimals sent to Kiwi in `SET mod ... freq=`. Built-in default is `3`; set `4` or more to send sub-Hz command frequencies.
 
 Presets:
 

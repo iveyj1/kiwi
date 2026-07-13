@@ -36,6 +36,8 @@ file = "presets.toml"
 [tuning]
 # CW user frequency is passband center; radio frequency adds this signed offset.
 cw_offset_hz = -800
+# Frequency decimals sent in SET mod ... freq= commands. Use 4+ for sub-Hz tuning.
+command_frequency_decimals = 4
 
 [tuning.mode_passbands.am]
 low_cut_hz = -5000

@@ -39,6 +39,7 @@ file = "presets.toml"
 
 [tuning]
 cw_offset_hz = -800
+command_frequency_decimals = 3
 
 [tuning.mode_passbands.am]
 low_cut_hz = -5000
@@ -168,6 +169,7 @@ class TuningConfig:
     """Tuning and per-mode passband settings."""
 
     cw_offset_hz: int = -800
+    command_frequency_decimals: int = 3
     mode_passbands: dict[str, tuple[int, int]] = field(
         default_factory=lambda: {
             "am": (-5000, 5000),
@@ -340,6 +342,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         tuning = replace(
             tuning,
             cw_offset_hz=int(tuning_data.get("cw_offset_hz", tuning.cw_offset_hz)),
+            command_frequency_decimals=int(tuning_data.get("command_frequency_decimals", tuning.command_frequency_decimals)),
             mode_passbands=mode_passbands,
             mode_step_pairs=mode_step_pairs,
         )

@@ -38,6 +38,7 @@ DEFAULT_MODE_PASSBANDS: dict[str, tuple[int, int]] = {
 DEFAULT_LOW_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][0]
 DEFAULT_HIGH_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][1]
 DEFAULT_CW_OFFSET_HZ = -800
+DEFAULT_FREQUENCY_COMMAND_DECIMALS = 3
 DEFAULT_MODE_STEP_PAIRS: dict[str, tuple[tuple[float, float], ...]] = {
     "am": ((5000, 1000),),
     "usb": ((1000, 100),),
@@ -74,6 +75,7 @@ class ClientState:
     high_cut_hz: int = DEFAULT_HIGH_CUT_HZ
     mode_passbands: dict[str, tuple[int, int]] = field(default_factory=lambda: dict(DEFAULT_MODE_PASSBANDS))
     cw_offset_hz: int = DEFAULT_CW_OFFSET_HZ
+    frequency_command_decimals: int = DEFAULT_FREQUENCY_COMMAND_DECIMALS
     mode_step_pairs: dict[str, tuple[tuple[float, float], ...]] = field(default_factory=lambda: dict(DEFAULT_MODE_STEP_PAIRS))
     mode_step_indices: dict[str, int] = field(default_factory=dict)
     user: str = "kiwi-client"
@@ -643,6 +645,7 @@ class ClientController:
             self.state.low_cut_hz,
             self.state.high_cut_hz,
             self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
         )
 
     def _state_response(self) -> dict[str, Any]:
@@ -849,6 +852,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -869,6 +873,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -887,6 +892,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,

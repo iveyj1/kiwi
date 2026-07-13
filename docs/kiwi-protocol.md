@@ -171,9 +171,10 @@ Failure behavior: TBD.
 Command: SET mod=<mode> low_cut=<Hz> high_cut=<Hz> freq=<kHz>
 Direction: client -> server
 Purpose: Set demodulation mode, passband, and tuned frequency.
-Fields: mode, low/high passband cuts in Hz, radio frequency in kHz with 3 decimal places. For project CW tuning, the UI/user frequency is passband center and the command `freq` is offset by configured `cw_offset_hz`.
+Fields: mode, low/high passband cuts in Hz, radio frequency in kHz. The default encoder emits 3 decimal places, but the client can be configured to emit more (e.g. 4 decimals for sub-Hz tuning). For project CW tuning, the UI/user frequency is passband center and the command `freq` is offset by configured `cw_offset_hz`.
 Example: SET mod=am low_cut=-4900 high_cut=4900 freq=4625.000
 CW example with user/passband frequency 335.000 kHz and `cw_offset_hz=-800`: SET mod=cw low_cut=650 high_cut=1050 freq=334.200
+Sub-Hz example with 4 command decimals: SET mod=cw low_cut=650 high_cut=1050 freq=4999.2005
 Evidence: `kiwiclient/kiwi/client.py` `set_mod()`.
 Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
 Failure behavior: TBD.

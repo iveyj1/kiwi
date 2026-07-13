@@ -209,6 +209,8 @@ Added per-mode tuning step pairs and TUI step cycling. Defaults are AM `5000/100
 
 Improved TUI frequency display: `[display].frequency_decimals` controls displayed kHz precision for frequency and step sizes, defaulting to `3`. Steps are shown as fractional kHz (`Step: 1.000/0.100 kHz`). CW dashboard display labels the user frequency as `Center frequency` and adds a separate radio-frequency/offset line. TUI command handling now catches background `RuntimeError`, so repeating `:pb` while playback is already running reports an error instead of unwinding curses.
 
+Added configurable Kiwi command frequency precision via `[tuning].command_frequency_decimals`. Existing behavior remains 3 decimals by default, while local root config uses 4 decimals so sub-Hz steps can produce sub-Hz `SET mod ... freq=` values such as `4999.2005`.
+
 ## YYYY-MM-DD
 
 ### Finding

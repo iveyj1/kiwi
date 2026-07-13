@@ -2,23 +2,22 @@
 
 ## Current slice
 
-Goal: Improve TUI frequency/step display and harden repeated playback start.
+Goal: Support sub-Hz Kiwi tuning commands.
 
 Done criteria:
 
-- Add `[display].frequency_decimals`, default `3`, for displayed kHz frequency/step precision.
-- Display step pairs as fractional kHz to the same precision as frequency.
-- Label AM/USB/LSB frequency as `Frequency`; label CW as `Center frequency`.
-- In CW mode, show a separate radio frequency / CW offset line.
-- Verify sub-Hz configured steps are represented when display precision is high enough.
-- Repeating `:pb` while a background operation is already running reports an error instead of crashing TUI.
-- Root `config.toml`, user docs, radio parameter docs, and dev log are updated.
+- Add configurable Kiwi modulation command frequency precision.
+- Preserve existing 3-decimal default command formatting unless configured otherwise.
+- Root config enables 4-decimal command frequency formatting for local sub-Hz step testing.
+- Active playback retune commands and live setup plans use configured command precision.
+- Harness tests prove a sub-Hz step emits a sub-Hz `SET mod ... freq=` value.
+- Update root `config.toml`, user docs, radio parameter docs, Kiwi protocol notes, and dev log.
 
-Test command: `python3 -m pytest tests/harness/test_config.py tests/harness/test_client_app.py tests/harness/test_tui.py && python3 -m pytest`
+Test command: `python3 -m pytest tests/protocol/test_commands.py tests/harness/test_config.py tests/harness/test_client_app.py tests/harness/test_tui.py && python3 -m pytest`
 
-Live-radio needed: no; TUI/display robustness only.
+Live-radio needed: no; command encoding behavior only.
 
-Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/dev-log.md`.
+Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-protocol.md`, `docs/dev-log.md`.
 
 ## Next
 

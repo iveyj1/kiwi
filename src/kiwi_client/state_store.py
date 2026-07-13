@@ -21,6 +21,7 @@ FULL_PRESET_EXCLUDED_FIELDS = frozenset(
         "duration_seconds",
         "max_frames",
         "cw_offset_hz",
+        "frequency_command_decimals",
         "mode_step_pairs",
         "mode_step_indices",
         "connected",

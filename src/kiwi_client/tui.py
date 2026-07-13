@@ -683,6 +683,7 @@ def state_from_config(config: KiwiClientConfig, state: ClientState | None = None
         mode_passbands=dict(config.tuning.mode_passbands),
         mode_step_pairs=dict(config.tuning.mode_step_pairs),
         cw_offset_hz=config.tuning.cw_offset_hz,
+        frequency_command_decimals=config.tuning.command_frequency_decimals,
     )
     if config.default_state:
         state = apply_preset(state, config.default_state)
