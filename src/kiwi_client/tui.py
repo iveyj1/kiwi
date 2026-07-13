@@ -354,27 +354,44 @@ def describe_key_action(action: str) -> str:
     return action
 
 
+def format_khz(value: float, decimals: int) -> str:
+    return f"{value:.{decimals}f}"
+
+
+def format_step_khz(step_hz: float, decimals: int) -> str:
+    return format_khz(step_hz / 1000.0, decimals)
+
+
 def render_dashboard(
     state: ClientState,
     last_response: dict[str, Any] | None = None,
     *,
     message: str = "",
     operation: dict[str, Any] | None = None,
+    frequency_decimals: int = 3,
 ) -> str:
     """Render a text dashboard for tests and curses display."""
+    frequency_label = "Center frequency" if state.mode.lower() == "cw" else "Frequency"
     lines = [
         "KiwiSDR Client",
         "==============",
         f"Receiver: {state.receiver}",
         f"Connected: {'yes' if state.connected or (operation is not None and operation.get('running')) else 'no'}",
-        f"Frequency: {state.frequency_khz:.3f} kHz",
+        f"{frequency_label}: {format_khz(state.frequency_khz, frequency_decimals)} kHz",
+    ]
+    if state.mode.lower() == "cw":
+        lines.append(
+            f"Radio frequency: {format_khz(state.radio_frequency_khz, frequency_decimals)} kHz "
+            f"(CW offset {format_khz(state.cw_offset_hz / 1000.0, frequency_decimals)} kHz)"
+        )
+    lines.extend([
         f"Mode/filter: {state.mode} {state.low_cut_hz}..{state.high_cut_hz} Hz",
-        f"Step: {state.current_step_hz}/{state.current_small_step_hz} Hz",
+        f"Step: {format_step_khz(state.current_step_hz, frequency_decimals)}/{format_step_khz(state.current_small_step_hz, frequency_decimals)} kHz",
         f"Volume: {state.volume_percent}%",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
         "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, record-bg, capture-bg, stop, help, quit",
-    ]
+    ])
     if operation is not None:
         lines.extend([
             "",
@@ -460,7 +477,7 @@ def expand_key_action(action: str, controller: ClientController, config: KiwiCli
         }.get(token)
         if step_hz is not None:
             new_frequency = controller.state.frequency_khz + sign * step_hz / 1000.0
-            return f"tune {new_frequency:.3f}"
+            return f"tune {new_frequency:.{config.display.frequency_decimals}f}"
     if len(parts) == 2 and parts[0] == "step-pair":
         return action
     if len(parts) == 2 and parts[0] == "volume-step" and parts[1] in {"+10", "-10"}:
@@ -590,7 +607,7 @@ def handle_tui_key(
                 return request_tui_quit(controller, config=config)
             try:
                 return controller.execute(expand_key_action(action, controller, config)), ""
-            except ClientCommandError as exc:
+            except (ClientCommandError, RuntimeError) as exc:
                 return None, f"error: {exc}"
         return None, None
 
@@ -636,7 +653,7 @@ def handle_tui_key(
             response = controller.execute(command)
             message = persist_added_receivers_to_config(response, config)
             return response, message
-        except ClientCommandError as exc:
+        except (ClientCommandError, RuntimeError) as exc:
             return None, f"error: {exc}"
     if 0 <= ch < 256:
         input_state.command += chr(ch)
@@ -807,6 +824,7 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
             last_response,
             message=message,
             operation=controller.background.status().as_dict(),
+            frequency_decimals=config.display.frequency_decimals,
         )
         hints = render_tui_hints(input_state, config, controller)
         height, width = stdscr.getmaxyx()

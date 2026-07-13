@@ -3,6 +3,10 @@ small_hz = 100
 medium_hz = 1000
 large_hz = 5000
 
+[display]
+# Number of decimal places for displayed kHz frequencies and steps.
+frequency_decimals = 3
+
 [volume]
 step_percent = 10
 
@@ -50,16 +54,18 @@ low_cut_hz = 650
 high_cut_hz = 1050
 
 [tuning.mode_steps.am]
-pairs = [[5000, 1000], [10000, 1000]]
+pairs = [[100, 10], [1000, 100], [5000, 1000], [10000, 1000]]
 
 [tuning.mode_steps.usb]
-pairs = [[1000, 100], [2500, 250], [5000, 500]]
+pairs = [[0.1, 0.001], [0.1, 0.01], [1, 0.1], [10, 1], [100, 10], [1000, 100], [2500, 250], [5000, 500]]
 
 [tuning.mode_steps.lsb]
-pairs = [[1000, 100], [2500, 250], [5000, 500]]
+pairs = [[0.1, 0.001], [0.1, 0.01], [1, 0.1], [10, 1], [100, 10], [1000, 100], [2500, 250], [5000, 500]]
+# pairs = [[1000, 100], [2500, 250], [5000, 500]]
 
 [tuning.mode_steps.cw]
-pairs = [[100, 10], [500, 50], [1000, 100]]
+pairs = [[0.1, 0.001], [0.1, 0.01], [1, 0.1], [10, 1], [100, 10], [1000, 100], [2500, 250], [5000, 500]]
+# pairs = [[100, 10], [500, 50], [1000, 100]]
 
 [startup]
 # mode can be "last", "default", or "preset".

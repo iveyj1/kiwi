@@ -10,6 +10,7 @@ def test_default_config_has_keymaps_and_steps():
     assert config.steps.small_hz == 100
     assert config.steps.medium_hz == 1000
     assert config.steps.large_hz == 5000
+    assert config.display.frequency_decimals == 3
     assert config.volume.step_percent == 10
     assert config.audio.startup_mute_ms == 300
     assert config.audio.startup_fade_in_ms == 100
@@ -49,6 +50,9 @@ def test_load_config_overlays_defaults(tmp_path: Path):
         """
 [steps]
 medium_hz = 2500
+
+[display]
+frequency_decimals = 4
 
 [volume]
 step_percent = 5
@@ -102,6 +106,7 @@ mode = "usb"
     assert config.steps.small_hz == 100
     assert config.steps.medium_hz == 2500
     assert config.steps.large_hz == 5000
+    assert config.display.frequency_decimals == 4
     assert config.volume.step_percent == 5
     assert config.audio.startup_mute_ms == 125
     assert config.audio.startup_fade_in_ms == 50

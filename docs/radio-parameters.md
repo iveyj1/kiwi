@@ -22,7 +22,8 @@ Concise list of radio/client parameters currently settable or persisted by this 
 - `cw_offset_hz` — signed CW heterodyne offset. With `frequency_khz = 335.000` and `cw_offset_hz = -800`, `radio_frequency_khz = 334.200`.
 - `mode_step_pairs` — configured per-mode tuning step pairs as `(normal_hz, small_hz)`.
 - `mode_step_indices` — current selected step-pair index per mode.
-- `current_step_hz` / `current_small_step_hz` — active normal/small tuning steps for the current mode.
+- `current_step_hz` / `current_small_step_hz` — active normal/small tuning steps for the current mode. Displayed as kHz using configured display precision.
+- `frequency_decimals` — number of decimal places for displayed kHz frequencies and step sizes. Default is `3` (`.000 kHz`).
 
 Kiwi command shape:
 

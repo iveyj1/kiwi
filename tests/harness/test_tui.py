@@ -225,7 +225,7 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Frequency: 10000.000 kHz" in text
     assert "Mode/filter: usb 300..2700 Hz" in text
     assert "Volume: 10%" in text
-    assert "Step: 1000/100 Hz" in text
+    assert "Step: 1.000/0.100 kHz" in text
     assert "Live limits: 45s / 1200 SND frames" in text
     assert "Operation: play" in text
     assert "Running: yes" in text
@@ -237,6 +237,25 @@ def test_render_dashboard_includes_persistent_live_state():
     assert "Last response: state" in text
     assert "Applied to active stream: SET mod=am low_cut=-5000 high_cut=5000 freq=7000.000" in text
     assert "Message: ok" in text
+
+
+def test_render_dashboard_labels_cw_center_and_offset_frequency():
+    state = ClientState(mode="cw", frequency_khz=335.0, low_cut_hz=650, high_cut_hz=1050)
+
+    text = render_dashboard(state)
+
+    assert "Center frequency: 335.000 kHz" in text
+    assert "Radio frequency: 334.200 kHz (CW offset -0.800 kHz)" in text
+    assert "Step: 0.100/0.010 kHz" in text
+
+
+def test_render_dashboard_uses_configured_frequency_precision():
+    state = ClientState(frequency_khz=5000.12345)
+
+    text = render_dashboard(state, frequency_decimals=4)
+
+    assert "Frequency: 5000.1235 kHz" in text
+    assert "Step: 5.0000/1.0000 kHz" in text
 
 
 def test_render_dashboard_includes_batch_active_commands():
@@ -297,6 +316,27 @@ def test_tui_command_mode_executes_semicolon_batch():
     assert controller.state.mode == "usb"
     assert message == ""
     assert state.mode == InputMode.KEYMAP
+
+
+def test_tui_command_mode_repeated_pb_reports_error_without_crashing(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text("[live]\nallow_live = true\n", encoding="utf-8")
+    config = load_config(config_path)
+    controller = ClientController(operations=TuiBlockingOperations(), allow_live_default=config.live.allow_live)
+    state = TuiInputState(mode=InputMode.COMMAND)
+
+    for ch in "pb --null-sink":
+        handle_tui_key(ord(ch), state, controller, config)
+    first, message = handle_tui_key(10, state, controller, config)
+    state.mode = InputMode.COMMAND
+    for ch in "pb --null-sink":
+        handle_tui_key(ord(ch), state, controller, config)
+    second, message = handle_tui_key(10, state, controller, config)
+
+    assert first["operation"]["name"] == "play"
+    assert second is None
+    assert message == "error: background operation already running"
+    controller.execute("wait 1")
 
 
 def test_tui_command_mode_pb_uses_configured_allow_live(tmp_path):
@@ -388,6 +428,28 @@ pairs = [[1000, 100], [2500, 250]]
     assert expand_key_action("tune-step +mode", controller, config) == "tune 5002.500"
     response, message = handle_tui_key(ord("T"), TuiInputState(), controller, config)
     assert response["state"]["current_step_hz"] == 1000
+
+
+def test_tui_keymap_supports_sub_hz_steps_when_display_precision_allows(tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[display]
+frequency_decimals = 4
+
+[tuning.mode_steps.cw]
+pairs = [[0.5, 0.1]]
+""".strip(),
+        encoding="utf-8",
+    )
+    config = load_config(config_path)
+    controller = ClientController(state=state_from_config(config))
+    controller.execute("mode cw")
+
+    response, message = handle_tui_key(ord("L"), TuiInputState(), controller, config)
+
+    assert response["state"]["frequency_khz"] == 5000.0001
+    assert expand_key_action("tune-step +mode", controller, config) == "tune 5000.0006"
 
 
 def test_tui_expand_key_action_uses_configured_steps(tmp_path):

@@ -57,6 +57,10 @@ small_hz = 100
 medium_hz = 1000
 large_hz = 5000
 
+[display]
+# Number of decimal places for displayed kHz frequencies and steps.
+frequency_decimals = 3
+
 [volume]
 step_percent = 10
 
@@ -304,8 +308,9 @@ Tuning/filter behavior:
 - Each mode has one or more configured step pairs: `[normal_hz, small_hz]`.
 - Normal `h/l` and left/right arrows use the current normal step; shifted `H/L` and shifted arrows use the current small step.
 - `t` advances to the next configured step pair for the current mode; `T` moves to the previous pair. Both stop at the ends of the list.
-- The dashboard/status line shows the active pair, e.g. `Step: 1000/100 Hz`.
-- CW `frequency_khz` is the user-facing passband-center frequency. The radio command frequency adds signed `[tuning].cw_offset_hz`; for example, `tune 335` in CW with `cw_offset_hz = -800` sends `freq=334.200` while keeping the UI frequency at `335.000 kHz`.
+- The dashboard/status line shows the active pair in kHz using `[display].frequency_decimals`, e.g. `Step: 1.000/0.100 kHz`.
+- `[display].frequency_decimals` also controls displayed frequency precision; set it to `4` or more to see sub-Hz steps.
+- CW `frequency_khz` is the user-facing passband-center frequency and is labeled `Center frequency`. The radio command frequency adds signed `[tuning].cw_offset_hz`; for example, `tune 335` in CW with `cw_offset_hz = -800` sends `freq=334.200` while keeping the UI center frequency at `335.000 kHz`. In CW mode the dashboard shows a separate radio-frequency/offset line.
 
 Presets:
 

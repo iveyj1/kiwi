@@ -14,6 +14,9 @@ small_hz = 100
 medium_hz = 1000
 large_hz = 5000
 
+[display]
+frequency_decimals = 3
+
 [volume]
 step_percent = 10
 
@@ -114,6 +117,13 @@ class StepConfig:
 
 
 @dataclass(frozen=True)
+class DisplayConfig:
+    """Display formatting settings."""
+
+    frequency_decimals: int = 3
+
+
+@dataclass(frozen=True)
 class VolumeConfig:
     """Volume control settings."""
 
@@ -166,7 +176,7 @@ class TuningConfig:
             "cw": (650, 1050),
         }
     )
-    mode_step_pairs: dict[str, tuple[tuple[int, int], ...]] = field(
+    mode_step_pairs: dict[str, tuple[tuple[float, float], ...]] = field(
         default_factory=lambda: {
             "am": ((5000, 1000),),
             "usb": ((1000, 100),),
@@ -192,6 +202,7 @@ class KiwiClientConfig:
 
     source_path: str | None = None
     steps: StepConfig = field(default_factory=StepConfig)
+    display: DisplayConfig = field(default_factory=DisplayConfig)
     volume: VolumeConfig = field(default_factory=VolumeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
@@ -254,6 +265,7 @@ def resolve_state_path(config: KiwiClientConfig) -> Path:
 
 def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientConfig:
     steps = config.steps
+    display = config.display
     volume = config.volume
     audio = config.audio
     live = config.live
@@ -272,6 +284,9 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
             medium_hz=int(step_data.get("medium_hz", steps.medium_hz)),
             large_hz=int(step_data.get("large_hz", steps.large_hz)),
         )
+    if isinstance(data.get("display"), dict):
+        display_data = data["display"]
+        display = replace(display, frequency_decimals=int(display_data.get("frequency_decimals", display.frequency_decimals)))
     if isinstance(data.get("volume"), dict):
         volume_data = data["volume"]
         volume = replace(volume, step_percent=int(volume_data.get("step_percent", volume.step_percent)))
@@ -321,7 +336,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
                 if isinstance(step_data, dict):
                     pairs = step_data.get("pairs")
                     if isinstance(pairs, list) and pairs:
-                        mode_step_pairs[str(mode).lower()] = tuple((int(pair[0]), int(pair[1])) for pair in pairs)
+                        mode_step_pairs[str(mode).lower()] = tuple((float(pair[0]), float(pair[1])) for pair in pairs)
         tuning = replace(
             tuning,
             cw_offset_hz=int(tuning_data.get("cw_offset_hz", tuning.cw_offset_hz)),
@@ -345,6 +360,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     return KiwiClientConfig(
         source_path=config.source_path,
         steps=steps,
+        display=display,
         volume=volume,
         audio=audio,
         live=live,
