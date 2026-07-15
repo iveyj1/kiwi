@@ -20,11 +20,12 @@ class WaterfallSequenceStatus:
     expected_seq: int | None
     missing_count: int = 0
     out_of_order: bool = False
+    repeated_zero: bool = False
 
     @property
     def ok(self) -> bool:
-        """Return true when this frame arrived at the expected sequence."""
-        return self.expected_seq is None or (self.missing_count == 0 and not self.out_of_order)
+        """Return true when this frame arrived at the expected sequence or sequence is inactive."""
+        return self.expected_seq is None or self.repeated_zero or (self.missing_count == 0 and not self.out_of_order)
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,8 @@ class WaterfallSequenceTracker:
         delta = (frame.sequence - expected) % SEQ_MODULUS
         if delta == 0:
             return WaterfallSequenceStatus(seq=frame.sequence, expected_seq=expected)
+        if expected == 1 and frame.sequence == 0:
+            return WaterfallSequenceStatus(seq=frame.sequence, expected_seq=expected, repeated_zero=True)
         if delta > SEQ_REORDER_THRESHOLD:
             return WaterfallSequenceStatus(seq=frame.sequence, expected_seq=expected, out_of_order=True)
         return WaterfallSequenceStatus(seq=frame.sequence, expected_seq=expected, missing_count=delta)

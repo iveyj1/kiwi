@@ -41,6 +41,9 @@ class LiveWaterfallCaptureConfig:
     zoom: int = 0
     maxdb: int = 0
     mindb: int = -110
+    render_maxdb: int | None = None
+    render_mindb: int | None = None
+    ascii_ramp: str = DEFAULT_ASCII_RAMP
     speed: int = 1
     interp: int = 13
     duration_seconds: float = 3.0
@@ -69,10 +72,24 @@ class LiveWaterfallCaptureConfig:
             raise LiveCaptureError("waterfall speed must be in range 1..4")
         if self.maxdb <= self.mindb:
             raise LiveCaptureError("maxdb must be greater than mindb")
+        if self.ascii_maxdb <= self.ascii_mindb:
+            raise LiveCaptureError("render max dB must be greater than render min dB")
+        if len(self.ascii_ramp) < 2:
+            raise LiveCaptureError("ASCII waterfall ramp must contain at least two characters")
         if self.compression:
             raise LiveCaptureError("first live W/F capture must use wf_comp=0 for existing parser coverage")
         if self.output.exists() and not self.overwrite:
             raise LiveCaptureError(f"output already exists; use --overwrite to replace: {self.output}")
+
+    @property
+    def ascii_mindb(self) -> int:
+        """Return the lower dB bound used for local ASCII rendering."""
+        return self.mindb if self.render_mindb is None else self.render_mindb
+
+    @property
+    def ascii_maxdb(self) -> int:
+        """Return the upper dB bound used for local ASCII rendering."""
+        return self.maxdb if self.render_maxdb is None else self.render_maxdb
 
     def websocket_uri(self) -> str:
         """Return the KiwiSDR W/F WebSocket URI for this capture."""
@@ -100,6 +117,9 @@ class LiveWaterfallCaptureConfig:
             "zoom": self.zoom,
             "maxdb": self.maxdb,
             "mindb": self.mindb,
+            "render_maxdb": self.ascii_maxdb,
+            "render_mindb": self.ascii_mindb,
+            "ascii_ramp": self.ascii_ramp,
             "speed": self.speed,
             "interp": self.interp,
             "duration_seconds": self.duration_seconds,
@@ -204,7 +224,13 @@ async def capture_live_waterfall(
                         "wf_frames": frames,
                         "sequence_gaps": status.missing_count,
                         "out_of_order": status.out_of_order,
-                        "ascii_row": render_ascii_waterfall_row(frame, min_dbm=config.mindb, max_dbm=config.maxdb),
+                        "repeated_zero_sequence": status.repeated_zero,
+                        "ascii_row": render_ascii_waterfall_row(
+                            frame,
+                            min_dbm=config.ascii_mindb,
+                            max_dbm=config.ascii_maxdb,
+                            ramp=config.ascii_ramp,
+                        ),
                     }
                     status_callback(metrics)
 
@@ -219,8 +245,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--center-khz", type=float, default=5000.0)
     parser.add_argument("--zoom", type=int, default=0)
-    parser.add_argument("--max-db", type=int, default=0)
-    parser.add_argument("--min-db", type=int, default=-110)
+    parser.add_argument("--max-db", type=int, default=0, help="receiver waterfall max dB setting")
+    parser.add_argument("--min-db", type=int, default=-110, help="receiver waterfall min dB setting")
+    parser.add_argument("--render-max-db", type=int, help="local ASCII render max dB; defaults to --max-db")
+    parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
+    parser.add_argument("--ramp", default=DEFAULT_ASCII_RAMP, help="ASCII intensity ramp from dim to bright")
     parser.add_argument("--speed", type=int, default=1)
     parser.add_argument("--interp", type=int, default=13)
     parser.add_argument("--duration-seconds", type=float, default=3.0)
@@ -242,6 +271,9 @@ def config_from_args(args: argparse.Namespace) -> LiveWaterfallCaptureConfig:
         zoom=args.zoom,
         maxdb=args.max_db,
         mindb=args.min_db,
+        render_maxdb=args.render_max_db,
+        render_mindb=args.render_min_db,
+        ascii_ramp=args.ramp,
         speed=args.speed,
         interp=args.interp,
         duration_seconds=args.duration_seconds,

@@ -15,6 +15,9 @@ live = [
 playback = [
     "sounddevice>=0.4",
 ]
+image = [
+    "matplotlib>=3.8",
+]
 
 [project.scripts]
 kiwi-client = "kiwi_client.client_app:main"

@@ -134,7 +134,7 @@ Local captured W/F observations:
 - The receiver reported `MSG center_freq=15000000 bandwidth=30000000 adc_clk_nom=66666600`.
 - The receiver reported `MSG wf_fft_size=1024 wf_fps=23 wf_fps_max=23 zoom_max=14 zoom_cap=14 rx_chans=4 wf_chans=4 wf_chans_real=4 wf_cal=-13 wf_setup` followed by `MSG zoom=0 start=0` and `MSG wf_fps=1`.
 - The two captured W/F frames decoded with complete-message layout: 3-byte `W/F` tag, one raw flags byte, 12-byte little-endian W/F header, and 1024 raw bin bytes.
-- Both captured frames had `raw_flags=32`, `x_bin_server=0`, `flags_x_zoom_server=0`, and `seq=0`; sequence semantics therefore need more investigation before treating repeated `seq=0` as a real gap.
+- Both captured frames had `raw_flags=32`, `x_bin_server=0`, `flags_x_zoom_server=0`, and `seq=0`. Because the two frames have different bin data and plausible waterfall intensity ranges, repeated `seq=0` is treated by the local tracker as an inactive/unknown W/F sequence counter rather than a real dropout. More captures are still needed before assigning exact sequence semantics.
 
 Still to verify with project fixtures:
 

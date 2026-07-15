@@ -207,6 +207,14 @@ Added per-mode passband tuning and CW heterodyne offset handling. AM/USB/LSB/CW 
 
 Added per-mode tuning step pairs and TUI step cycling. Defaults are AM `5000/1000`, USB/LSB `1000/100`, and CW `100/10`; config may define additional `[normal_hz, small_hz]` pairs per mode. Normal tune keys use the current normal step, shifted tune keys use the current small step, and `t`/`T` move between configured pairs with end clamping. Dashboard/status now shows the active pair as `Step: normal/small Hz`.
 
+Changed `setup-python` into a fresh-machine bootstrap for the current project harness: it now installs the editable package with `dev`, `live`, `playback`, and `image` extras and verifies that `pytest`, `websockets`, `sounddevice`, and `matplotlib` are importable. Added an explicit `image` optional dependency for the waterfall PNG inspection helper, and improved the helper's missing-matplotlib error to suggest `./setup-python` or `python3 -m pip install -e '.[image]'`.
+
+Regenerated `artifacts/local-wf-5000-zoom0.png` from the local W/F fixture after installing the image extra. The 2x1024 fixture has plausible raw `sample - 255` intensity ranges: row 0 min/max/median `-200/-31/-88 dBm`, row 1 `-200/-25/-87 dBm`, with persistent bright bins around 26/31 and 529/538. Repeated valid local W/F frames both used `seq=0`; `WaterfallSequenceTracker` now reports repeated zero as `repeated_zero=True`/OK instead of an out-of-order dropout while exact sequence semantics remain open.
+
+Changed standalone live W/F ASCII preview defaults to 50 rows and a 60-second cap. Added separate local ASCII display scaling controls (`--render-min-db`, `--render-max-db`, `--ramp`) while leaving receiver-side waterfall commands as `--min-db` / `--max-db`. The capture path includes the render scaling in status metrics and dry-run plans.
+
+Bookmarked future terminal raster-image waterfall work in `docs/terminal-waterfall-renderer.md`. The spec proposes a standalone optional `kiwi-wf-terminal` command with Kitty graphics first, Sixel later, an in-memory waterfall image buffer, deterministic dBm-to-RGB rendering, and harness tests that do not require a graphics-capable terminal.
+
 ## YYYY-MM-DD
 
 ### Finding

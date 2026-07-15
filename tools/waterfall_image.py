@@ -61,7 +61,11 @@ def render_waterfall_png(
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:  # pragma: no cover - depends on optional local env
-        raise RuntimeError("matplotlib is required for PNG rendering: pip install matplotlib") from exc
+        raise RuntimeError(
+            "matplotlib is required for PNG rendering. "
+            "Run ./setup-python or install the image extra with: "
+            "python3 -m pip install -e '.[image]'"
+        ) from exc
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig_width = max(8.0, min(18.0, width / 96.0))

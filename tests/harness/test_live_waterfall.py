@@ -48,6 +48,9 @@ def test_live_waterfall_config_dry_run_plan(tmp_path: Path):
     plan = config.dry_run_plan()
 
     assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/W/F"
+    assert plan["render_mindb"] == -110
+    assert plan["render_maxdb"] == 0
+    assert plan["ascii_ramp"] == " .:-=+*#%@"
     assert plan["commands"] == [
         "SET auth t=kiwi p=",
         "SET zoom=0 cf=5000.000",
@@ -109,3 +112,22 @@ def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Pat
     assert metrics[-1]["wf_seq"] == 42
     assert metrics[-1]["wf_frames"] == 1
     assert metrics[-1]["ascii_row"] == "   +@"
+
+
+def test_capture_live_waterfall_uses_separate_ascii_render_scale(tmp_path: Path):
+    output = tmp_path / "wf.jsonl"
+    config = LiveWaterfallCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=output,
+        timestamp=123456,
+        max_frames=1,
+        render_mindb=-255,
+        render_maxdb=0,
+    )
+    fake_connect = FakeConnect([WF_PAYLOAD])
+    metrics = []
+
+    asyncio.run(capture_live_waterfall(config, allow_live=True, websocket_connect=fake_connect, status_callback=metrics.append))
+
+    assert metrics[-1]["ascii_row"] == " :+#@"

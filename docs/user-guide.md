@@ -430,20 +430,38 @@ PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
   --output tests/fixtures/kiwi/local-wf-capture.jsonl
 ```
 
-A standalone guarded live ASCII preview is also available:
+A standalone guarded live ASCII preview is also available. By default it prints up to 50 rows over up to 60 seconds:
+
+```bash
+PYTHONPATH=src python3 -m kiwi_client.live_waterfall_preview \
+  --allow-live \
+  --host 10.0.0.40
+```
+
+If the preview looks washed out or too sparse, adjust local ASCII scaling without changing the receiver-side W/F dB settings:
 
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_waterfall_preview \
   --allow-live \
   --host 10.0.0.40 \
-  --max-frames 5
+  --max-frames 50 \
+  --render-min-db -100 \
+  --render-max-db -40
 ```
+
+Useful controls:
+
+- `--max-frames N`: number of W/F rows to print; default `50` for live preview.
+- `--duration-seconds N`: time cap; default `60` for live preview.
+- `--min-db` / `--max-db`: receiver waterfall scale commands.
+- `--render-min-db` / `--render-max-db`: local ASCII display scale; defaults to receiver scale.
+- `--ramp " .:-=+*#%@"`: ASCII colormap from dim to bright.
 
 Installed script names:
 
 ```bash
 kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local-wf-capture.jsonl
-kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 5
+kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
 
 Expected future operations:

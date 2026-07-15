@@ -139,7 +139,7 @@ Implemented first parser scope in `src/kiwi_client/waterfall.py`:
 
 Also implemented:
 
-- `WaterfallSequenceTracker` tracks in-order frames, gaps, out-of-order frames, and uint32 wraparound using the same philosophy as SND sequence tracking.
+- `WaterfallSequenceTracker` tracks in-order frames, gaps, out-of-order frames, and uint32 wraparound using the same philosophy as SND sequence tracking. Local fixture evidence shows repeated `seq=0` frames can occur during valid W/F output, so repeated zero is treated as an inactive/unknown sequence counter (`repeated_zero=True`) rather than a dropout.
 
 Explicitly out of first scope:
 

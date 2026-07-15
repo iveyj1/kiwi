@@ -22,4 +22,6 @@ def test_local_wf_5000_zoom0_capture_decodes_frames():
     assert [frame.flags_x_zoom_server for frame in frames] == [0, 0]
     assert [frame.sequence for frame in frames] == [0, 0]
     assert statuses[0].ok is True
-    assert statuses[1].out_of_order is True
+    assert statuses[1].ok is True
+    assert statuses[1].repeated_zero is True
+    assert statuses[1].out_of_order is False

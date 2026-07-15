@@ -1,1 +1,23 @@
-python3 -m pip install -e '.[live,playback]'
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 -m pip install -e '.[dev,live,playback,image]'
+python3 - <<'PY'
+import importlib.util
+import sys
+
+required = {
+    "pytest": "dev test runner",
+    "websockets": "live KiwiSDR capture/playback",
+    "sounddevice": "live audio playback",
+    "matplotlib": "waterfall PNG tool",
+}
+missing = [f"{name} ({purpose})" for name, purpose in required.items() if importlib.util.find_spec(name) is None]
+if missing:
+    print("setup-python did not make all required project libraries importable:", file=sys.stderr)
+    for item in missing:
+        print(f"  - {item}", file=sys.stderr)
+    print("Try: python3 -m pip install -e '.[dev,live,playback,image]'", file=sys.stderr)
+    raise SystemExit(1)
+print("Kiwi client Python dependencies are installed.")
+PY

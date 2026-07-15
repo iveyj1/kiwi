@@ -23,6 +23,8 @@ def test_live_waterfall_preview_main_dry_run(capsys):
     captured = capsys.readouterr()
     assert code == 0
     assert "ws://10.0.0.40:8073/123456/W/F" in captured.out
+    assert '"duration_seconds": 60.0' in captured.out
+    assert '"max_frames": 50' in captured.out
 
 
 def test_live_waterfall_preview_main_uses_save_fixture_with_fake_websocket(tmp_path: Path, monkeypatch, capsys):
@@ -46,3 +48,29 @@ def test_live_waterfall_preview_main_uses_save_fixture_with_fake_websocket(tmp_p
     assert code == 0
     assert captured.out == "   +@\n"
     assert output.exists()
+
+
+def test_live_waterfall_preview_main_accepts_render_scale_with_fake_websocket(tmp_path: Path, monkeypatch, capsys):
+    output = tmp_path / "wf.jsonl"
+    fake_connect = FakeConnect([WF_PAYLOAD])
+
+    monkeypatch.setattr("kiwi_client.live_waterfall_preview._websocket_connect_for_main", lambda: fake_connect)
+    code = main([
+        "--allow-live",
+        "--host",
+        "10.0.0.40",
+        "--timestamp",
+        "123456",
+        "--max-frames",
+        "1",
+        "--render-min-db",
+        "-255",
+        "--render-max-db",
+        "0",
+        "--save-fixture",
+        str(output),
+    ])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert captured.out == " :+#@\n"

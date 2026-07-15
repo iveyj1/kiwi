@@ -89,3 +89,16 @@ def test_wf_sequence_tracker_marks_out_of_order():
     assert status.expected_seq == 11
     assert status.out_of_order is True
     assert status.missing_count == 0
+
+
+def test_wf_sequence_tracker_treats_repeated_zero_as_inactive_sequence():
+    tracker = WaterfallSequenceTracker()
+    tracker.observe(WaterfallFrame(sequence=0, bins=(0,), dbm=(-255,)))
+
+    status = tracker.observe(WaterfallFrame(sequence=0, bins=(0,), dbm=(-255,)))
+
+    assert status.ok is True
+    assert status.expected_seq == 1
+    assert status.repeated_zero is True
+    assert status.out_of_order is False
+    assert status.missing_count == 0

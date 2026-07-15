@@ -2,29 +2,27 @@
 
 ## Current slice
 
-Goal: Per-mode tuning step pairs and TUI step cycling.
+Goal: Waterfall fixture inspection and sequence semantics.
 
 Done criteria:
 
-- Each mode has current normal/small tuning step sizes.
-- Defaults: AM `5000/1000`, USB/LSB `1000/100`, CW `100/10`.
-- Normal left/right arrows and `h/l` use the current normal step; shifted arrows and `H/L` use the current small step.
-- `t` increases to the next configured step pair for the current mode; `T` decreases to the previous pair; both clamp at the list ends.
-- Dashboard/status display current steps as `Step: normal/small Hz`.
-- Additional per-mode step pairs are configurable in `config.toml`.
-- Root `config.toml`, user docs, radio parameter docs, and dev log are updated.
+- Generated static W/F PNG inspection path is usable from a fresh setup.
+- `setup-python` installs the development, live, playback, and waterfall image dependencies needed to run the full harness on a new machine with Python already installed.
+- Missing waterfall image libraries report a clear remediation command.
+- The standalone live ASCII preview prints 50 rows by default.
+- The standalone live ASCII preview can adjust local display scale separately from receiver-side W/F min/max dB settings.
+- The local W/F fixture `tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl` is inspected for plausible bin orientation/scaling.
+- Repeated local W/F `seq=0` behavior is investigated before sequence tracking treats repeated zero as dropout.
+- `docs/kiwi-protocol.md`, `docs/waterfall-rendering.md`, and `docs/dev-log.md` are updated if protocol/rendering conclusions change.
 
-Test command: `python3 -m pytest tests/harness/test_config.py tests/harness/test_client_app.py tests/harness/test_tui.py && python3 -m pytest`
+Test command: `python3 -m pytest`
 
-Live-radio needed: no; TUI/control behavior only.
-
-Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/dev-log.md`.
+Live-radio needed: not initially; use existing fixtures first. If more W/F frames are needed, perform a short guarded local-only capture after harness tests pass.
 
 ## Next
 
-- Inspect the generated static PNG and decide whether bin orientation/scaling is plausible.
-- Investigate W/F sequence semantics: local fixture repeated `seq=0` for two frames despite valid 1024-bin payloads.
 - Add frequency/bin mapping from local W/F metadata (`center_freq`, `bandwidth`, `wf_fft_size`, zoom/start).
+- When ready for richer terminal display, implement the bookmarked `docs/terminal-waterfall-renderer.md` spec.
 - Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
 
 ## Later

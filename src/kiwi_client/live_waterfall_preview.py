@@ -48,12 +48,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--center-khz", type=float, default=5000.0)
     parser.add_argument("--zoom", type=int, default=0)
-    parser.add_argument("--max-db", type=int, default=0)
-    parser.add_argument("--min-db", type=int, default=-110)
+    parser.add_argument("--max-db", type=int, default=0, help="receiver waterfall max dB setting")
+    parser.add_argument("--min-db", type=int, default=-110, help="receiver waterfall min dB setting")
+    parser.add_argument("--render-max-db", type=int, help="local ASCII render max dB; defaults to --max-db")
+    parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
+    parser.add_argument("--ramp", default=" .:-=+*#%@", help="ASCII intensity ramp from dim to bright")
     parser.add_argument("--speed", type=int, default=1)
     parser.add_argument("--interp", type=int, default=13)
-    parser.add_argument("--duration-seconds", type=float, default=3.0)
-    parser.add_argument("--max-frames", type=int, default=5)
+    parser.add_argument("--duration-seconds", type=float, default=60.0)
+    parser.add_argument("--max-frames", type=int, default=50)
     parser.add_argument("--timestamp", type=int)
     parser.add_argument("--save-fixture", type=Path, help="optional JSONL fixture output path")
     parser.add_argument("--overwrite", action="store_true")
@@ -72,6 +75,9 @@ def config_from_args(args: argparse.Namespace, output: Path) -> LiveWaterfallCap
         zoom=args.zoom,
         maxdb=args.max_db,
         mindb=args.min_db,
+        render_maxdb=args.render_max_db,
+        render_mindb=args.render_min_db,
+        ascii_ramp=args.ramp,
         speed=args.speed,
         interp=args.interp,
         duration_seconds=args.duration_seconds,
