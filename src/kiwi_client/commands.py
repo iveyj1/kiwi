@@ -55,9 +55,10 @@ def encode_gen(frequency: int = 0, attenuation: int = 0, mix: int = -1) -> list[
     return [f"SET genattn={attenuation:d}", f"SET gen={frequency:d} mix={mix:d}"]
 
 
-def encode_modulation(mod: str, low_cut: int, high_cut: int, freq_khz: float) -> str:
+def encode_modulation(mod: str, low_cut: int, high_cut: int, freq_khz: float, *, frequency_decimals: int = 3) -> str:
     """Encode the basic frequency/mode/passband command."""
-    return f"SET mod={mod.lower()} low_cut={low_cut:d} high_cut={high_cut:d} freq={freq_khz:.3f}"
+    decimals = max(0, int(frequency_decimals))
+    return f"SET mod={mod.lower()} low_cut={low_cut:d} high_cut={high_cut:d} freq={freq_khz:.{decimals}f}"
 
 
 def encode_agc(settings: AgcSettings | None = None) -> str:
@@ -85,13 +86,14 @@ def encode_basic_snd_setup(
     high_cut: int = 4900,
     compression: bool = False,
     agc: AgcSettings | None = None,
+    frequency_decimals: int = 3,
 ) -> list[str]:
     """Build the first fixture-tested non-admin SND setup command sequence."""
     return [
         encode_squelch(False, 0),
         *encode_gen(0, 0),
         encode_ident_user(user),
-        encode_modulation(modulation, low_cut, high_cut, frequency_khz),
+        encode_modulation(modulation, low_cut, high_cut, frequency_khz, frequency_decimals=frequency_decimals),
         encode_agc(agc),
         encode_compression(compression),
         encode_keepalive(),

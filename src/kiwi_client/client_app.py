@@ -38,7 +38,8 @@ DEFAULT_MODE_PASSBANDS: dict[str, tuple[int, int]] = {
 DEFAULT_LOW_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][0]
 DEFAULT_HIGH_CUT_HZ = DEFAULT_MODE_PASSBANDS["am"][1]
 DEFAULT_CW_OFFSET_HZ = -800
-DEFAULT_MODE_STEP_PAIRS: dict[str, tuple[tuple[int, int], ...]] = {
+DEFAULT_FREQUENCY_COMMAND_DECIMALS = 3
+DEFAULT_MODE_STEP_PAIRS: dict[str, tuple[tuple[float, float], ...]] = {
     "am": ((5000, 1000),),
     "usb": ((1000, 100),),
     "lsb": ((1000, 100),),
@@ -74,7 +75,8 @@ class ClientState:
     high_cut_hz: int = DEFAULT_HIGH_CUT_HZ
     mode_passbands: dict[str, tuple[int, int]] = field(default_factory=lambda: dict(DEFAULT_MODE_PASSBANDS))
     cw_offset_hz: int = DEFAULT_CW_OFFSET_HZ
-    mode_step_pairs: dict[str, tuple[tuple[int, int], ...]] = field(default_factory=lambda: dict(DEFAULT_MODE_STEP_PAIRS))
+    frequency_command_decimals: int = DEFAULT_FREQUENCY_COMMAND_DECIMALS
+    mode_step_pairs: dict[str, tuple[tuple[float, float], ...]] = field(default_factory=lambda: dict(DEFAULT_MODE_STEP_PAIRS))
     mode_step_indices: dict[str, int] = field(default_factory=dict)
     user: str = "kiwi-client"
     duration_seconds: float = 60.0
@@ -98,17 +100,17 @@ class ClientState:
         return f"{self.host}:{self.port}"
 
     @property
-    def current_step_pair(self) -> tuple[int, int]:
+    def current_step_pair(self) -> tuple[float, float]:
         pairs = self.mode_step_pairs.get(self.mode.lower()) or DEFAULT_MODE_STEP_PAIRS.get(self.mode.lower()) or ((1000, 100),)
         index = max(0, min(self.mode_step_indices.get(self.mode.lower(), 0), len(pairs) - 1))
-        return int(pairs[index][0]), int(pairs[index][1])
+        return float(pairs[index][0]), float(pairs[index][1])
 
     @property
-    def current_step_hz(self) -> int:
+    def current_step_hz(self) -> float:
         return self.current_step_pair[0]
 
     @property
-    def current_small_step_hz(self) -> int:
+    def current_small_step_hz(self) -> float:
         return self.current_step_pair[1]
 
     @property
@@ -643,6 +645,7 @@ class ClientController:
             self.state.low_cut_hz,
             self.state.high_cut_hz,
             self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
         )
 
     def _state_response(self) -> dict[str, Any]:
@@ -801,7 +804,7 @@ class ClientController:
         raise ClientCommandError("expected boolean value")
 
     @staticmethod
-    def _parse_tune_step_hz(value: str) -> int:
+    def _parse_tune_step_hz(value: str) -> float:
         sign = 1
         token = value.strip().lower()
         if token.startswith("+"):
@@ -810,7 +813,7 @@ class ClientController:
             token = token[1:]
             sign = -1
         named = {"small": 100, "medium": 1000, "large": 5000}
-        hz = named[token] if token in named else int(token)
+        hz = named[token] if token in named else float(token)
         return sign * hz
 
     @staticmethod
@@ -849,6 +852,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -869,6 +873,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,
@@ -887,6 +892,7 @@ class ClientController:
             user=self.state.user,
             frequency_khz=self.state.frequency_khz,
             radio_frequency_khz=self.state.radio_frequency_khz,
+            frequency_decimals=self.state.frequency_command_decimals,
             mode=self.state.mode,
             low_cut_hz=self.state.low_cut_hz,
             high_cut_hz=self.state.high_cut_hz,

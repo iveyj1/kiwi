@@ -149,6 +149,28 @@ def test_client_cw_tunes_radio_frequency_by_configured_offset():
     controller.execute("stop")
 
 
+def test_client_sub_hz_step_uses_configured_command_precision():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+    controller.state = replace(
+        controller.state,
+        mode="cw",
+        low_cut_hz=650,
+        high_cut_hz=1050,
+        frequency_command_decimals=4,
+        mode_step_pairs={**controller.state.mode_step_pairs, "cw": ((0.5, 0.1),)},
+    )
+    controller.execute("play-bg --allow-live --null-sink")
+
+    stepped = controller.execute("tune-step +0.5")
+    plan = controller.execute("play-plan")["plan"]
+
+    assert stepped["state"]["frequency_khz"] == 5000.0005
+    assert stepped["active_command"] == "SET mod=cw low_cut=650 high_cut=1050 freq=4999.2005"
+    assert "SET mod=cw low_cut=650 high_cut=1050 freq=4999.2005" in plan["dynamic_commands"]
+    controller.execute("stop")
+
+
 def test_client_executes_semicolon_command_batch():
     controller = ClientController()
 

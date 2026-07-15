@@ -67,6 +67,7 @@ class LiveSndCaptureConfig:
     user: str = "kiwi-client"
     frequency_khz: float = 4625.0
     radio_frequency_khz: float | None = None
+    frequency_decimals: int = 3
     mode: str = "am"
     low_cut_hz: int = -4900
     high_cut_hz: int = 4900
@@ -110,6 +111,7 @@ class LiveSndCaptureConfig:
             user=self.user,
             frequency_khz=self.effective_radio_frequency_khz,
             modulation=self.mode,
+            frequency_decimals=self.frequency_decimals,
             low_cut=self.low_cut_hz,
             high_cut=self.high_cut_hz,
             compression=self.compression,
@@ -123,6 +125,7 @@ class LiveSndCaptureConfig:
             "output": str(self.output),
             "frequency_khz": self.frequency_khz,
             "radio_frequency_khz": self.effective_radio_frequency_khz,
+            "frequency_decimals": self.frequency_decimals,
             "mode": self.mode,
             "low_cut_hz": self.low_cut_hz,
             "high_cut_hz": self.high_cut_hz,

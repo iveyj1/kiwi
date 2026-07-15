@@ -21,6 +21,7 @@ FULL_PRESET_EXCLUDED_FIELDS = frozenset(
         "duration_seconds",
         "max_frames",
         "cw_offset_hz",
+        "frequency_command_decimals",
         "mode_step_pairs",
         "mode_step_indices",
         "connected",
@@ -164,7 +165,7 @@ def _state_value(key: str, value: Any) -> Any:
     if key == "mode_passbands":
         return {str(mode): (int(cuts[0]), int(cuts[1])) for mode, cuts in dict(value).items()}
     if key == "mode_step_pairs":
-        return {str(mode): tuple((int(pair[0]), int(pair[1])) for pair in pairs) for mode, pairs in dict(value).items()}
+        return {str(mode): tuple((float(pair[0]), float(pair[1])) for pair in pairs) for mode, pairs in dict(value).items()}
     if key == "mode_step_indices":
         return {str(mode): int(index) for mode, index in dict(value).items()}
     return value

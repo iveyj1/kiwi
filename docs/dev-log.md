@@ -205,7 +205,11 @@ Cleaned preset/state ownership: full radio presets now exclude config/state-owne
 
 Added per-mode passband tuning and CW heterodyne offset handling. AM/USB/LSB/CW now carry separate passbands; `filter` updates the current mode only and bare `mode` restores the mode-specific saved/default passband. In CW, the displayed/user frequency remains passband center while the Kiwi command frequency adds configured `cw_offset_hz` (default `-800`, so `335.000 kHz` sends `334.200 kHz`). Live plans expose both `frequency_khz` and `radio_frequency_khz`.
 
-Added per-mode tuning step pairs and TUI step cycling. Defaults are AM `5000/1000`, USB/LSB `1000/100`, and CW `100/10`; config may define additional `[normal_hz, small_hz]` pairs per mode. Normal tune keys use the current normal step, shifted tune keys use the current small step, and `t`/`T` move between configured pairs with end clamping. Dashboard/status now shows the active pair as `Step: normal/small Hz`.
+Added per-mode tuning step pairs and TUI step cycling. Defaults are AM `5000/1000`, USB/LSB `1000/100`, and CW `100/10`; config may define additional `[normal_hz, small_hz]` pairs per mode. Normal tune keys use the current normal step, shifted tune keys use the current small step, and `t`/`T` move between configured pairs with end clamping.
+
+Improved TUI frequency display: `[display].frequency_decimals` controls displayed kHz precision for frequency and step sizes, defaulting to `3`. Steps are shown as fractional kHz (`Step: 1.000/0.100 kHz`). CW dashboard display labels the user frequency as `Center frequency` and adds a separate radio-frequency/offset line. TUI command handling now catches background `RuntimeError`, so repeating `:pb` while playback is already running reports an error instead of unwinding curses.
+
+Added configurable Kiwi command frequency precision via `[tuning].command_frequency_decimals`. Existing behavior remains 3 decimals by default, while local root config uses 4 decimals so sub-Hz steps can produce sub-Hz `SET mod ... freq=` values such as `4999.2005`.
 
 Changed `setup-python` into a fresh-machine bootstrap for the current project harness: it now installs the editable package with `dev`, `live`, `playback`, and `image` extras and verifies that `pytest`, `websockets`, `sounddevice`, and `matplotlib` are importable. Added an explicit `image` optional dependency for the waterfall PNG inspection helper, and improved the helper's missing-matplotlib error to suggest `./setup-python` or `python3 -m pip install -e '.[image]'`.
 

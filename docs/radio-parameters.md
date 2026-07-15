@@ -22,7 +22,9 @@ Concise list of radio/client parameters currently settable or persisted by this 
 - `cw_offset_hz` — signed CW heterodyne offset. With `frequency_khz = 335.000` and `cw_offset_hz = -800`, `radio_frequency_khz = 334.200`.
 - `mode_step_pairs` — configured per-mode tuning step pairs as `(normal_hz, small_hz)`.
 - `mode_step_indices` — current selected step-pair index per mode.
-- `current_step_hz` / `current_small_step_hz` — active normal/small tuning steps for the current mode.
+- `current_step_hz` / `current_small_step_hz` — active normal/small tuning steps for the current mode. Displayed as kHz using configured display precision.
+- `frequency_decimals` — number of decimal places for displayed kHz frequencies and step sizes. Default is `3` (`.000 kHz`).
+- `command_frequency_decimals` — number of decimal places sent in Kiwi `SET mod ... freq=` commands. Default is `3`; set `4` or more for sub-Hz command frequencies.
 
 Kiwi command shape:
 
@@ -83,7 +85,7 @@ Minimal preset currently stores:
 - `low_cut_hz`
 - `high_cut_hz`
 
-Full preset stores receiver/tuning/filter/AGC fields, including per-mode passbands. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `cw_offset_hz`, mode step settings/indices, `user`, `volume_percent`, and `connected`.
+Full preset stores receiver/tuning/filter/AGC fields, including per-mode passbands. It intentionally excludes config/state-owned fields such as `allowed_receivers`, audio startup/fade settings, `receivers_restricted`, `duration_seconds`, `max_frames`, `cw_offset_hz`, `command_frequency_decimals`, mode step settings/indices, `user`, `volume_percent`, and `connected`.
 
 Persistence layout:
 
