@@ -218,6 +218,15 @@ Evidence: `kiwiclient/kiwi/client.py` `_set_snd_comp()`.
 Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
 Failure behavior: TBD.
 
+Command: SET zoom=<zoom> cf=<center_khz>
+Direction: client -> server W/F
+Purpose: Set or dynamically recenter/zoom the waterfall around an exact selected frequency.
+Fields: integer zoom level and center frequency in kHz; interactive cursor path emits four decimals.
+Example: SET zoom=8 cf=5000.1250
+Evidence: existing setup/reference behavior plus fake-WebSocket dynamic command harness.
+Fixture/test: `tests/protocol/test_commands.py`, `tests/harness/test_live_waterfall.py`, `tests/harness/test_waterfall_terminal.py`.
+Failure behavior: command is bounded locally to zoom `0..zoom_max`; no automatic reconnect.
+
 Command: SET keepalive
 Direction: client -> server
 Purpose: Keep SND session alive.

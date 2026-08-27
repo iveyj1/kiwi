@@ -254,7 +254,8 @@ Suggested order:
 15. Done: prevent terminal output backpressure from starving W/F networking by using a single coalescing worker renderer and Kiwi application keepalives instead of WebSocket ping timeouts.
 16. Done: add a source-bin cursor, precise frequency/offset/step status, local keyboard navigation/reset, and clean keyboard quit without mutating receiver tuning.
 17. Done: replace bin-sized cursor movement with exact configured per-mode main/small frequency steps and pair cycling while retaining bin width only as display resolution.
-18. Next: add fixture-tested W/F recenter and zoom commands, then coordinate selected tuning with a separate audio session before choosing integrated/native display direction.
+18. Done: add queued fixture-tested W/F recenter and bounded zoom commands centered on exact cursor selection.
+19. Next: coordinate cursor tuning with a separately owned SND audio session and audio on/off controls before choosing integrated/native display direction.
 
 Notes:
 

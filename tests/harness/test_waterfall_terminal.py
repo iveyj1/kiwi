@@ -233,11 +233,15 @@ def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
 def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
     decoder = CursorKeyDecoder()
 
-    assert decoder.feed(b"hLtT0q") == (
+    assert decoder.feed(b"hLtTc+=-0q") == (
         CursorAction("move", -1),
         CursorAction("move-small", 1),
         CursorAction("cycle-step", 1),
         CursorAction("cycle-step", -1),
+        CursorAction("recenter"),
+        CursorAction("zoom", 1),
+        CursorAction("zoom", 1),
+        CursorAction("zoom", -1),
         CursorAction("reset"),
         CursorAction("quit"),
     )
@@ -523,6 +527,36 @@ def test_viewer_cursor_uses_exact_steps_independent_from_bin_resolution():
     viewer.reset_cursor()
     assert viewer.cursor_frequency_khz == pytest.approx(150.0)
     assert viewer.tuned_khz == 150.0
+
+
+def test_viewer_builds_recenter_and_zoom_commands_around_exact_cursor():
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=1,
+        tuned_khz=5000.0,
+        show_cursor=True,
+        step_pairs_hz=((1000.0, 100.0),),
+        zoom=7,
+        zoom_max=8,
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=4882.8125,
+            span_khz=234.375,
+            bin_width_hz=58_593.75,
+        ),
+        draw=False,
+    )
+    viewer.move_cursor_steps(1)
+
+    assert viewer.cursor_frequency_khz == pytest.approx(5001.0)
+    assert viewer.recenter_command() == "SET zoom=7 cf=5001.0000"
+    assert viewer.zoom_command(1) == "SET zoom=8 cf=5001.0000"
+    assert viewer.zoom_command(1) is None
+    assert viewer.zoom_command(-1) == "SET zoom=7 cf=5001.0000"
 
 
 def test_viewer_cycles_mode_step_pairs_and_uses_small_step():

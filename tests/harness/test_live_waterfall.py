@@ -1,5 +1,6 @@
 import asyncio
 import json
+import queue
 from pathlib import Path
 
 import pytest
@@ -144,6 +145,30 @@ def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Pat
     assert len(frames) == 1
     assert frames[0].sequence == 42
     assert frames[0].dbm == (-255, -200, -127, -55, 0)
+
+
+def test_capture_live_waterfall_sends_queued_navigation_command(tmp_path: Path):
+    config = LiveWaterfallCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=tmp_path / "wf-control.jsonl",
+        timestamp=123456,
+        max_frames=1,
+    )
+    fake_connect = FakeConnect([WF_PAYLOAD])
+    commands: queue.Queue[str] = queue.Queue()
+    commands.put("SET zoom=8 cf=5000.1250")
+
+    asyncio.run(
+        capture_live_waterfall(
+            config,
+            allow_live=True,
+            websocket_connect=fake_connect,
+            command_queue=commands,
+        )
+    )
+
+    assert fake_connect.websocket.sent[-1] == "SET zoom=8 cf=5000.1250"
 
 
 def test_capture_live_waterfall_reports_websocket_closure_without_raw_transport_error(tmp_path: Path):

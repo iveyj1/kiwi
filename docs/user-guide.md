@@ -535,12 +535,15 @@ Live keyboard controls are local-only and do not send tuning or zoom commands:
 - `H`, shifted-left arrow: move down by the active small step.
 - `L`, shifted-right arrow: move up by the active small step.
 - `t` / `T`: cycle forward/backward through the mode's configured main/small step pairs.
-- `0`: reset cursor to the nearest source bin at tuned frequency.
+- `0`: reset cursor to tuned frequency on the active round step grid.
+- `c`: recenter the current W/F zoom on the exact cursor frequency.
+- `+` / `=`: zoom in one level around the cursor.
+- `-`: zoom out one level around the cursor.
 - `q`: stop cleanly.
 
 The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
 
-Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair.
+Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send only fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands; they do not tune audio.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 
