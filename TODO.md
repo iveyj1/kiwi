@@ -2,6 +2,18 @@
 
 ## Current slice
 
+Goal: Pair combined W/F and SND connections with one Kiwi session timestamp.
+
+Observed failure: pressing `a` on `misdr.proxy.kiwisdr.com:8073` caused the existing W/F socket to close with code 1005. Kiwi browser source uses one `kiwi.conn_tstamp` for both `SND` and `W/F`; the combined client left both timestamps as `None`, so each delayed `websocket_uri()` call generated a different timestamp.
+
+Done criteria:
+
+- Add a pure harness proving delayed audio uses exactly the same assigned session timestamp as W/F.
+- Resolve one timestamp once in the standalone viewer before constructing either config.
+- Preserve explicit `--timestamp` unchanged.
+- Record browser-source evidence and regression behavior.
+- Run full harness and merge `fix/wf-shared-session-id` into `wf1`; no automatic external live test.
+
 Goal: Add coordinated SND audio ownership and cursor tune controls to complete requested step 4.
 
 Done criteria:
