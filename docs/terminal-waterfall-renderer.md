@@ -197,4 +197,5 @@ Do not require a Kitty terminal in automated tests.
 9. Done: isolate live terminal rendering from the network event loop, coalesce redraw requests, disable redundant WebSocket protocol pings, and report connection closure without a traceback.
 10. Done: add a local cursor, precise status readout, local keyboard movement/reset, and clean keyboard quit without transmitting receiver commands.
 11. Done: change cursor movement to configured per-mode round main/small frequency steps, preserve exact selected frequency, cycle step pairs, and map selection to the nearest raster column; bin width remains display resolution.
-12. Pending: add fixture-tested receiver recenter/zoom commands, then coordinate exact selected tuning with the separate audio session.
+12. Done: add queued, fixture-tested W/F recenter and zoom commands around exact cursor selection with zoom bounds.
+13. Pending: coordinate exact selected tuning with a separately owned SND audio session and audio on/off controls.

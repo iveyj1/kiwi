@@ -8,6 +8,7 @@ import base64
 import json
 import math
 import os
+import queue
 import shutil
 import sys
 import tempfile
@@ -19,6 +20,7 @@ from pathlib import Path
 from threading import Event, Lock
 from typing import Any, BinaryIO, Callable, Mapping, Protocol
 
+from kiwi_client.commands import encode_waterfall_view
 from kiwi_client.config import KiwiClientConfig, discover_config_path, load_config
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.live_capture import LiveCaptureError
@@ -27,6 +29,7 @@ from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
     WaterfallCursor,
     WaterfallFrame,
+    WF_ZOOM_MASK,
     WaterfallReceiverState,
     contextualize_waterfall_frame,
     parse_waterfall_uncompressed,
@@ -66,6 +69,10 @@ class CursorKeyDecoder:
         ord("t"): CursorAction("cycle-step", 1),
         ord("T"): CursorAction("cycle-step", -1),
         ord("0"): CursorAction("reset"),
+        ord("c"): CursorAction("recenter"),
+        ord("+"): CursorAction("zoom", 1),
+        ord("="): CursorAction("zoom", 1),
+        ord("-"): CursorAction("zoom", -1),
         ord("q"): CursorAction("quit"),
     }
 
@@ -423,6 +430,8 @@ class WaterfallTerminalViewer:
         mode: str = "am",
         step_pairs_hz: tuple[tuple[float, float], ...] = ((1000.0, 100.0),),
         step_pair_index: int = 0,
+        zoom: int = 0,
+        zoom_max: int = 14,
         keyboard_enabled: bool = False,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -434,6 +443,8 @@ class WaterfallTerminalViewer:
             raise ValueError("high_cut_hz must be greater than low_cut_hz")
         if not step_pairs_hz or any(main <= 0 or small <= 0 for main, small in step_pairs_hz):
             raise ValueError("cursor step pairs must contain positive main/small steps")
+        if zoom < 0 or zoom_max < zoom:
+            raise ValueError("waterfall zoom must satisfy 0 <= zoom <= zoom_max")
         self.backend = backend
         self.history = WaterfallHistory(max_rows=max_rows)
         self.min_dbm = min_dbm
@@ -449,6 +460,8 @@ class WaterfallTerminalViewer:
         self.mode = mode.lower()
         self.step_pairs_hz = tuple((float(main), float(small)) for main, small in step_pairs_hz)
         self.step_pair_index = step_pair_index % len(self.step_pairs_hz)
+        self.zoom = zoom
+        self.zoom_max = zoom_max
         self.keyboard_enabled = keyboard_enabled
         self.refresh_interval = 1.0 / refresh_hz
         self.clock = clock
@@ -490,7 +503,7 @@ class WaterfallTerminalViewer:
         if tuned_khz is not None:
             parts.insert(1, f"tuned {cursor.frequency_khz - tuned_khz:+.3f} kHz")
         if keyboard_enabled:
-            parts.append("h/l main H/L small t/T pair 0 reset q quit")
+            parts.append("h/l main H/L small t/T pair c center +/- zoom 0 reset q quit")
         return " | ".join(parts)
 
     def cursor_status(self) -> str:
@@ -529,6 +542,22 @@ class WaterfallTerminalViewer:
             self._generation += 1
             return True
 
+    def recenter_command(self) -> str | None:
+        with self._lock:
+            if self._cursor is None:
+                return None
+            return encode_waterfall_view(self.zoom, self._cursor.frequency_khz, frequency_decimals=4)
+
+    def zoom_command(self, delta: int) -> str | None:
+        with self._lock:
+            if self._cursor is None:
+                return None
+            zoom = min(max(0, self.zoom + delta), self.zoom_max)
+            if zoom == self.zoom:
+                return None
+            self.zoom = zoom
+            return encode_waterfall_view(zoom, self._cursor.frequency_khz, frequency_decimals=4)
+
     def reset_cursor(self) -> bool:
         with self._lock:
             if self._cursor is None:
@@ -552,6 +581,8 @@ class WaterfallTerminalViewer:
         now = self.clock()
         should_draw = False
         with self._lock:
+            if frame.flags_x_zoom_server is not None:
+                self.zoom = min(frame.flags_x_zoom_server & WF_ZOOM_MASK, self.zoom_max)
             if frame.start_khz is not None and frame.span_khz is not None:
                 start_khz = frame.start_khz
                 end_khz = frame.start_khz + frame.span_khz
@@ -673,6 +704,7 @@ async def control_waterfall_cursor(
     redraw_requested: asyncio.Event,
     stop_event: Event,
     input_fd: int,
+    command_queue: queue.Queue[str] | None = None,
 ) -> None:
     """Read local cursor controls in cbreak mode and always restore terminal input."""
     loop = asyncio.get_running_loop()
@@ -708,6 +740,14 @@ async def control_waterfall_cursor(
                 elif action.kind == "reset":
                     if viewer.reset_cursor():
                         redraw_requested.set()
+                elif action.kind == "recenter" and command_queue is not None:
+                    command = viewer.recenter_command()
+                    if command is not None:
+                        command_queue.put(command)
+                elif action.kind == "zoom" and command_queue is not None:
+                    command = viewer.zoom_command(action.bins)
+                    if command is not None:
+                        command_queue.put(command)
                 elif action.kind == "quit":
                     stop_event.set()
                     return
@@ -727,6 +767,7 @@ async def view_live_waterfall(
     """Receive frames promptly while a bounded background renderer draws the latest state."""
     redraw_requested = asyncio.Event()
     stop_event = Event()
+    command_queue: queue.Queue[str] = queue.Queue()
     stopping = False
 
     def receive_frame(frame: WaterfallFrame) -> None:
@@ -758,6 +799,7 @@ async def view_live_waterfall(
             allow_live=allow_live,
             stop_event=stop_event,
             frame_callback=receive_frame,
+            command_queue=command_queue,
             websocket_connect=websocket_connect,
         )
     )
@@ -769,6 +811,7 @@ async def view_live_waterfall(
                 redraw_requested=redraw_requested,
                 stop_event=stop_event,
                 input_fd=keyboard_fd,
+                command_queue=command_queue,
             )
         )
         if keyboard_fd is not None
@@ -939,6 +982,7 @@ def _viewer(args: argparse.Namespace, output: BinaryIO) -> WaterfallTerminalView
         mode=args.mode,
         step_pairs_hz=args.cursor_step_pairs,
         step_pair_index=args.step_pair,
+        zoom=args.zoom,
         keyboard_enabled=args.keyboard and args.fixture is None,
     )
 

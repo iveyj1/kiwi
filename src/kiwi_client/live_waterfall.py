@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import queue
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +15,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from kiwi_client.capture import JsonlCaptureWriter, WaterfallCaptureMetadata
-from kiwi_client.commands import encode_auth, encode_keepalive
+from kiwi_client.commands import encode_auth, encode_keepalive, encode_waterfall_view
 from kiwi_client.live_capture import (
     LiveCaptureError,
     allowed_receiver_names,
@@ -119,7 +120,7 @@ class LiveWaterfallCaptureConfig:
     def setup_commands(self) -> list[str]:
         """Return setup commands sent after auth."""
         return [
-            f"SET zoom={self.zoom} cf={self.center_khz:.3f}",
+            encode_waterfall_view(self.zoom, self.center_khz),
             f"SET maxdb={self.maxdb} mindb={self.mindb}",
             f"SET wf_speed={self.speed}",
             "SET wf_comp=0",
@@ -176,6 +177,7 @@ async def capture_live_waterfall(
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
     frame_callback: Callable[[WaterfallFrame], None] | None = None,
+    command_queue: queue.Queue[str] | None = None,
     websocket_connect: Callable[..., Any] | None = None,
 ) -> Path:
     """Run one guarded live W/F capture and write a JSONL fixture."""
@@ -218,6 +220,14 @@ async def capture_live_waterfall(
                     writer.add_tx_cmd(now - start, command, stream="wf")
                     await websocket.send(command)
                     last_keepalive = now
+                if command_queue is not None:
+                    while True:
+                        try:
+                            command = command_queue.get_nowait()
+                        except queue.Empty:
+                            break
+                        writer.add_tx_cmd(now - start, command, stream="wf")
+                        await websocket.send(command)
                 remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
                 if remaining == 0:
                     break

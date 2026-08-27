@@ -10,6 +10,7 @@ from kiwi_client.commands import (
     encode_keepalive,
     encode_modulation,
     encode_squelch,
+    encode_waterfall_view,
 )
 
 
@@ -33,6 +34,10 @@ def test_encode_identity_mode_agc_compression_keepalive():
     assert encode_compression(False) == "SET compression=0"
     assert encode_compression(True) == "SET compression=1"
     assert encode_keepalive() == "SET keepalive"
+
+
+def test_encode_waterfall_view_uses_exact_selected_frequency():
+    assert encode_waterfall_view(8, 5000.125, frequency_decimals=4) == "SET zoom=8 cf=5000.1250"
 
 
 def test_encode_basic_snd_setup_supports_configured_frequency_precision():
