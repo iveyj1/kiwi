@@ -640,7 +640,6 @@ async def control_waterfall_cursor(
     queue: asyncio.Queue[bytes] = asyncio.Queue()
     decoder = CursorKeyDecoder()
     previous_attributes = termios.tcgetattr(input_fd)
-    previous_blocking = os.get_blocking(input_fd)
 
     def read_ready() -> None:
         try:
@@ -655,7 +654,6 @@ async def control_waterfall_cursor(
 
     try:
         tty.setcbreak(input_fd, termios.TCSANOW)
-        os.set_blocking(input_fd, False)
         loop.add_reader(input_fd, read_ready)
         while not stop_event.is_set():
             for action in decoder.feed(await queue.get()):
@@ -670,7 +668,6 @@ async def control_waterfall_cursor(
                     return
     finally:
         loop.remove_reader(input_fd)
-        os.set_blocking(input_fd, previous_blocking)
         termios.tcsetattr(input_fd, termios.TCSANOW, previous_attributes)
 
 
@@ -950,7 +947,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
         return 0
-    except (LiveCaptureError, RuntimeError, ValueError) as exc:
+    except (LiveCaptureError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     return 2
 

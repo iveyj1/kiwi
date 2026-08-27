@@ -27,6 +27,7 @@ from kiwi_client.waterfall_terminal import (
     format_frequency_ruler,
     frequency_label_decimals,
     frequency_ticks,
+    main as waterfall_terminal_main,
     preview_terminal_fixture,
     terminal_supports_kitty,
     view_live_waterfall,
@@ -121,6 +122,28 @@ high_cut_hz = 5000
     assert overridden.show_passband is False
 
 
+def test_terminal_main_reports_output_oserror_without_traceback(monkeypatch, capsys):
+    async def fail_output(*args, **kwargs):
+        raise BlockingIOError(11, "write could not complete without blocking")
+
+    monkeypatch.setattr("kiwi_client.waterfall_terminal.view_live_waterfall", fail_output)
+
+    with pytest.raises(SystemExit) as exc:
+        waterfall_terminal_main([
+            "--allow-live",
+            "--no-keyboard",
+            "--duration-seconds",
+            "1",
+            "--max-frames",
+            "1",
+        ])
+
+    captured = capsys.readouterr()
+    assert exc.value.code == 2
+    assert "write could not complete without blocking" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
     monkeypatch.setattr("kiwi_client.waterfall_terminal.shutil.get_terminal_size", lambda fallback=None: os.terminal_size((132, 48)))
     args = apply_waterfall_config(
@@ -156,6 +179,7 @@ def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
 
 def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_terminal():
     master_fd, input_fd = pty.openpty()
+    output_fd = os.dup(input_fd)
     original_attributes = termios.tcgetattr(input_fd)
     viewer = WaterfallTerminalViewer(
         backend=FakeBackend(),
@@ -189,6 +213,7 @@ def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_termin
             )
         )
         await asyncio.sleep(0)
+        assert os.get_blocking(output_fd) is True
         os.write(master_fd, b"hq")
         await asyncio.wait_for(task, timeout=1.0)
 
@@ -201,6 +226,7 @@ def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_termin
     finally:
         os.close(master_fd)
         os.close(input_fd)
+        os.close(output_fd)
 
 
 def test_terminal_capability_detection_is_explicit_and_conservative():

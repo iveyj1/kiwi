@@ -2,6 +2,22 @@
 
 ## Current slice
 
+Goal: Prevent cursor input setup from making terminal graphics output nonblocking.
+
+Observed failure: live cursor mode raised `BlockingIOError: [Errno 11] write could not complete without blocking` from the background renderer. `control_waterfall_cursor()` calls `os.set_blocking(input_fd, False)`; when shell stdin/stdout are duplicated from the same terminal open-file description, that changes the shared `O_NONBLOCK` status and makes graphics writes fail with `EAGAIN`.
+
+Done criteria:
+
+- Add a pseudo-terminal regression where input and output descriptors share one open-file description.
+- Do not alter terminal descriptor blocking mode; `add_reader()` already invokes reads only when input is ready.
+- Preserve cbreak setup/restoration and clean keyboard quit.
+- Ensure renderer failures are reported without an uncaught traceback if an output `OSError` occurs for another reason.
+- Run targeted and full harnesses, document the finding, and merge `fix/wf-keyboard-blocking` into `wf1` while leaving `main` untouched.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_terminal.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no initially; shared descriptor flags and keyboard restoration are deterministic under a pseudo-terminal. User can retry after merge.
+
 Goal: Add a local waterfall cursor, precise frequency readout, and non-transmitting keyboard navigation.
 
 Done criteria:
