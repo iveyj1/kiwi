@@ -253,7 +253,8 @@ Suggested order:
 14. Done: add white tuned-frequency and orange passband-edge raster overlays, plus persistent `[waterfall]` defaults with explicit CLI precedence.
 15. Done: prevent terminal output backpressure from starving W/F networking by using a single coalescing worker renderer and Kiwi application keepalives instead of WebSocket ping timeouts.
 16. Done: add a source-bin cursor, precise frequency/offset/step status, local keyboard navigation/reset, and clean keyboard quit without mutating receiver tuning.
-17. Next: evaluate cursor/overlay/ruler choices, add fixture-tested W/F recenter and zoom commands, then coordinate selected tuning with the separate audio session before choosing integrated/native display direction.
+17. Done: replace bin-sized cursor movement with exact configured per-mode main/small frequency steps and pair cycling while retaining bin width only as display resolution.
+18. Next: add fixture-tested W/F recenter and zoom commands, then coordinate selected tuning with a separate audio session before choosing integrated/native display direction.
 
 Notes:
 

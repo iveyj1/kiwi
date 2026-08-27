@@ -90,13 +90,12 @@ def decode_waterfall_interpolation(value: int) -> WaterfallInterpolation:
 
 @dataclass(frozen=True)
 class WaterfallCursor:
-    """A selected source-bin center within one mapped waterfall span."""
+    """An exact selected frequency with independent waterfall-bin resolution."""
 
     start_khz: float
     end_khz: float
     bin_width_hz: float
-    bin_index: int
-    bin_count: int
+    frequency_khz: float
 
     @classmethod
     def for_span(
@@ -105,43 +104,63 @@ class WaterfallCursor:
         start_khz: float,
         end_khz: float,
         bin_width_hz: float,
+        step_hz: float,
         preferred_khz: float | None = None,
     ) -> "WaterfallCursor":
         if end_khz <= start_khz:
             raise ValueError("cursor end_khz must be greater than start_khz")
         if bin_width_hz <= 0:
             raise ValueError("cursor bin_width_hz must be positive")
-        bin_count = max(1, round((end_khz - start_khz) * 1000.0 / bin_width_hz))
-        first_center_khz = start_khz + bin_width_hz / 2000.0
+        if step_hz <= 0:
+            raise ValueError("cursor step_hz must be positive")
         target_khz = (start_khz + end_khz) / 2.0 if preferred_khz is None else preferred_khz
         if not math.isfinite(target_khz):
             raise ValueError("cursor preferred_khz must be finite")
-        raw_index = (target_khz - first_center_khz) * 1000.0 / bin_width_hz
-        bin_index = min(max(0, math.floor(raw_index + 0.5)), bin_count - 1)
+        minimum_step = math.ceil(start_khz * 1000.0 / step_hz - 1e-12)
+        maximum_step = math.floor(end_khz * 1000.0 / step_hz + 1e-12)
+        if minimum_step <= maximum_step:
+            selected_step = min(
+                max(minimum_step, math.floor(target_khz * 1000.0 / step_hz + 0.5)),
+                maximum_step,
+            )
+            frequency_khz = selected_step * step_hz / 1000.0
+        else:
+            frequency_khz = min(max(target_khz, start_khz), end_khz)
         return cls(
             start_khz=start_khz,
             end_khz=end_khz,
             bin_width_hz=bin_width_hz,
-            bin_index=bin_index,
-            bin_count=bin_count,
+            frequency_khz=frequency_khz,
         )
 
-    @property
-    def frequency_khz(self) -> float:
-        return self.start_khz + (self.bin_index + 0.5) * self.bin_width_hz / 1000.0
-
-    def moved_bins(self, delta: int) -> "WaterfallCursor":
-        return replace(
-            self,
-            bin_index=min(max(0, self.bin_index + delta), self.bin_count - 1),
-        )
+    def moved_steps(self, delta: int, *, step_hz: float) -> "WaterfallCursor":
+        if step_hz <= 0:
+            raise ValueError("cursor step_hz must be positive")
+        frequency_hz = self.frequency_khz * 1000.0
+        if delta > 0:
+            selected_step = math.floor(frequency_hz / step_hz + 1e-12) + delta
+        elif delta < 0:
+            selected_step = math.ceil(frequency_hz / step_hz - 1e-12) + delta
+        else:
+            return self
+        minimum_step = math.ceil(self.start_khz * 1000.0 / step_hz - 1e-12)
+        maximum_step = math.floor(self.end_khz * 1000.0 / step_hz + 1e-12)
+        if minimum_step > maximum_step:
+            return self
+        selected_step = min(max(minimum_step, selected_step), maximum_step)
+        return replace(self, frequency_khz=selected_step * step_hz / 1000.0)
 
     def with_span(self, *, start_khz: float, end_khz: float, bin_width_hz: float) -> "WaterfallCursor":
-        return self.for_span(
+        if end_khz <= start_khz:
+            raise ValueError("cursor end_khz must be greater than start_khz")
+        if bin_width_hz <= 0:
+            raise ValueError("cursor bin_width_hz must be positive")
+        return replace(
+            self,
             start_khz=start_khz,
             end_khz=end_khz,
             bin_width_hz=bin_width_hz,
-            preferred_khz=self.frequency_khz,
+            frequency_khz=min(max(self.frequency_khz, start_khz), end_khz),
         )
 
 

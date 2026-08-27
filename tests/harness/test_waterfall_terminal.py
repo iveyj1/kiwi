@@ -116,6 +116,9 @@ high_cut_hz = 5000
     assert configured.show_passband is True
     assert configured.show_cursor is True
     assert configured.keyboard is True
+    assert configured.mode == "am"
+    assert configured.step_pair == 0
+    assert configured.cursor_step_pairs == ((5000, 1000),)
     assert configured.low_cut_hz == -5000
     assert configured.duration_seconds == 60.0
     assert configured.max_frames == 1500
@@ -230,9 +233,11 @@ def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
 def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
     decoder = CursorKeyDecoder()
 
-    assert decoder.feed(b"hL0q") == (
+    assert decoder.feed(b"hLtT0q") == (
         CursorAction("move", -1),
-        CursorAction("move", 10),
+        CursorAction("move-small", 1),
+        CursorAction("cycle-step", 1),
+        CursorAction("cycle-step", -1),
         CursorAction("reset"),
         CursorAction("quit"),
     )
@@ -242,8 +247,8 @@ def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
         CursorAction("move", 1),
     )
     assert decoder.feed(b"\x1b[1;2D\x1b[1;2C") == (
-        CursorAction("move", -10),
-        CursorAction("move", 10),
+        CursorAction("move-small", -1),
+        CursorAction("move-small", 1),
     )
 
 
@@ -289,7 +294,7 @@ def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_termin
 
     try:
         asyncio.run(exercise())
-        assert viewer.cursor_frequency_khz == pytest.approx(137.5)
+        assert viewer.cursor_frequency_khz == pytest.approx(149.0)
         assert redraw_requested.is_set()
         assert stop_event.is_set()
         assert termios.tcgetattr(input_fd) == original_attributes
@@ -488,7 +493,7 @@ def test_live_viewer_coalesces_immediate_frames_and_draws_off_event_loop(tmp_pat
     assert backend.draw_threads[0] != event_loop_thread
 
 
-def test_viewer_cursor_initializes_at_source_bin_and_moves_without_tuning():
+def test_viewer_cursor_uses_exact_steps_independent_from_bin_resolution():
     backend = FakeBackend()
     viewer = WaterfallTerminalViewer(
         backend=backend,
@@ -509,14 +514,44 @@ def test_viewer_cursor_initializes_at_source_bin_and_moves_without_tuning():
 
     viewer.append(frame, draw=False)
 
-    assert viewer.cursor_frequency_khz == pytest.approx(162.5)
-    assert viewer.move_cursor_bins(-1) is True
-    assert viewer.cursor_frequency_khz == pytest.approx(137.5)
-    assert "Cursor 137.500 kHz" in viewer.cursor_status()
-    assert "tuned -12.500 kHz" in viewer.cursor_status()
+    assert viewer.cursor_frequency_khz == pytest.approx(150.0)
+    assert viewer.move_cursor_steps(-1) is True
+    assert viewer.cursor_frequency_khz == pytest.approx(149.0)
+    assert "Cursor 149.0000 kHz" in viewer.cursor_status()
+    assert "tuned -1.000 kHz" in viewer.cursor_status()
+    assert "resolution 25000.000 Hz" in viewer.cursor_status()
     viewer.reset_cursor()
-    assert viewer.cursor_frequency_khz == pytest.approx(162.5)
+    assert viewer.cursor_frequency_khz == pytest.approx(150.0)
     assert viewer.tuned_khz == 150.0
+
+
+def test_viewer_cycles_mode_step_pairs_and_uses_small_step():
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=1,
+        tuned_khz=150.0,
+        show_cursor=True,
+        mode="am",
+        step_pairs_hz=((1000.0, 100.0), (5000.0, 500.0)),
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=100.0,
+            span_khz=100.0,
+            bin_width_hz=25_000.0,
+        ),
+        draw=False,
+    )
+
+    assert viewer.move_cursor_steps(1, small=True) is True
+    assert viewer.cursor_frequency_khz == pytest.approx(150.1)
+    assert viewer.cycle_step_pair(1) is True
+    assert viewer.move_cursor_steps(1) is True
+    assert viewer.cursor_frequency_khz == pytest.approx(155.0)
+    assert "am step 5000/500 Hz" in viewer.cursor_status()
 
 
 def test_viewer_raster_applies_configured_tuned_and_passband_overlays():

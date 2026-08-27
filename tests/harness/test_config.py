@@ -45,6 +45,7 @@ def test_default_config_has_keymaps_and_steps():
     assert config.waterfall.show_passband is False
     assert config.waterfall.show_cursor is True
     assert config.waterfall.keyboard is True
+    assert config.waterfall.cursor_step_pair == 0
     assert config.startup.mode == "last"
     assert config.startup.preset == 1
     assert config.startup.playback is False
@@ -115,6 +116,7 @@ show_tuned_marker = true
 show_passband = true
 show_cursor = false
 keyboard = false
+cursor_step_pair = 2
 low_cut_hz = -5000
 high_cut_hz = 5000
 
@@ -171,6 +173,7 @@ mode = "usb"
     assert config.waterfall.show_passband is True
     assert config.waterfall.show_cursor is False
     assert config.waterfall.keyboard is False
+    assert config.waterfall.cursor_step_pair == 2
     assert config.waterfall.low_cut_hz == -5000
     assert config.waterfall.high_cut_hz == 5000
     assert resolve_presets_path(config) == tmp_path / "my-presets.toml"

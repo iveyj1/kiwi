@@ -70,40 +70,43 @@ def test_wf_interpolation_rejects_unsupported_gap_values():
         decode_waterfall_interpolation(5)
 
 
-def test_waterfall_cursor_snaps_to_source_bin_centers_and_moves_by_bins():
+def test_waterfall_cursor_snaps_to_round_frequency_grid_and_moves_by_steps():
     cursor = WaterfallCursor.for_span(
         start_khz=100.0,
         end_khz=104.0,
         bin_width_hz=1000.0,
+        step_hz=1000.0,
         preferred_khz=102.2,
     )
 
-    assert cursor.frequency_khz == pytest.approx(102.5)
-    assert cursor.moved_bins(-1).frequency_khz == pytest.approx(101.5)
-    assert cursor.moved_bins(10).frequency_khz == pytest.approx(103.5)
-    assert cursor.moved_bins(-10).frequency_khz == pytest.approx(100.5)
+    assert cursor.frequency_khz == pytest.approx(102.0)
+    assert cursor.moved_steps(-1, step_hz=1000.0).frequency_khz == pytest.approx(101.0)
+    assert cursor.moved_steps(10, step_hz=1000.0).frequency_khz == pytest.approx(104.0)
+    assert cursor.moved_steps(-10, step_hz=1000.0).frequency_khz == pytest.approx(100.0)
 
 
-def test_waterfall_cursor_preserves_frequency_across_span_changes_when_visible():
+def test_waterfall_cursor_preserves_exact_frequency_across_resolution_changes():
     cursor = WaterfallCursor.for_span(
         start_khz=100.0,
         end_khz=104.0,
         bin_width_hz=1000.0,
+        step_hz=500.0,
         preferred_khz=102.5,
     )
 
     changed = cursor.with_span(start_khz=101.0, end_khz=103.0, bin_width_hz=500.0)
 
-    assert changed.frequency_khz == pytest.approx(102.75)
-    assert abs(changed.frequency_khz - cursor.frequency_khz) <= changed.bin_width_hz / 2000.0
+    assert changed.frequency_khz == pytest.approx(102.5)
     assert changed.bin_width_hz == pytest.approx(500.0)
 
 
 def test_waterfall_cursor_rejects_invalid_span_or_bin_width():
     with pytest.raises(ValueError, match="end_khz"):
-        WaterfallCursor.for_span(start_khz=10.0, end_khz=10.0, bin_width_hz=1.0)
+        WaterfallCursor.for_span(start_khz=10.0, end_khz=10.0, bin_width_hz=1.0, step_hz=1.0)
     with pytest.raises(ValueError, match="bin_width_hz"):
-        WaterfallCursor.for_span(start_khz=10.0, end_khz=11.0, bin_width_hz=0.0)
+        WaterfallCursor.for_span(start_khz=10.0, end_khz=11.0, bin_width_hz=0.0, step_hz=1.0)
+    with pytest.raises(ValueError, match="step_hz"):
+        WaterfallCursor.for_span(start_khz=10.0, end_khz=11.0, bin_width_hz=1.0, step_hz=0.0)
 
 
 def test_wf_receiver_state_maps_zoomed_max_bin_grid_to_frequency():

@@ -2,6 +2,22 @@
 
 ## Current slice
 
+Goal: Implement exact frequency-step cursor selection as prerequisite 1–2 of the requested cursor/navigation/audio sequence.
+
+Done criteria:
+
+- Replace bin-index cursor state with exact selected frequency plus separate raster-resolution metadata.
+- Snap initial and moved selection to a zero-anchored round frequency grid.
+- Reuse configured per-mode main/small step pairs; add mode and active pair state to the standalone viewer.
+- Map exact selection to the nearest raster column without changing selected frequency.
+- Use `h`/`l` and arrows for the main step, `H`/`L` and shifted arrows for the small step, and `t`/`T` to cycle step pairs.
+- Report exact cursor frequency, main/small steps, active mode, tuned offset, and bin resolution.
+- Add pure model/config/key/status/overlay regressions, run the full harness, and merge `feature/wf-frequency-steps` into `wf1`.
+
+Follow-on branches: W/F recenter/zoom command transport, then coordinated SND audio on/off and tune-to-cursor. `main` remains closed.
+
+Live-radio needed: no for this slice.
+
 Goal: Make `kiwi-wf-terminal` honor configured receiver restrictions and allowlists.
 
 Observed failure: adding `misdr.proxy.kiwisdr.com:8073` under `[receivers].allowed` did not affect the standalone W/F client. Configuration discovery loaded the TOML, but `_capture_config()` omitted `config.receivers.restricted` and `config.receivers.allowed`, so `LiveWaterfallCaptureConfig` silently fell back to its built-in local-only guard values.

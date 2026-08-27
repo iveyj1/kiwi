@@ -530,16 +530,17 @@ The live viewer defaults the tuned marker to `--center-khz`. A white vertical li
 
 Live keyboard controls are local-only and do not send tuning or zoom commands:
 
-- `h`, left arrow: move cursor one source bin lower.
-- `l`, right arrow: move cursor one source bin higher.
-- `H`, shifted-left arrow: move ten bins lower.
-- `L`, shifted-right arrow: move ten bins higher.
+- `h`, left arrow: move cursor down by the active main frequency step.
+- `l`, right arrow: move cursor up by the active main frequency step.
+- `H`, shifted-left arrow: move down by the active small step.
+- `L`, shifted-right arrow: move up by the active small step.
+- `t` / `T`: cycle forward/backward through the mode's configured main/small step pairs.
 - `0`: reset cursor to the nearest source bin at tuned frequency.
 - `q`: stop cleanly.
 
 The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
 
-Current cursor movement is intentionally a visualization prototype and advances by source bins. Before cursor-driven receiver/audio tuning is added, movement will use configured round frequency steps instead. The exact selected frequency will be retained independently and drawn at the nearest available raster column; source-bin width will describe display resolution only.
+Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 

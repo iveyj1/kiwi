@@ -53,16 +53,18 @@ class CursorKeyDecoder:
     """Incrementally decode cursor keys without assuming one read per escape sequence."""
 
     _sequences = {
-        b"\x1b[1;2D": CursorAction("move", -10),
-        b"\x1b[1;2C": CursorAction("move", 10),
+        b"\x1b[1;2D": CursorAction("move-small", -1),
+        b"\x1b[1;2C": CursorAction("move-small", 1),
         b"\x1b[D": CursorAction("move", -1),
         b"\x1b[C": CursorAction("move", 1),
     }
     _single = {
         ord("h"): CursorAction("move", -1),
         ord("l"): CursorAction("move", 1),
-        ord("H"): CursorAction("move", -10),
-        ord("L"): CursorAction("move", 10),
+        ord("H"): CursorAction("move-small", -1),
+        ord("L"): CursorAction("move-small", 1),
+        ord("t"): CursorAction("cycle-step", 1),
+        ord("T"): CursorAction("cycle-step", -1),
         ord("0"): CursorAction("reset"),
         ord("q"): CursorAction("quit"),
     }
@@ -418,6 +420,9 @@ class WaterfallTerminalViewer:
         show_passband: bool = False,
         show_cursor: bool = False,
         cursor_khz: float | None = None,
+        mode: str = "am",
+        step_pairs_hz: tuple[tuple[float, float], ...] = ((1000.0, 100.0),),
+        step_pair_index: int = 0,
         keyboard_enabled: bool = False,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -427,6 +432,8 @@ class WaterfallTerminalViewer:
             raise ValueError("refresh_hz must be positive")
         if low_cut_hz is not None and high_cut_hz is not None and high_cut_hz <= low_cut_hz:
             raise ValueError("high_cut_hz must be greater than low_cut_hz")
+        if not step_pairs_hz or any(main <= 0 or small <= 0 for main, small in step_pairs_hz):
+            raise ValueError("cursor step pairs must contain positive main/small steps")
         self.backend = backend
         self.history = WaterfallHistory(max_rows=max_rows)
         self.min_dbm = min_dbm
@@ -439,6 +446,9 @@ class WaterfallTerminalViewer:
         self.show_passband = show_passband
         self.show_cursor = show_cursor
         self.initial_cursor_khz = cursor_khz
+        self.mode = mode.lower()
+        self.step_pairs_hz = tuple((float(main), float(small)) for main, small in step_pairs_hz)
+        self.step_pair_index = step_pair_index % len(self.step_pairs_hz)
         self.keyboard_enabled = keyboard_enabled
         self.refresh_interval = 1.0 / refresh_hz
         self.clock = clock
@@ -465,36 +475,57 @@ class WaterfallTerminalViewer:
         cursor: WaterfallCursor | None,
         tuned_khz: float | None,
         *,
+        mode: str,
+        main_step_hz: float,
+        small_step_hz: float,
         keyboard_enabled: bool,
     ) -> str | None:
         if cursor is None:
             return None
         parts = [
-            f"Cursor {cursor.frequency_khz:.3f} kHz",
-            f"step {cursor.bin_width_hz:.3f} Hz",
+            f"Cursor {cursor.frequency_khz:.4f} kHz",
+            f"{mode} step {main_step_hz:g}/{small_step_hz:g} Hz",
+            f"resolution {cursor.bin_width_hz:.3f} Hz",
         ]
         if tuned_khz is not None:
             parts.insert(1, f"tuned {cursor.frequency_khz - tuned_khz:+.3f} kHz")
         if keyboard_enabled:
-            parts.append("h/l 1 bin H/L 10 0 reset q quit")
+            parts.append("h/l main H/L small t/T pair 0 reset q quit")
         return " | ".join(parts)
 
     def cursor_status(self) -> str:
         with self._lock:
+            main_step_hz, small_step_hz = self.step_pairs_hz[self.step_pair_index]
             return self._format_cursor_status(
                 self._cursor,
                 self.tuned_khz,
+                mode=self.mode,
+                main_step_hz=main_step_hz,
+                small_step_hz=small_step_hz,
                 keyboard_enabled=self.keyboard_enabled,
             ) or ""
 
-    def move_cursor_bins(self, delta: int) -> bool:
+    def move_cursor_steps(self, delta: int, *, small: bool = False) -> bool:
         with self._lock:
             if self._cursor is None:
                 return False
-            cursor = self._cursor.moved_bins(delta)
+            main_step_hz, small_step_hz = self.step_pairs_hz[self.step_pair_index]
+            cursor = self._cursor.moved_steps(
+                delta,
+                step_hz=small_step_hz if small else main_step_hz,
+            )
             if cursor == self._cursor:
                 return False
             self._cursor = cursor
+            self._generation += 1
+            return True
+
+    def cycle_step_pair(self, delta: int) -> bool:
+        with self._lock:
+            index = (self.step_pair_index + delta) % len(self.step_pairs_hz)
+            if index == self.step_pair_index:
+                return False
+            self.step_pair_index = index
             self._generation += 1
             return True
 
@@ -503,10 +534,12 @@ class WaterfallTerminalViewer:
             if self._cursor is None:
                 return False
             preferred_khz = self.tuned_khz
+            main_step_hz, _small_step_hz = self.step_pairs_hz[self.step_pair_index]
             cursor = WaterfallCursor.for_span(
                 start_khz=self._cursor.start_khz,
                 end_khz=self._cursor.end_khz,
                 bin_width_hz=self._cursor.bin_width_hz,
+                step_hz=main_step_hz,
                 preferred_khz=preferred_khz,
             )
             if cursor == self._cursor:
@@ -528,10 +561,12 @@ class WaterfallTerminalViewer:
                         preferred_khz = self.initial_cursor_khz
                         if preferred_khz is None:
                             preferred_khz = self.tuned_khz
+                        main_step_hz, _small_step_hz = self.step_pairs_hz[self.step_pair_index]
                         self._cursor = WaterfallCursor.for_span(
                             start_khz=start_khz,
                             end_khz=end_khz,
                             bin_width_hz=frame.bin_width_hz,
+                            step_hz=main_step_hz,
                             preferred_khz=preferred_khz,
                         )
                     else:
@@ -556,9 +591,13 @@ class WaterfallTerminalViewer:
             frequency_range = self._frequency_range
             cursor = self._cursor
             cursor_khz = None if cursor is None else cursor.frequency_khz
+            main_step_hz, small_step_hz = self.step_pairs_hz[self.step_pair_index]
             status = self._format_cursor_status(
                 cursor,
                 self.tuned_khz,
+                mode=self.mode,
+                main_step_hz=main_step_hz,
+                small_step_hz=small_step_hz,
                 keyboard_enabled=self.keyboard_enabled,
             )
             generation = self._generation
@@ -658,7 +697,13 @@ async def control_waterfall_cursor(
         while not stop_event.is_set():
             for action in decoder.feed(await queue.get()):
                 if action.kind == "move":
-                    if viewer.move_cursor_bins(action.bins):
+                    if viewer.move_cursor_steps(action.bins):
+                        redraw_requested.set()
+                elif action.kind == "move-small":
+                    if viewer.move_cursor_steps(action.bins, small=True):
+                        redraw_requested.set()
+                elif action.kind == "cycle-step":
+                    if viewer.cycle_step_pair(action.bins):
                         redraw_requested.set()
                 elif action.kind == "reset":
                     if viewer.reset_cursor():
@@ -773,7 +818,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-tuned-marker", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--show-passband", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--show-cursor", action=argparse.BooleanOptionalAction, default=None)
-    parser.add_argument("--cursor-khz", type=float, help="initial local cursor frequency")
+    parser.add_argument("--cursor-khz", type=float, help="initial exact local cursor frequency")
+    parser.add_argument("--mode", help="mode whose configured main/small cursor step pairs are used")
+    parser.add_argument("--step-pair", type=int, help="initial zero-based configured mode step-pair index")
     parser.add_argument("--keyboard", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--force", action="store_true", help="emit Kitty graphics even when capability detection fails")
     parser.add_argument("--host", default="10.0.0.40")
@@ -817,6 +864,8 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
         "show_passband": waterfall.show_passband,
         "show_cursor": waterfall.show_cursor,
         "keyboard": waterfall.keyboard,
+        "mode": str(config.default_state.get("mode", "am")),
+        "step_pair": waterfall.cursor_step_pair,
         "tuned_khz": waterfall.tuned_khz,
         "low_cut_hz": waterfall.low_cut_hz,
         "high_cut_hz": waterfall.high_cut_hz,
@@ -827,6 +876,11 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
     for name, value in defaults.items():
         if getattr(args, name) is None:
             setattr(args, name, value)
+    mode = args.mode.lower()
+    if mode not in config.tuning.mode_step_pairs:
+        raise ValueError(f"no configured cursor step pairs for mode: {mode}")
+    args.mode = mode
+    args.cursor_step_pairs = config.tuning.mode_step_pairs[mode]
     args.receivers_restricted = config.receivers.restricted
     args.allowed_receivers = config.receivers.allowed
     return args
@@ -882,6 +936,9 @@ def _viewer(args: argparse.Namespace, output: BinaryIO) -> WaterfallTerminalView
         show_passband=args.show_passband,
         show_cursor=args.show_cursor,
         cursor_khz=args.cursor_khz,
+        mode=args.mode,
+        step_pairs_hz=args.cursor_step_pairs,
+        step_pair_index=args.step_pair,
         keyboard_enabled=args.keyboard and args.fixture is None,
     )
 
@@ -921,6 +978,9 @@ def main(argv: list[str] | None = None) -> int:
                     "show_tuned_marker": viewer.show_tuned_marker,
                     "show_passband": viewer.show_passband,
                     "show_cursor": viewer.show_cursor,
+                    "cursor_mode": viewer.mode,
+                    "cursor_step_pair": viewer.step_pair_index,
+                    "cursor_step_pairs_hz": viewer.step_pairs_hz,
                     "keyboard": args.keyboard,
                     "receivers_restricted": app_config.receivers.restricted,
                     "allowed_receivers": app_config.receivers.allowed,
