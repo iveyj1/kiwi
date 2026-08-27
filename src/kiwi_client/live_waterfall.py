@@ -25,7 +25,13 @@ from kiwi_client.live_capture import (
 )
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import WaterfallSequenceTracker, parse_waterfall_uncompressed
-from kiwi_client.waterfall_render import DEFAULT_ASCII_RAMP, render_ascii_waterfall_row
+from kiwi_client.waterfall_render import (
+    DEFAULT_ASCII_RAMP,
+    DEFAULT_REDUCTION,
+    REDUCTIONS,
+    render_ascii_waterfall_row,
+    resolve_columns,
+)
 
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
 
@@ -44,6 +50,8 @@ class LiveWaterfallCaptureConfig:
     render_maxdb: int | None = None
     render_mindb: int | None = None
     ascii_ramp: str = DEFAULT_ASCII_RAMP
+    ascii_columns: int | None = None
+    ascii_reduction: str = DEFAULT_REDUCTION
     speed: int = 1
     interp: int = 13
     duration_seconds: float = 3.0
@@ -76,6 +84,10 @@ class LiveWaterfallCaptureConfig:
             raise LiveCaptureError("render max dB must be greater than render min dB")
         if len(self.ascii_ramp) < 2:
             raise LiveCaptureError("ASCII waterfall ramp must contain at least two characters")
+        if self.ascii_columns is not None and self.ascii_columns < 1:
+            raise LiveCaptureError("ASCII waterfall columns must be >= 1, or None for one character per bin")
+        if self.ascii_reduction not in REDUCTIONS:
+            raise LiveCaptureError(f"ASCII waterfall reduction must be one of {REDUCTIONS}")
         if self.compression:
             raise LiveCaptureError("first live W/F capture must use wf_comp=0 for existing parser coverage")
         if self.output.exists() and not self.overwrite:
@@ -120,6 +132,8 @@ class LiveWaterfallCaptureConfig:
             "render_maxdb": self.ascii_maxdb,
             "render_mindb": self.ascii_mindb,
             "ascii_ramp": self.ascii_ramp,
+            "ascii_columns": self.ascii_columns,
+            "ascii_reduction": self.ascii_reduction,
             "speed": self.speed,
             "interp": self.interp,
             "duration_seconds": self.duration_seconds,
@@ -230,6 +244,8 @@ async def capture_live_waterfall(
                             min_dbm=config.ascii_mindb,
                             max_dbm=config.ascii_maxdb,
                             ramp=config.ascii_ramp,
+                            columns=config.ascii_columns,
+                            reduction=config.ascii_reduction,
                         ),
                     }
                     status_callback(metrics)
@@ -250,6 +266,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--render-max-db", type=int, help="local ASCII render max dB; defaults to --max-db")
     parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
     parser.add_argument("--ramp", default=DEFAULT_ASCII_RAMP, help="ASCII intensity ramp from dim to bright")
+    parser.add_argument(
+        "--columns",
+        type=int,
+        help="ASCII display columns per frame; defaults to terminal width, 0 renders one character per bin",
+    )
+    parser.add_argument(
+        "--reduction",
+        choices=REDUCTIONS,
+        default=DEFAULT_REDUCTION,
+        help="how bins are aggregated into a column; max keeps narrow carriers visible",
+    )
     parser.add_argument("--speed", type=int, default=1)
     parser.add_argument("--interp", type=int, default=13)
     parser.add_argument("--duration-seconds", type=float, default=3.0)
@@ -274,6 +301,8 @@ def config_from_args(args: argparse.Namespace) -> LiveWaterfallCaptureConfig:
         render_maxdb=args.render_max_db,
         render_mindb=args.render_min_db,
         ascii_ramp=args.ramp,
+        ascii_columns=resolve_columns(args.columns),
+        ascii_reduction=args.reduction,
         speed=args.speed,
         interp=args.interp,
         duration_seconds=args.duration_seconds,
@@ -286,6 +315,8 @@ def config_from_args(args: argparse.Namespace) -> LiveWaterfallCaptureConfig:
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+    if args.columns is not None and args.columns < 0:
+        parser.error("--columns must be >= 0")
     config = config_from_args(args)
     try:
         config.validate()

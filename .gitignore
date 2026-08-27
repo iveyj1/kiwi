@@ -1,6 +1,8 @@
 __pycache__/
+.venv-kiwi/
 kiwiclient/
 recordings/
+sweeps/
 artifacts/
 state.json
 *egg-info/

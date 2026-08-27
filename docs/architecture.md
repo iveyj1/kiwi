@@ -28,6 +28,23 @@ Interactive receiver/playback lifecycle policy belongs in the controller layer, 
 
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md).
 
+## Measurement belongs to the audio path, not the waterfall
+
+The waterfall is a visualization path. Detectors and any frequency, amplitude, or
+timing measurement read the SND audio stream instead.
+
+The W/F stream is lossy by design: 8-bit levels quantised to 1 dB, receiver-side
+`interp` smoothing already applied, no phase, and a bin-to-frequency mapping that
+is known not to be exactly linear in the receiver's own window index (see the W/F
+section of [Kiwi protocol notes](kiwi-protocol.md)). The SND stream carries full
+16-bit PCM, preserves phase, offers IQ mode, and reports its own `sample_rate` to
+six decimals so the timebase can be corrected; the waterfall exposes no equivalent
+and works from the nominal `bandwidth`.
+
+Practically this means beacon detection and long-integration analysis take audio
+as input, and waterfall accuracy only ever has to be good enough to put a signal
+on the right pixel.
+
 ## Suggested modules
 
 ```text

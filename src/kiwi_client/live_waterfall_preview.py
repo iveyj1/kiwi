@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
+from kiwi_client.waterfall_render import DEFAULT_REDUCTION, REDUCTIONS, resolve_columns
 
 
 def preview_live_waterfall(
@@ -53,6 +54,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--render-max-db", type=int, help="local ASCII render max dB; defaults to --max-db")
     parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
     parser.add_argument("--ramp", default=" .:-=+*#%@", help="ASCII intensity ramp from dim to bright")
+    parser.add_argument(
+        "--columns",
+        type=int,
+        help="display columns per frame; defaults to terminal width, 0 renders one character per bin",
+    )
+    parser.add_argument(
+        "--reduction",
+        choices=REDUCTIONS,
+        default=DEFAULT_REDUCTION,
+        help="how bins are aggregated into a column; max keeps narrow carriers visible",
+    )
     parser.add_argument("--speed", type=int, default=1)
     parser.add_argument("--interp", type=int, default=13)
     parser.add_argument("--duration-seconds", type=float, default=60.0)
@@ -78,6 +90,8 @@ def config_from_args(args: argparse.Namespace, output: Path) -> LiveWaterfallCap
         render_maxdb=args.render_max_db,
         render_mindb=args.render_min_db,
         ascii_ramp=args.ramp,
+        ascii_columns=resolve_columns(args.columns),
+        ascii_reduction=args.reduction,
         speed=args.speed,
         interp=args.interp,
         duration_seconds=args.duration_seconds,
@@ -104,6 +118,8 @@ def _run_live_preview(args: argparse.Namespace, output: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
+    if args.columns is not None and args.columns < 0:
+        parser.error("--columns must be >= 0")
     if args.dry_run:
         output = args.save_fixture or Path("<temporary-wf-preview.jsonl>")
         config = config_from_args(args, output)

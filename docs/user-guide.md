@@ -464,6 +464,34 @@ Useful controls:
 - `--min-db` / `--max-db`: receiver waterfall scale commands.
 - `--render-min-db` / `--render-max-db`: local ASCII display scale; defaults to receiver scale.
 - `--ramp " .:-=+*#%@"`: ASCII colormap from dim to bright.
+- `--columns N`: display columns per frame; defaults to the detected terminal width.
+- `--reduction max|mean`: how bins are aggregated into a column; default `max`.
+
+### Display columns
+
+A W/F frame normally carries 1024 bins. Rendering one character per bin makes a
+single frame wrap across several physical terminal rows, which is unreadable as
+a waterfall. `kiwi-wf-preview`, `kiwi-wf-capture`, and `kiwi-wf-live` therefore
+reduce bins to the detected terminal width by default, so one frame is one row.
+
+```bash
+# One row per frame at the current terminal width (default).
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --min-db -200 --max-db -25
+
+# Fixed width, useful for reproducible output in scripts and notes.
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --columns 100
+
+# One character per bin, the previous behavior.
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --columns 0
+```
+
+`--reduction max` is the default because a narrow carrier occupying one bin
+survives decimation. `--reduction mean` averages instead, which shows the noise
+floor more evenly but buries single-bin signals — useful for judging band
+conditions, not for spotting beacons.
+
+Reduction never upsamples: if the requested column count is at least the bin
+count, the row is rendered one character per bin unchanged.
 
 Installed script names:
 
@@ -471,6 +499,62 @@ Installed script names:
 kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local-wf-capture.jsonl
 kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
+
+### Measuring the bin center offset
+
+`kiwi-wf-sweep` measures the W/F bin center offset directly, against a reference
+of known exact frequency, instead of inferring it from broadcast carriers whose
+own tolerance is +/-20 Hz.
+
+It steps the receive window past the reference in small increments. Each window
+position constrains the offset, and the constraints intersect to a narrow range
+once the peak crosses a bin boundary. Precision is set by the step size, not by
+the reference's frequency error.
+
+Plan first, without connecting:
+
+```bash
+kiwi-wf-sweep --dry-run --output sweeps/wwvb.jsonl --reference-khz 60 --zoom 9
+```
+
+Run it:
+
+```bash
+kiwi-wf-sweep --allow-live --host 10.0.0.40 \
+  --output sweeps/wwvb.jsonl --reference-khz 60 --zoom 9
+```
+
+Re-analyse a saved sweep offline, with no network access:
+
+```bash
+kiwi-wf-sweep --analyse sweeps/wwvb.jsonl --reference-khz 60
+```
+
+Choosing a reference:
+
+- **WWVB at 60 kHz** is cesium-referenced, so its frequency error is negligible.
+  It needs `--zoom 8` or higher, because lower zooms cannot center 60 kHz and
+  clamp the window against 0 Hz, where bin 0 is dead in every frame.
+- **WWV at 5000/10000/15000/20000 kHz** is equally accurate and sits mid-band,
+  avoiding the LF noise floor. Running one sweep at 60 kHz and another at
+  10 MHz puts `start` at very different values, which tests whether the offset
+  depends on `start` at all.
+- **The receiver's own signal generator** (`SET gen=`) would be ideal, being
+  locked to the same ADC clock as the FFT. Check first whether it is global to
+  the receiver rather than per-connection; if global, it injects a tone into
+  every other user's receiver.
+
+Choosing a zoom trades two effects against each other:
+
+- Higher zoom narrows the bins, so less atmospheric noise lands in each one:
+  about +3 dB of SNR per zoom step.
+- Higher zoom also halves the number of window positions per bin, coarsening
+  the sweep. At zoom 14 there is one position per bin and the sweep cannot
+  work at all.
+
+Zoom 9 or 10 balances the two. The CLI refuses configurations that cannot work:
+a sweep too short to cross a bin boundary, a step too coarse to improve on the
+existing bound, or a zoom too low to center the reference.
 
 Expected future operations:
 

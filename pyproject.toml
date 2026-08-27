@@ -30,6 +30,7 @@ kiwi-play-wav = "kiwi_client.playback:main"
 kiwi-wf-preview = "kiwi_client.waterfall_preview:main"
 kiwi-wf-capture = "kiwi_client.live_waterfall:main"
 kiwi-wf-live = "kiwi_client.live_waterfall_preview:main"
+kiwi-wf-sweep = "kiwi_client.waterfall_sweep:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

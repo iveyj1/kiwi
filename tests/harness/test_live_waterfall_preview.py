@@ -2,7 +2,7 @@ from pathlib import Path
 
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.live_waterfall_preview import main, preview_live_waterfall
-from tests.harness.test_live_waterfall import FakeConnect, WF_PAYLOAD
+from tests.harness.test_live_waterfall import FakeConnect, LOCAL_WF_PAYLOAD, WF_PAYLOAD
 
 
 def test_preview_live_waterfall_prints_ascii_rows_with_fake_websocket(tmp_path: Path):
@@ -48,6 +48,69 @@ def test_live_waterfall_preview_main_uses_save_fixture_with_fake_websocket(tmp_p
     assert code == 0
     assert captured.out == "   +@\n"
     assert output.exists()
+
+
+def test_live_waterfall_preview_main_reduces_rows_to_terminal_width(tmp_path: Path, monkeypatch, capsys):
+    output = tmp_path / "wf.jsonl"
+    fake_connect = FakeConnect([LOCAL_WF_PAYLOAD])
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setattr("kiwi_client.live_waterfall_preview._websocket_connect_for_main", lambda: fake_connect)
+
+    code = main([
+        "--allow-live",
+        "--host",
+        "10.0.0.40",
+        "--timestamp",
+        "123456",
+        "--max-frames",
+        "1",
+        "--render-min-db",
+        "-200",
+        "--render-max-db",
+        "-25",
+        "--save-fixture",
+        str(output),
+    ])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert [len(row) for row in captured.out.splitlines()] == [100]
+
+
+def test_live_waterfall_preview_main_columns_zero_keeps_one_char_per_bin(tmp_path: Path, monkeypatch, capsys):
+    output = tmp_path / "wf.jsonl"
+    fake_connect = FakeConnect([LOCAL_WF_PAYLOAD])
+    monkeypatch.setenv("COLUMNS", "100")
+    monkeypatch.setattr("kiwi_client.live_waterfall_preview._websocket_connect_for_main", lambda: fake_connect)
+
+    code = main([
+        "--allow-live",
+        "--host",
+        "10.0.0.40",
+        "--timestamp",
+        "123456",
+        "--max-frames",
+        "1",
+        "--columns",
+        "0",
+        "--save-fixture",
+        str(output),
+    ])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert [len(row) for row in captured.out.splitlines()] == [1024]
+
+
+def test_live_waterfall_preview_main_dry_run_reports_resolved_columns(monkeypatch, capsys):
+    monkeypatch.setenv("COLUMNS", "100")
+
+    code = main(["--dry-run", "--host", "10.0.0.40", "--timestamp", "123456"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert '"ascii_columns": 100' in captured.out
+    assert '"ascii_reduction": "max"' in captured.out
 
 
 def test_live_waterfall_preview_main_accepts_render_scale_with_fake_websocket(tmp_path: Path, monkeypatch, capsys):

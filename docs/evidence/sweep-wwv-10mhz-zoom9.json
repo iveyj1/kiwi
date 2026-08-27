@@ -1,0 +1,317 @@
+{
+  "bandwidth_hz": 30000000.0,
+  "fft_size": 1024,
+  "reference_hz": 10000000.0,
+  "samples": [
+    {
+      "floor_dbm": -112.9047619047619,
+      "frame_count": 21,
+      "peak_bin": 512,
+      "peak_dbm": -66.95238095238095,
+      "x_bin_server": 5575999
+    },
+    {
+      "floor_dbm": -111.14285714285714,
+      "frame_count": 21,
+      "peak_bin": 512,
+      "peak_dbm": -67.9047619047619,
+      "x_bin_server": 5576000
+    },
+    {
+      "floor_dbm": -113.75,
+      "frame_count": 20,
+      "peak_bin": 512,
+      "peak_dbm": -73.05,
+      "x_bin_server": 5576001
+    },
+    {
+      "floor_dbm": -113.94736842105263,
+      "frame_count": 19,
+      "peak_bin": 512,
+      "peak_dbm": -75.6842105263158,
+      "x_bin_server": 5576002
+    },
+    {
+      "floor_dbm": -114.2,
+      "frame_count": 20,
+      "peak_bin": 512,
+      "peak_dbm": -72.15,
+      "x_bin_server": 5576003
+    },
+    {
+      "floor_dbm": -111.85,
+      "frame_count": 20,
+      "peak_bin": 512,
+      "peak_dbm": -80.95,
+      "x_bin_server": 5576004
+    },
+    {
+      "floor_dbm": -112.25,
+      "frame_count": 20,
+      "peak_bin": 512,
+      "peak_dbm": -71.65,
+      "x_bin_server": 5576005
+    },
+    {
+      "floor_dbm": -113.15,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -73.2,
+      "x_bin_server": 5576006
+    },
+    {
+      "floor_dbm": -113.14285714285714,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -78.04761904761905,
+      "x_bin_server": 5576008
+    },
+    {
+      "floor_dbm": -112.45,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -76.5,
+      "x_bin_server": 5576009
+    },
+    {
+      "floor_dbm": -113.21052631578948,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -71.15789473684211,
+      "x_bin_server": 5576010
+    },
+    {
+      "floor_dbm": -113.7,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -69.5,
+      "x_bin_server": 5576011
+    },
+    {
+      "floor_dbm": -113.15,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -75.15,
+      "x_bin_server": 5576012
+    },
+    {
+      "floor_dbm": -112.1,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.85,
+      "x_bin_server": 5576013
+    },
+    {
+      "floor_dbm": -112.66666666666667,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -66.14285714285714,
+      "x_bin_server": 5576014
+    },
+    {
+      "floor_dbm": -112.1,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -77.15,
+      "x_bin_server": 5576015
+    },
+    {
+      "floor_dbm": -112.95,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -66.7,
+      "x_bin_server": 5576017
+    },
+    {
+      "floor_dbm": -112.6842105263158,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -64.52631578947368,
+      "x_bin_server": 5576018
+    },
+    {
+      "floor_dbm": -113.75,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -70.35,
+      "x_bin_server": 5576019
+    },
+    {
+      "floor_dbm": -112.475,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -78.0,
+      "x_bin_server": 5576020
+    },
+    {
+      "floor_dbm": -112.33333333333333,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -73.95238095238095,
+      "x_bin_server": 5576021
+    },
+    {
+      "floor_dbm": -113.0,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -75.2,
+      "x_bin_server": 5576022
+    },
+    {
+      "floor_dbm": -113.57894736842105,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -74.21052631578948,
+      "x_bin_server": 5576023
+    },
+    {
+      "floor_dbm": -113.42857142857143,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -67.23809523809524,
+      "x_bin_server": 5576024
+    },
+    {
+      "floor_dbm": -113.1,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -66.85,
+      "x_bin_server": 5576025
+    },
+    {
+      "floor_dbm": -113.10526315789474,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -74.84210526315789,
+      "x_bin_server": 5576027
+    },
+    {
+      "floor_dbm": -113.19047619047619,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -65.71428571428571,
+      "x_bin_server": 5576028
+    },
+    {
+      "floor_dbm": -112.95,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -65.7,
+      "x_bin_server": 5576029
+    },
+    {
+      "floor_dbm": -111.47368421052632,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -67.57894736842105,
+      "x_bin_server": 5576030
+    },
+    {
+      "floor_dbm": -111.4,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -65.75,
+      "x_bin_server": 5576031
+    },
+    {
+      "floor_dbm": -113.28571428571429,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -70.95238095238095,
+      "x_bin_server": 5576032
+    },
+    {
+      "floor_dbm": -113.0,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.7,
+      "x_bin_server": 5576033
+    },
+    {
+      "floor_dbm": -113.3157894736842,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -70.3157894736842,
+      "x_bin_server": 5576034
+    },
+    {
+      "floor_dbm": -112.85714285714286,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -66.42857142857143,
+      "x_bin_server": 5576036
+    },
+    {
+      "floor_dbm": -112.73684210526316,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -63.63157894736842,
+      "x_bin_server": 5576037
+    },
+    {
+      "floor_dbm": -113.55,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.75,
+      "x_bin_server": 5576038
+    },
+    {
+      "floor_dbm": -113.19047619047619,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -71.23809523809524,
+      "x_bin_server": 5576039
+    },
+    {
+      "floor_dbm": -113.57894736842105,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -67.94736842105263,
+      "x_bin_server": 5576040
+    },
+    {
+      "floor_dbm": -111.7,
+      "frame_count": 20,
+      "peak_bin": 510,
+      "peak_dbm": -68.4,
+      "x_bin_server": 5576041
+    },
+    {
+      "floor_dbm": -113.3157894736842,
+      "frame_count": 19,
+      "peak_bin": 510,
+      "peak_dbm": -67.0,
+      "x_bin_server": 5576042
+    }
+  ],
+  "summary": {
+    "best_snr_db": 49.10526315789475,
+    "bin_transitions": [
+      [
+        5576006,
+        512,
+        511
+      ],
+      [
+        5576041,
+        511,
+        510
+      ]
+    ],
+    "bin_width_hz": 57.220458984375,
+    "constant_offset_fits": false,
+    "crossed_bin_boundary": true,
+    "model_positions_per_bin": 32.0,
+    "observed_positions_per_bin": 35.0,
+    "offset_max": 1.4791666666666288,
+    "offset_mean": 0.9026041666666558,
+    "offset_min": 0.4166666666666856,
+    "offset_range": 1.0624999999999432,
+    "reference_hz": 10000000.0,
+    "usable_positions": 40,
+    "window_positions": 40,
+    "zoom": 9
+  },
+  "zoom": 9,
+  "zoom_max": 14
+}
