@@ -136,14 +136,57 @@ Local captured W/F observations:
 - The two captured W/F frames decoded with complete-message layout: 3-byte `W/F` tag, one raw flags byte, 12-byte little-endian W/F header, and 1024 raw bin bytes.
 - Both captured frames had `raw_flags=32`, `x_bin_server=0`, `flags_x_zoom_server=0`, and `seq=0`. Because the two frames have different bin data and plausible waterfall intensity ranges, repeated `seq=0` is treated by the local tracker as an inactive/unknown W/F sequence counter rather than a real dropout. More captures are still needed before assigning exact sequence semantics.
 
+### Zoomed W/F captures and frequency mapping
+
+Two further local captures from `10.0.0.40:8073` on 2026-08-27 UTC, both `wf_comp=0`, `wf_speed=4`, 60 frames:
+
+- `tests/fixtures/kiwi/local-wf-910-zoom8.jsonl` — center 910 kHz, `MSG zoom=8 start=476140`.
+- `tests/fixtures/kiwi/local-wf-760-zoom9.jsonl` — center 760 kHz, `MSG zoom=9 start=408638`.
+
+These captures resolve several previously open questions:
+
+- **`x_bin_server` equals `MSG start`.** Both captures show the frame header field matching the `start` value reported in `MSG zoom=<z> start=<n>` exactly. At zoom 0 both are `0`, which is why the field looked unused in the first fixture.
+- **`start` is expressed in zoom-max bin units**, not in bins at the current zoom. One count is `bandwidth / (wf_fft_size * 2**zoom_max)` = 1.788139 Hz for a 30 MHz, 1024-bin, `zoom_max=14` receiver.
+- **`flags_x_zoom_server` carries zoom in its low bits.** Observed `8` at zoom 8 and `0x40009` at zoom 9. Only two samples exist, so the exact mask width is unconfirmed; `MSG zoom=` is the reliable source and the local helper `zoom_from_flags()` is marked provisional.
+- **Span follows `bandwidth / 2**zoom` across all bins.** Fitting measured AM carrier positions gives a bin width within 1 part in 10^4 of the formula.
+
+Resulting mapping, implemented as `WaterfallSpan` in `src/kiwi_client/waterfall.py`:
+
+```text
+unit_hz  = bandwidth / (wf_fft_size * 2**zoom_max)
+start_hz = x_bin_server * unit_hz
+bin_hz   = bandwidth / (wf_fft_size * 2**zoom)
+span_hz  = bandwidth / 2**zoom
+
+window center  = start_hz + (wf_fft_size / 2) * bin_hz
+signal in bin i = start_hz + (i + BIN_CENTER_OFFSET) * bin_hz
+```
+
+The window center reproduces the tuned `cf` value to within a few Hz: 909.998 kHz and 759.999 kHz for captures tuned to 910 and 760.
+
+**`BIN_CENTER_OFFSET = 0.83` is provisional and unexplained.** Known AM broadcast carriers on their 10 kHz channels peak 0.83 bins below where `start_hz + i * bin_hz` predicts. The offset is identical in both captures despite different zooms, centers, and bin widths, so it is constant in bins rather than in Hz. The captures bound it to `0.75 < offset <= 0.90`, which excludes both a clean half-bin and a clean whole-bin center convention. A third capture at another zoom is needed, and the cause should be identified before this is treated as settled.
+
+Evidence for the mapping, all fixture-backed and network-free in `tests/waterfall/test_frequency_mapping.py`:
+
+- All 11 AM channels from 860 to 960 kHz in the zoom-8 capture peak on the predicted bin.
+- All 5 AM channels from 740 to 780 kHz in the zoom-9 capture peak on the predicted bin.
+- Each of those peaks is more than 6 dB above the median bin level, so the test is measuring carriers rather than noise.
+
+Other observations from these captures:
+
+- `seq` remained `0` for all 60 frames at `wf_fps=23`, so repeated zero is not an artifact of the earlier 1 fps capture. W/F sequence still appears inactive on this receiver.
+- The receiver reported `rx_chans=8 wf_chans=3 wf_chans_real=3 wf_share=1 zoom_cap=11`, differing from the 2026-06-16 capture's `rx_chans=4 wf_chans=4 wf_chans_real=4 zoom_cap=14`. Either the receiver was reconfigured or these are different hosts behind the same address. **`zoom_cap` is the effective ceiling, not `zoom_max`.**
+- `SET wf_speed=4` produced `MSG wf_fps=23`, matching the reported `wf_fps_max`. The earlier `SET wf_speed=1` produced `MSG wf_fps=1`.
+- Carriers falling near a bin boundary split across two adjacent bins with nearly equal amplitude, e.g. 950 kHz at fractional bin position 0.71 gives bin 860 at -39 dBm and bin 861 at -38 dBm. Carriers near a bin center do not, e.g. 910 kHz at fractional position 0.18 gives a single peak with neighbours 10 dB down. This is ordinary FFT scalloping and is a property of the receiver's FFT, not of any display reduction.
+
 Still to verify with project fixtures:
 
-- `x_bin_server` and `flags_x_zoom_server` semantics.
-- Frequency span/bin mapping for local receiver versions.
-- Calibration and display scaling policy.
-- Timing/update behavior for each `wf_speed` value.
+- The cause and exact value of the provisional 0.83 bin center offset.
+- `flags_x_zoom_server` bit layout beyond the low zoom bits.
+- Calibration and display scaling policy, including how `wf_cal=-13` should be applied.
+- Timing/update behavior for `wf_speed` values 2 and 3.
 - Compressed W/F payload behavior.
-- Fixture coverage under `tests/fixtures/kiwi/wf-basic.jsonl` and later a local captured W/F fixture.
+- Whether `wf_share=1` changes frame timing or content.
 
 ## Commands
 

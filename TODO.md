@@ -2,6 +2,28 @@
 
 ## Current slice
 
+Goal: Reduce W/F bins to display columns so one frame renders as one row.
+
+Done criteria:
+
+- `waterfall_render.py` exposes a deterministic bin-to-column reduction with `max` and `mean` aggregation.
+- Bucket boundaries cover every bin exactly once, with bucket sizes differing by at most one bin.
+- `max` aggregation is the default so narrow carriers survive decimation.
+- Reduction is a no-op when the requested column count is at least the bin count; the library never upsamples.
+- ASCII row rendering accepts an optional column count without changing existing full-width behavior.
+- `kiwi-wf-preview` and `kiwi-wf-live` default to the detected terminal width and accept `--columns`, where `--columns 0` restores one character per bin.
+- `LiveWaterfallCaptureConfig` carries an explicit `ascii_columns` value so dry-run plans and capture metrics stay deterministic; terminal width is resolved in the CLI layer only.
+- Harness tests cover reduction arithmetic, clamping, terminal-width defaulting, and rendering from the 1024-bin local fixture.
+- `docs/waterfall-spec.md`, `docs/waterfall-rendering.md`, `docs/user-guide.md`, and `docs/dev-log.md` record the new display option.
+
+Test command: `python3 -m pytest tests/harness/test_waterfall_render.py tests/harness/test_waterfall_preview.py tests/harness/test_live_waterfall_preview.py tests/harness/test_live_waterfall.py && python3 -m pytest`
+
+Live-radio needed: no; rendering and CLI behavior only, using existing fixtures.
+
+Docs to update: `docs/waterfall-spec.md`, `docs/waterfall-rendering.md`, `docs/user-guide.md`, `docs/dev-log.md`.
+
+## Done in previous slices
+
 Goal: Waterfall fixture inspection and sequence semantics.
 
 Done criteria:
@@ -38,7 +60,10 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 ## Next
 
-- Add frequency/bin mapping from local W/F metadata (`center_freq`, `bandwidth`, `wf_fft_size`, zoom/start).
+- Explain the provisional `0.83` bin center offset in `WaterfallSpan`. Capture a third zoom level and check whether the offset is still `0.83` bins; identify the cause before treating the mapping as settled.
+- Confirm the `flags_x_zoom_server` bit layout beyond the low zoom bits; only `8` (zoom 8) and `0x40009` (zoom 9) have been observed.
+- Show a frequency axis in the W/F previews now that bin/frequency mapping exists.
+- Decide how `wf_cal=-13` should be applied to displayed dBm values.
 - When ready for richer terminal display, implement the bookmarked `docs/terminal-waterfall-renderer.md` spec.
 - Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
 

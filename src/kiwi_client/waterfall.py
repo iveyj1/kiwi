@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from kiwi_client.protocol import KiwiProtocolError, websocket_tag
 
 WF_HEADER_BYTES = 13
 SEQ_MODULUS = 2**32
 SEQ_REORDER_THRESHOLD = 2**31
+
+DEFAULT_WF_FFT_SIZE = 1024
+DEFAULT_ZOOM_MAX = 14
+ZOOM_FLAG_MASK = 0x0F
+
+# Provisional. Two local captures (zoom 8 at 910 kHz, zoom 9 at 760 kHz) both put
+# known AM carriers 0.83 bins below where `start_hz + index * bin_width` predicts.
+# The captures bound the offset to 0.75 < offset <= 0.90, which excludes both a
+# clean half-bin and a clean whole-bin center convention, so the cause is not yet
+# understood. See docs/kiwi-protocol.md.
+PROVISIONAL_BIN_CENTER_OFFSET = 0.83
 
 
 @dataclass(frozen=True)
@@ -42,6 +53,136 @@ class WaterfallFrame:
     x_bin_server: int | None = None
     flags_x_zoom_server: int | None = None
     raw_flags: int | None = None
+
+
+@dataclass(frozen=True)
+class WaterfallSpan:
+    """Receiver W/F geometry needed to map bin indices onto frequencies.
+
+    The values come from `MSG` frames, not from the W/F frame itself, so this is
+    kept separate from `WaterfallFrame` and combined with it by `apply_span()`.
+
+    Two different notions of frequency live here, and they differ by
+    `bin_center_offset`:
+
+    - Window geometry (`start_hz`, `span_hz`, `center_hz`) describes the tuned
+      window as the receiver reports it. No offset is applied; `center_hz`
+      reproduces the `cf` value sent in `SET zoom=<z> cf=<khz>`.
+    - `bin_frequency_hz()` describes where a signal appearing in a given bin
+      actually sits, and does apply the provisional offset.
+    """
+
+    bandwidth_hz: float
+    zoom: int
+    fft_size: int = DEFAULT_WF_FFT_SIZE
+    zoom_max: int = DEFAULT_ZOOM_MAX
+    bin_center_offset: float = PROVISIONAL_BIN_CENTER_OFFSET
+
+    def __post_init__(self) -> None:
+        if self.bandwidth_hz <= 0:
+            raise ValueError("waterfall bandwidth must be positive")
+        if self.fft_size < 1:
+            raise ValueError("waterfall FFT size must be >= 1")
+        if self.zoom < 0:
+            raise ValueError("waterfall zoom must be >= 0")
+        if self.zoom > self.zoom_max:
+            raise ValueError(f"waterfall zoom {self.zoom} exceeds zoom_max {self.zoom_max}")
+
+    @property
+    def unit_hz(self) -> float:
+        """Frequency step of one `x_bin_server` / `MSG start` count."""
+        return self.bandwidth_hz / (self.fft_size * 2**self.zoom_max)
+
+    @property
+    def bin_width_hz(self) -> float:
+        """Width of one displayed W/F bin at this zoom."""
+        return self.bandwidth_hz / (self.fft_size * 2**self.zoom)
+
+    @property
+    def span_hz(self) -> float:
+        """Total frequency span covered by one W/F frame at this zoom."""
+        return self.bandwidth_hz / 2**self.zoom
+
+    def start_hz(self, x_bin_server: int) -> float:
+        """Return the low-frequency edge of the window for this frame."""
+        return x_bin_server * self.unit_hz
+
+    def center_hz(self, x_bin_server: int) -> float:
+        """Return the window center, matching the `cf` value that was tuned."""
+        return self.start_hz(x_bin_server) + (self.fft_size / 2) * self.bin_width_hz
+
+    def bin_frequency_hz(self, x_bin_server: int, index: int) -> float:
+        """Return the calibrated signal frequency for one bin index."""
+        return self.start_hz(x_bin_server) + (index + self.bin_center_offset) * self.bin_width_hz
+
+    def bin_for_frequency(self, x_bin_server: int, frequency_hz: float) -> float:
+        """Return the fractional bin index a frequency falls at; inverse of `bin_frequency_hz()`."""
+        offset_hz = frequency_hz - self.start_hz(x_bin_server)
+        return offset_hz / self.bin_width_hz - self.bin_center_offset
+
+
+class WaterfallSessionMetadata:
+    """Accumulate W/F geometry from `MSG` frames across a session.
+
+    The receiver spreads the needed fields over several messages, so parameters
+    are folded in as they arrive and `span()` returns `None` until enough is
+    known.
+    """
+
+    def __init__(self) -> None:
+        self.bandwidth_hz: float | None = None
+        self.fft_size: int = DEFAULT_WF_FFT_SIZE
+        self.zoom_max: int = DEFAULT_ZOOM_MAX
+        self.zoom: int | None = None
+        self.start: int | None = None
+
+    def observe(self, params: dict[str, str | None]) -> None:
+        """Fold one parsed `MSG` parameter mapping into the accumulated geometry."""
+        if params.get("bandwidth") is not None:
+            self.bandwidth_hz = float(params["bandwidth"])
+        if params.get("wf_fft_size") is not None:
+            self.fft_size = int(params["wf_fft_size"])
+        if params.get("zoom_max") is not None:
+            self.zoom_max = int(params["zoom_max"])
+        if params.get("zoom") is not None:
+            self.zoom = int(params["zoom"])
+        if params.get("start") is not None:
+            self.start = int(params["start"])
+
+    def span(self) -> WaterfallSpan | None:
+        """Return the current span, or `None` while geometry is still incomplete."""
+        if self.bandwidth_hz is None or self.zoom is None:
+            return None
+        return WaterfallSpan(
+            bandwidth_hz=self.bandwidth_hz,
+            zoom=self.zoom,
+            fft_size=self.fft_size,
+            zoom_max=self.zoom_max,
+        )
+
+
+def zoom_from_flags(flags_x_zoom_server: int) -> int:
+    """Return the zoom level encoded in the low bits of `flags_x_zoom_server`.
+
+    Provisional: only two local observations exist, `8` at zoom 8 and `0x40009`
+    at zoom 9, so the exact mask width is unconfirmed. Prefer `MSG zoom=` when
+    it is available.
+    """
+    return flags_x_zoom_server & ZOOM_FLAG_MASK
+
+
+def apply_span(frame: WaterfallFrame, span: WaterfallSpan) -> WaterfallFrame:
+    """Return a copy of `frame` with its frequency fields filled in from `span`."""
+    if frame.x_bin_server is None:
+        raise ValueError("frame has no x_bin_server; cannot map bins to frequencies")
+    start_hz = span.start_hz(frame.x_bin_server)
+    return replace(
+        frame,
+        start_khz=start_hz / 1000.0,
+        span_khz=span.span_hz / 1000.0,
+        center_khz=span.center_hz(frame.x_bin_server) / 1000.0,
+        bin_width_hz=span.bin_width_hz,
+    )
 
 
 class WaterfallSequenceTracker:

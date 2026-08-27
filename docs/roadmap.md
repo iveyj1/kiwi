@@ -243,9 +243,11 @@ Suggested order:
 4. Done: add fixed-scale ASCII row renderer tests.
 5. Done: add fixture-to-text preview command.
 6. Done: capture a short local W/F fixture after parser/render tests pass.
-7. Partially done: update protocol notes with synthetic and local fixture-backed W/F facts; W/F sequence semantics still need investigation.
+7. Partially done: update protocol notes with synthetic and local fixture-backed W/F facts; W/F sequence semantics still need investigation. Repeated `seq=0` persists at 23 fps, so the counter appears inactive on the tested receiver.
 8. Done: add a standalone live W/F preview.
-9. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer.
+9. Done: reduce bins to display columns so one frame renders as one row, with `max` or `mean` aggregation.
+10. Done: bin-to-frequency mapping. `WaterfallSpan` / `WaterfallSessionMetadata` / `apply_span()` derive window geometry from `bandwidth`, `wf_fft_size`, `zoom_max`, `zoom`, and `x_bin_server`, verified against real AM carriers in two zoomed local fixtures. Carries a provisional, unexplained `0.83` bin center offset.
+11. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer. See `docs/terminal-waterfall-renderer.md`, whose Kitty-first backend order does not match the local terminal.
 
 Notes:
 
