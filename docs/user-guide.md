@@ -94,6 +94,9 @@ show_tuned_marker = true
 show_passband = true
 show_cursor = true
 keyboard = true
+# Start SND audio with the viewer; false still allows `a` to toggle it later.
+audio = false
+cursor_step_pair = 0
 low_cut_hz = -5000
 high_cut_hz = 5000
 
@@ -539,11 +542,15 @@ Live keyboard controls are local-only and do not send tuning or zoom commands:
 - `c`: recenter the current W/F zoom on the exact cursor frequency.
 - `+` / `=`: zoom in one level around the cursor.
 - `-`: zoom out one level around the cursor.
-- `q`: stop cleanly.
+- `a`: toggle the separately owned SND audio session.
+- Enter: tune active audio to the exact cursor frequency using current mode/passband.
+- `q`: stop W/F and audio cleanly.
 
 The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
 
-Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send only fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands; they do not tune audio.
+Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands.
+
+Audio uses a separate SND WebSocket owned by the same viewer lifecycle. Start it with `--audio`, `[waterfall].audio = true`, or toggle it with `a`; use `--null-audio` to test the SND session while discarding samples. Enter sends `SET mod=...` for the exact cursor frequency, mode, and passband. CW preserves the project convention that cursor/user frequency is passband center and applies configured `cw_offset_hz` to radio frequency. Audio errors appear in the status row without terminating W/F. Some receivers or proxies may account W/F and SND sessions separately.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 

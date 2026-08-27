@@ -18,7 +18,7 @@ The implementation in `src/kiwi_client/waterfall_raster.py` and `src/kiwi_client
 
 - Do not require Kitty/Sixel support for normal project use.
 - Do not bury W/F protocol parsing inside terminal UI code.
-- Do not couple this directly to curses TUI lifecycle at first.
+- Do not couple this directly to curses TUI lifecycle; optional SND audio remains a separately owned session task.
 - Do not implement a full GUI or browser-like Kiwi waterfall.
 
 ## Proposed command
@@ -198,4 +198,5 @@ Do not require a Kitty terminal in automated tests.
 10. Done: add a local cursor, precise status readout, local keyboard movement/reset, and clean keyboard quit without transmitting receiver commands.
 11. Done: change cursor movement to configured per-mode round main/small frequency steps, preserve exact selected frequency, cycle step pairs, and map selection to the nearest raster column; bin width remains display resolution.
 12. Done: add queued, fixture-tested W/F recenter and zoom commands around exact cursor selection with zoom bounds.
-13. Pending: coordinate exact selected tuning with a separately owned SND audio session and audio on/off controls.
+13. Done: coordinate exact selected tuning with a separately owned SND task, `a` audio toggle, Enter tune, CW offset/passband handling, null-sink diagnostics, status/error reporting, and shared viewer shutdown.
+14. Pending: user-evaluate combined W/F+SND operation and refine compact status/key presentation.

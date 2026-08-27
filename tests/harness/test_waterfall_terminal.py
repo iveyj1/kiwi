@@ -10,13 +10,16 @@ from pathlib import Path
 
 import pytest
 
+from kiwi_client.live_play import LiveSndPlaybackConfig
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.waterfall import WaterfallFrame
+from kiwi_client.playback import NullAudioSink
 from kiwi_client.waterfall_raster import PASSBAND_MARKER_RGB, TUNED_MARKER_RGB, RasterImage
 from kiwi_client.waterfall_terminal import (
     CursorAction,
     CursorKeyDecoder,
     KittyTerminalBackend,
+    WaterfallAudioController,
     WaterfallTerminalViewer,
     _capture_config,
     _viewer,
@@ -116,6 +119,7 @@ high_cut_hz = 5000
     assert configured.show_passband is True
     assert configured.show_cursor is True
     assert configured.keyboard is True
+    assert configured.audio is False
     assert configured.mode == "am"
     assert configured.step_pair == 0
     assert configured.cursor_step_pairs == ((5000, 1000),)
@@ -233,7 +237,7 @@ def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
 def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
     decoder = CursorKeyDecoder()
 
-    assert decoder.feed(b"hLtTc+=-0q") == (
+    assert decoder.feed(b"hLtTc+=-a\r0q") == (
         CursorAction("move", -1),
         CursorAction("move-small", 1),
         CursorAction("cycle-step", 1),
@@ -242,6 +246,8 @@ def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
         CursorAction("zoom", 1),
         CursorAction("zoom", 1),
         CursorAction("zoom", -1),
+        CursorAction("audio-toggle"),
+        CursorAction("audio-tune"),
         CursorAction("reset"),
         CursorAction("quit"),
     )
@@ -527,6 +533,119 @@ def test_viewer_cursor_uses_exact_steps_independent_from_bin_resolution():
     viewer.reset_cursor()
     assert viewer.cursor_frequency_khz == pytest.approx(150.0)
     assert viewer.tuned_khz == 150.0
+
+
+def test_audio_tune_command_applies_cw_radio_offset():
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=1,
+        tuned_khz=335.0,
+        low_cut_hz=650,
+        high_cut_hz=1050,
+        show_cursor=True,
+        mode="cw",
+        step_pairs_hz=((100.0, 10.0),),
+        cw_offset_hz=-800,
+        frequency_decimals=4,
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=330.0,
+            span_khz=10.0,
+            bin_width_hz=2500.0,
+        ),
+        draw=False,
+    )
+    viewer.move_cursor_steps(1)
+
+    assert viewer.audio_tune_command() == "SET mod=cw low_cut=650 high_cut=1050 freq=334.3000"
+    assert viewer.tuned_khz == pytest.approx(335.1)
+
+
+def test_audio_controller_toggles_and_tunes_to_exact_cursor():
+    calls = []
+
+    async def fake_audio_runner(config, sink, *, allow_live, stop_event, command_queue):
+        calls.append((config, sink, allow_live, command_queue))
+        while not stop_event.is_set():
+            await asyncio.sleep(0)
+
+    async def exercise():
+        viewer = WaterfallTerminalViewer(
+            backend=FakeBackend(),
+            max_rows=1,
+            tuned_khz=5000.0,
+            low_cut_hz=-5000,
+            high_cut_hz=5000,
+            show_cursor=True,
+            mode="am",
+            step_pairs_hz=((1000.0, 100.0),),
+            frequency_decimals=4,
+        )
+        viewer.append(
+            WaterfallFrame(
+                sequence=1,
+                bins=(155,) * 4,
+                dbm=(-100,) * 4,
+                start_khz=4882.8125,
+                span_khz=234.375,
+                bin_width_hz=58_593.75,
+            ),
+            draw=False,
+        )
+        redraw = asyncio.Event()
+        controller = WaterfallAudioController(
+            viewer=viewer,
+            config=LiveSndPlaybackConfig(receivers_restricted=False),
+            redraw_requested=redraw,
+            sink_factory=NullAudioSink,
+            runner=fake_audio_runner,
+        )
+
+        controller.start()
+        await asyncio.sleep(0)
+        assert controller.enabled is True
+        assert viewer.audio_status == "ON"
+        viewer.move_cursor_steps(1)
+        assert controller.tune_to_cursor() is True
+        assert controller.command_queue.get_nowait() == "SET mod=am low_cut=-5000 high_cut=5000 freq=5001.0000"
+        await controller.toggle()
+        assert controller.enabled is False
+        assert viewer.audio_status == "OFF"
+        return redraw
+
+    redraw = asyncio.run(exercise())
+
+    assert redraw.is_set()
+    assert len(calls) == 1
+    assert calls[0][2] is True
+
+
+def test_audio_controller_keeps_display_alive_after_audio_error():
+    async def fail_audio(*args, **kwargs):
+        raise RuntimeError("audio unavailable")
+
+    async def exercise():
+        viewer = WaterfallTerminalViewer(backend=FakeBackend(), max_rows=1)
+        controller = WaterfallAudioController(
+            viewer=viewer,
+            config=LiveSndPlaybackConfig(receivers_restricted=False),
+            redraw_requested=asyncio.Event(),
+            sink_factory=NullAudioSink,
+            runner=fail_audio,
+        )
+        controller.start()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        return viewer.audio_status, controller.enabled
+
+    status, enabled = asyncio.run(exercise())
+
+    assert status == "ERROR audio unavailable"
+    assert enabled is False
 
 
 def test_viewer_builds_recenter_and_zoom_commands_around_exact_cursor():

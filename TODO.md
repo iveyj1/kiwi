@@ -2,6 +2,20 @@
 
 ## Current slice
 
+Goal: Add coordinated SND audio ownership and cursor tune controls to complete requested step 4.
+
+Done criteria:
+
+- Keep W/F and SND as separate session tasks with independent transport lifecycle and a shared stop boundary.
+- Add `a` audio toggle and Enter tune-to-cursor using exact selected frequency, mode, passband, CW offset, and configured command precision.
+- Show audio OFF/STARTING/ON/ERROR state in the cursor status row.
+- Preserve explicit `--allow-live`, configured receiver policy, duration/frame limits, and audio startup/fade settings for the SND session.
+- Add `--audio` startup and `--null-audio` harness/diagnostic controls without requiring an audio device in tests.
+- Ensure audio errors do not kill the W/F display and all tasks/sinks stop on `q` or transport exit.
+- Add fake audio-runner tests before any live use, run full harness, document, and merge `feature/wf-audio-integration` into `wf1`.
+
+Live-radio needed: no automatically. User will perform attended audio evaluation after merge.
+
 Goal: Implement exact frequency-step cursor selection as prerequisite 1–2 of the requested cursor/navigation/audio sequence.
 
 Done criteria:
