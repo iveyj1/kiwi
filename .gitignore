@@ -1,4 +1,5 @@
 __pycache__/
+.venv-kiwi/
 kiwiclient/
 recordings/
 artifacts/
