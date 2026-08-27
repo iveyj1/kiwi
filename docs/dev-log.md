@@ -287,6 +287,12 @@ Reworked the sweep tool so the failure is informative rather than fatal. `offset
 
 Added `--export-samples`, writing a compact per-position record. A raw sweep fixture is about 1.3 MB because it keeps every frame; the record keeps only what the analysis consumes, around 7 KB, so the evidence is committable. Both sweeps are exported to `docs/evidence/` and asserted by tests, while the raw `sweeps/` directory is gitignored. Full suite: 311 passed.
 
+Scoped the waterfall as a visualization path rather than a measurement path, at the user's call, and recorded the boundary in `docs/architecture.md`. This settles the bin center offset question: it becomes a display concern affecting axis labels and cursor readout, not a blocker for anything.
+
+The reasoning, beyond the offset itself. W/F is lossy by design: 8-bit levels quantised to 1 dB, receiver-side `interp` smoothing already applied, no phase at all. SND carries full 16-bit PCM, preserves phase, offers IQ mode, and reports `sample_rate` to six decimals (`11998.940540` locally against a nominal 12000) so the timebase can be corrected. The waterfall exposes no equivalent and derives every frequency from the nominal `bandwidth=30000000`. For a steady carrier the audio path gives 1/T Hz from a plain FFT, so 0.017 Hz from a minute, against 14.3 Hz bins at zoom 11 with unusable sub-bin refinement.
+
+Milestone 9's long-integration and correlation work needs phase, which the waterfall discards entirely, so this was never going to work from W/F data regardless of the offset. Corrected an earlier dev-log and TODO claim that beacon-detection frequency estimates would be the first thing to need sub-bin waterfall accuracy; `docs/roadmap.md` already specified Milestone 8 as audio-based, so the architecture was right and only these notes were wrong.
+
 ## YYYY-MM-DD
 
 ### Finding

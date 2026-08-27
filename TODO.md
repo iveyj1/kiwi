@@ -63,7 +63,7 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 ## Next
 
 - Parked: explain why the W/F bin center offset is not constant across window positions. Live WWVB and WWV sweeps both show peak transitions 35 window positions apart where the model requires 32, and a per-position offset range of 1.062 bins, which no constant can produce. Both references agree to 0.003 bins despite a 300x difference in `start`, so it depends on window position rather than frequency. Bin width and `unit_hz` are each independently confirmed, which makes the discrepancy genuinely puzzling; the likely answer is that the passband does not move by exactly one `unit_hz` per reported `x_bin_server` count. Needs the KiwiSDR BeagleBone/DSP sources, not more black-box captures. Evidence in `docs/evidence/`, details in `docs/kiwi-protocol.md`.
-  Nothing depends on this today: `0.83` still puts every measured carrier on the correct bin. Revisit only if sub-bin frequency readout is needed, for example for beacon detection frequency estimates.
+  Likely permanent. The waterfall is a visualization path; accurate frequency measurement belongs to the SND audio stream, which keeps full-resolution PCM and phase and reports its own `sample_rate`. That makes the offset a display concern only, and `0.83` already puts every measured carrier on the correct bin.
 - Confirm the `flags_x_zoom_server` bit layout beyond the low zoom bits; only `8` (zoom 8) and `0x40009` (zoom 9) have been observed.
 - Show a frequency axis in the W/F previews now that bin/frequency mapping exists.
 - Decide how `wf_cal=-13` should be applied to displayed dBm values.

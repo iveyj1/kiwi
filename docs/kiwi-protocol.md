@@ -240,7 +240,9 @@ This is genuinely puzzling, because two other measurements independently confirm
 
 Given both, `bin_width / unit_hz` must be exactly 32, yet stepping `start` by 35 counts is what moves the peak by one bin. The likely explanation is that the receiver's actual passband does not move by exactly one `unit_hz` per reported `x_bin_server` count during retuning, which would make `x_bin_server` an accurate label for a window but not a linear measure of its position. Confirming that needs the KiwiSDR BeagleBone and DSP sources rather than more black-box captures.
 
-Deferred deliberately. Nothing currently depends on sub-bin accuracy, and the working constant still puts every measured carrier on the correct bin. Revisit if sub-bin frequency readout is ever needed, for example for beacon-detection frequency estimates.
+Deferred deliberately, and probably permanently. The waterfall is a visualization path, not a measurement path: it delivers 8-bit dBm quantised to 1 dB, with receiver-side `interp` smoothing already applied, and no phase. Accurate frequency work belongs to the SND audio stream instead, which preserves full 16-bit PCM, keeps phase, offers IQ mode, and reports its own `sample_rate` to six decimals so the timebase can be corrected. The waterfall exposes no equivalent and derives everything from the nominal `bandwidth`.
+
+That makes the offset a display concern only, affecting axis labels and cursor readout rather than any measurement. The working constant already puts every measured carrier on the correct bin, which is all a display needs. Revisit only if the waterfall itself ever needs sub-bin labelling.
 
 Evidence for the mapping, all fixture-backed and network-free in `tests/waterfall/test_frequency_mapping.py`:
 
