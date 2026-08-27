@@ -60,7 +60,7 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 ## Next
 
-- Explain the provisional `0.89` bin center offset in `WaterfallSpan`. Constancy in bins is settled by the zoom-11 capture; magnitude is `0.895 +/- 0.047` bins. Remaining question is the cause, and whether the true value is exactly `1.0` with parabolic-interpolation bias accounting for the gap. Identifying the receiver's FFT window would likely resolve it.
+- Explain the provisional `0.83` bin center offset in `WaterfallSpan`. Constancy in bins is settled by the zoom-11 capture, and the data admits only `0.762 < offset <= 0.895`, excluding both a half-bin (0.5) and a whole-bin (1.0) convention. Remaining question is the cause; identifying the receiver's FFT window is the likely next step.
 - Confirm the `flags_x_zoom_server` bit layout beyond the low zoom bits; only `8` (zoom 8) and `0x40009` (zoom 9) have been observed.
 - Show a frequency axis in the W/F previews now that bin/frequency mapping exists.
 - Decide how `wf_cal=-13` should be applied to displayed dBm values.

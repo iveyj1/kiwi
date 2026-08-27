@@ -165,17 +165,28 @@ signal in bin i = start_hz + (i + BIN_CENTER_OFFSET) * bin_hz
 
 The window center reproduces the tuned `cf` value to within a few Hz: 909.998 kHz and 759.999 kHz for captures tuned to 910 and 760.
 
-**`BIN_CENTER_OFFSET = 0.89` is provisional and unexplained.** Known AM broadcast carriers on their 10 kHz channels peak this many bins below where `start_hz + i * bin_hz` predicts.
+**`BIN_CENTER_OFFSET = 0.83` is provisional and unexplained.**
 
-The offset is **constant in bins, not in Hz.** The zoom-11 capture settles this: its bins are 8x narrower than the zoom-8 capture's, so a fixed frequency error would appear there as about 6.6 bins. The measured value is 1.0 bins, matching the bin-constant model and excluding the Hz-constant one by a wide margin.
+What the offset is between: for a carrier of known frequency, the *naive* bin index `(f - start_hz) / bin_hz` and the *measured* index of its energy peak. Known AM carriers peak about 0.83 bins below the naive prediction. Stated as frequency instead, the signal in bin `i` sits at `start_hz + (i + 0.83) * bin_hz`.
 
-Magnitude, by parabolic interpolation of 17 carrier peaks across all three captures: **mean 0.895 bins, sd 0.192, standard error 0.047, 95% interval 0.803 to 0.986.** Independently, requiring every carrier to round to its observed bin bounds the offset to `0.75 < offset <= 0.90`. The two methods agree.
+The offset is **constant in bins, not in Hz.** The zoom-11 capture settles this: its bins are 8x narrower than the zoom-8 capture's, so a fixed frequency error would appear there as about 6.6 bins. The measured value is 1.0 bins. In Hz the discrepancy is 102 Hz at zoom 8, 51 Hz at zoom 9 and 13 Hz at zoom 11, tracking bin width. It is therefore a bin-indexing convention, not a tuning error or a bias in `start_hz`.
 
-Caveats that keep this provisional:
+Requiring all 17 measured carriers to round onto their observed bins admits only:
 
-- The cause is unknown. It is not a half-bin center convention, which the bounds exclude.
-- An exact whole-bin offset of `1.0` cannot be ruled out. It sits just outside the 95% interval, but parabolic interpolation in the dB domain carries a window-dependent bias of comparable size, and the receiver's FFT window is not known.
-- The choice does not affect bin selection. Any value in `0.75..0.90` puts every measured carrier on the same bin, so only sub-bin frequency readout depends on it.
+```text
+0.762 < offset <= 0.895
+```
+
+with the lower bound set by 750 kHz at zoom 9 and the upper by 920 kHz at zoom 8. The configured value is the center of that window, chosen to maximise margin against misbinning a carrier this data has not seen.
+
+Two candidate explanations are ruled out:
+
+- **A half-bin center convention (0.5).** Misplaces 7 of 17 carriers.
+- **A whole-bin offset (1.0),** which would mean `x_bin_server` points one bin below the first displayed bin. Misplaces 3 of 17 carriers.
+
+Parabolic interpolation of the same peaks in the dB domain gives a mean of 0.895 bins, but that falls exactly on the admissible window's upper edge, which suggests the interpolation is biased high rather than that 0.895 is the true value. Interpolation bias here is window-dependent and the receiver's FFT window is unknown.
+
+Accuracy is not what is at stake in the choice: the whole admissible window spans 0.133 bins, which is about 7 Hz at zoom 8 and 1 Hz at zoom 11. Bin-selection robustness is. `tests/waterfall/test_frequency_mapping.py` asserts the configured value stays more than 0.05 bins clear of both edges.
 
 Evidence for the mapping, all fixture-backed and network-free in `tests/waterfall/test_frequency_mapping.py`:
 
@@ -194,7 +205,7 @@ Other observations from these captures:
 
 Still to verify with project fixtures:
 
-- The cause of the provisional 0.89 bin center offset, and whether it is exactly 1.0.
+- The cause of the provisional 0.83 bin center offset. Constancy in bins is settled and both 0.5 and 1.0 are excluded; identifying the receiver's FFT window is the likely next step.
 - `flags_x_zoom_server` bit layout beyond the low zoom bits.
 - Calibration and display scaling policy, including how `wf_cal=-13` should be applied.
 - Timing/update behavior for `wf_speed` values 2 and 3.

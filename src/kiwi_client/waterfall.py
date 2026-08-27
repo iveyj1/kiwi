@@ -16,21 +16,27 @@ DEFAULT_ZOOM_MAX = 14
 ZOOM_FLAG_MASK = 0x0F
 
 # Provisional. Known AM carriers peak this many bins below where
-# `start_hz + index * bin_width` predicts. Measured across three local captures
-# (zoom 8 at 910 kHz, zoom 9 at 760 kHz, zoom 11 at 910 kHz) by parabolic
-# interpolation of 17 carrier peaks: mean 0.895 bins, sd 0.192, 95% interval
-# 0.803..0.986.
+# `start_hz + index * bin_width` predicts, measured across three local captures
+# (zoom 8 at 910 kHz, zoom 9 at 760 kHz, zoom 11 at 910 kHz).
 #
-# The offset is constant in BINS, not in Hz: the zoom 11 capture has bins 8x
-# narrower than zoom 8, and a Hz-constant offset would have shown up there as
-# 6.6 bins rather than the observed 1.0.
+# The offset is constant in BINS, not in Hz. The zoom 11 capture settles this:
+# its bins are 8x narrower than zoom 8's, so a Hz-constant offset would have
+# appeared there as 6.6 bins rather than the observed 1.0.
 #
-# The cause is still unknown, and an exact whole-bin offset of 1.0 cannot be
-# ruled out, because parabolic interpolation in the dB domain carries a
-# window-dependent bias comparable to the gap. Any value in 0.75..0.90 puts
-# every measured carrier on the same bin, so this choice does not affect bin
-# selection, only sub-bin frequency readout. See docs/kiwi-protocol.md.
-PROVISIONAL_BIN_CENTER_OFFSET = 0.89
+# Requiring all 17 measured carriers to round to their observed bin admits only
+# `0.762 < offset <= 0.895`. The value here is the center of that window, which
+# maximises margin against misbinning a carrier this data has not seen. An exact
+# whole-bin offset of 1.0 is excluded: it misplaces three carriers, so
+# `x_bin_server` does not simply point one bin below the first displayed bin.
+#
+# Parabolic interpolation of the same peaks gives 0.895, but that lands exactly
+# on the window's upper edge, which suggests the dB-domain interpolation is
+# biased high rather than that 0.895 is the true value.
+#
+# The cause remains unknown. Sub-bin readout differs by only ~7 Hz at zoom 8
+# across the whole admissible window, so the choice matters for bin selection
+# robustness, not for accuracy. See docs/kiwi-protocol.md.
+PROVISIONAL_BIN_CENTER_OFFSET = 0.83
 
 
 @dataclass(frozen=True)

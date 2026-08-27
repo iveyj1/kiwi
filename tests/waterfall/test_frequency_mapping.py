@@ -174,3 +174,46 @@ def test_zoom11_window_holds_only_the_tuned_channel():
     channels = [khz for khz in range(530, 1710, 10) if low <= khz * 1000 <= high]
 
     assert channels == [910]
+
+
+def _naive_minus_peak():
+    """Return (label, naive_index - measured_peak) for every calibration carrier."""
+    results = []
+    for path, _center, _zoom, channels in CAPTURES:
+        metadata, frames = _load(path)
+        span = metadata.span()
+        x_bin = frames[0].x_bin_server
+        hold = _max_hold(frames)
+        for khz in channels:
+            naive = (khz * 1000 - span.start_hz(x_bin)) / span.bin_width_hz
+            peak = max(range(int(naive) - 3, int(naive) + 4), key=lambda i: hold[i])
+            results.append((f"zoom{span.zoom}/{khz}kHz", naive - peak))
+    return results
+
+
+def test_configured_offset_sits_centrally_in_the_admissible_window():
+    """The offset must round every measured carrier onto its observed bin, with margin.
+
+    Each carrier admits offsets in `(naive - peak - 0.5, naive - peak + 0.5]`.
+    The intersection across all carriers is narrow, so a value near either edge
+    would misbin a carrier this data has not seen.
+    """
+    observed = _naive_minus_peak()
+    low = max(value for _, value in observed) - 0.5
+    high = min(value for _, value in observed) + 0.5
+
+    assert low < PROVISIONAL_BIN_CENTER_OFFSET <= high
+    margin = min(PROVISIONAL_BIN_CENTER_OFFSET - low, high - PROVISIONAL_BIN_CENTER_OFFSET)
+    assert margin > 0.05, (
+        f"offset {PROVISIONAL_BIN_CENTER_OFFSET} is only {margin:.3f} bins from the edge "
+        f"of the admissible window ({low:.3f}, {high:.3f}]"
+    )
+
+
+def test_whole_bin_offset_is_excluded():
+    """An offset of exactly 1.0 would mean `start` points one bin low; it does not."""
+    observed = _naive_minus_peak()
+    low = max(value for _, value in observed) - 0.5
+    high = min(value for _, value in observed) + 0.5
+
+    assert not (low < 1.0 <= high), "1.0 is admissible; the docs claiming otherwise are stale"

@@ -253,6 +253,14 @@ Added two tests beyond extending the existing parametrized set: one asserting th
 
 Process note: an uncapped `kiwi-wf-live --save-fixture` run at `wf_speed=4` reached 12 MB and 8112 frames in six minutes. A `git add -A` swept a partially-written 191 KB snapshot of it into a commit; it was removed by amending before the commit was final. Two lessons recorded: stage fixture paths explicitly rather than using `git add -A` while a capture may be running, and cap capture length, since the calibration needs only 60 frames.
 
+Corrected the bin center offset back to 0.83 after a question exposed a bad choice. Raising it to 0.89 on the strength of the interpolated mean was wrong: requiring all 17 measured carriers to round onto their observed bins admits only `0.762 < offset <= 0.895`, so 0.89 sat 0.005 bins from the edge and the interpolated mean of 0.895 landed exactly on it. A point estimate landing precisely on a hard bound is evidence the dB-domain parabolic interpolation is biased high, not evidence the bound is coincidental. The configured value is now the window center, which maximises margin against misbinning a carrier this data has not seen.
+
+Also disproved the leading explanation. If `x_bin_server` pointed one bin below the first displayed bin, the offset would be exactly 1.0; that misplaces 3 of 17 carriers, so it is excluded. A half-bin center convention misplaces 7 of 17. Both are now ruled out rather than merely unsupported.
+
+Recorded that accuracy is not what the choice trades off: the whole admissible window spans 0.133 bins, about 7 Hz at zoom 8 and 1 Hz at zoom 11. Bin-selection robustness is. Added two tests, one asserting the configured offset stays more than 0.05 bins clear of both edges of the admissible window, and one asserting 1.0 remains excluded so the documentation cannot drift from the data.
+
+Clarified in the protocol notes what the offset is actually between, since that was not stated: the naive bin index `(f - start_hz) / bin_hz` for a carrier of known frequency, and the measured index of its energy peak.
+
 ## YYYY-MM-DD
 
 ### Finding
