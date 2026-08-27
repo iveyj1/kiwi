@@ -5,6 +5,7 @@ import pytest
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import KiwiProtocolError
 from kiwi_client.waterfall import (
+    WaterfallCursor,
     WaterfallFrame,
     WaterfallReceiverState,
     WaterfallSequenceTracker,
@@ -67,6 +68,42 @@ def test_wf_interpolation_values_are_categorical_modes(value, method, cic_compen
 def test_wf_interpolation_rejects_unsupported_gap_values():
     with pytest.raises(ValueError, match="0..4 or 10..14"):
         decode_waterfall_interpolation(5)
+
+
+def test_waterfall_cursor_snaps_to_source_bin_centers_and_moves_by_bins():
+    cursor = WaterfallCursor.for_span(
+        start_khz=100.0,
+        end_khz=104.0,
+        bin_width_hz=1000.0,
+        preferred_khz=102.2,
+    )
+
+    assert cursor.frequency_khz == pytest.approx(102.5)
+    assert cursor.moved_bins(-1).frequency_khz == pytest.approx(101.5)
+    assert cursor.moved_bins(10).frequency_khz == pytest.approx(103.5)
+    assert cursor.moved_bins(-10).frequency_khz == pytest.approx(100.5)
+
+
+def test_waterfall_cursor_preserves_frequency_across_span_changes_when_visible():
+    cursor = WaterfallCursor.for_span(
+        start_khz=100.0,
+        end_khz=104.0,
+        bin_width_hz=1000.0,
+        preferred_khz=102.5,
+    )
+
+    changed = cursor.with_span(start_khz=101.0, end_khz=103.0, bin_width_hz=500.0)
+
+    assert changed.frequency_khz == pytest.approx(102.75)
+    assert abs(changed.frequency_khz - cursor.frequency_khz) <= changed.bin_width_hz / 2000.0
+    assert changed.bin_width_hz == pytest.approx(500.0)
+
+
+def test_waterfall_cursor_rejects_invalid_span_or_bin_width():
+    with pytest.raises(ValueError, match="end_khz"):
+        WaterfallCursor.for_span(start_khz=10.0, end_khz=10.0, bin_width_hz=1.0)
+    with pytest.raises(ValueError, match="bin_width_hz"):
+        WaterfallCursor.for_span(start_khz=10.0, end_khz=11.0, bin_width_hz=0.0)
 
 
 def test_wf_receiver_state_maps_zoomed_max_bin_grid_to_frequency():

@@ -11,10 +11,12 @@ import os
 import shutil
 import sys
 import tempfile
+import termios
 import time
+import tty
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Lock
+from threading import Event, Lock
 from typing import Any, BinaryIO, Callable, Mapping, Protocol
 
 from kiwi_client.config import KiwiClientConfig, discover_config_path, load_config
@@ -23,6 +25,7 @@ from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
+    WaterfallCursor,
     WaterfallFrame,
     WaterfallReceiverState,
     contextualize_waterfall_frame,
@@ -36,6 +39,58 @@ from kiwi_client.waterfall_raster import (
     encode_png,
     render_dbm_rows,
 )
+
+
+@dataclass(frozen=True)
+class CursorAction:
+    """One decoded local-only cursor control action."""
+
+    kind: str
+    bins: int = 0
+
+
+class CursorKeyDecoder:
+    """Incrementally decode cursor keys without assuming one read per escape sequence."""
+
+    _sequences = {
+        b"\x1b[1;2D": CursorAction("move", -10),
+        b"\x1b[1;2C": CursorAction("move", 10),
+        b"\x1b[D": CursorAction("move", -1),
+        b"\x1b[C": CursorAction("move", 1),
+    }
+    _single = {
+        ord("h"): CursorAction("move", -1),
+        ord("l"): CursorAction("move", 1),
+        ord("H"): CursorAction("move", -10),
+        ord("L"): CursorAction("move", 10),
+        ord("0"): CursorAction("reset"),
+        ord("q"): CursorAction("quit"),
+    }
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+
+    def feed(self, data: bytes) -> tuple[CursorAction, ...]:
+        self._buffer.extend(data)
+        actions: list[CursorAction] = []
+        while self._buffer:
+            raw = bytes(self._buffer)
+            matched = next(
+                ((sequence, action) for sequence, action in self._sequences.items() if raw.startswith(sequence)),
+                None,
+            )
+            if matched is not None:
+                sequence, action = matched
+                del self._buffer[:len(sequence)]
+                actions.append(action)
+                continue
+            if any(sequence.startswith(raw) for sequence in self._sequences):
+                break
+            action = self._single.get(self._buffer[0])
+            del self._buffer[0]
+            if action is not None:
+                actions.append(action)
+        return tuple(actions)
 
 
 @dataclass(frozen=True)
@@ -262,6 +317,21 @@ class KittyTerminalBackend:
         self._area_reserved = False
         self._finished = False
         self._frequency_ruler: str | None = None
+        self._status_line: str | None = None
+
+    def set_status_line(self, status: str) -> None:
+        """Set or update a terminal-text status row above the frequency ruler."""
+        if self.columns is None:
+            return
+        line = status[:self.columns].ljust(self.columns)
+        if line == self._status_line:
+            return
+        self._status_line = line
+        if self._area_reserved:
+            rows_up = 2 if self._frequency_ruler is not None else 1
+            self.output.write(f"\x1b[{rows_up}A\r\x1b[2K".encode("ascii"))
+            self.output.write(line.encode("ascii"))
+            self.output.write(f"\x1b[{rows_up}B\r".encode("ascii"))
 
     def set_frequency_range(self, start_khz: float, end_khz: float) -> None:
         """Set or update the terminal-text frequency ruler above the image."""
@@ -288,6 +358,10 @@ class KittyTerminalBackend:
         # the placement rectangle, then return to its top-left cell. Without
         # this, C=1 correctly fixes the cursor but leaves the image clipped below
         # the viewport until the shell scrolls during process exit.
+        if self._status_line is not None:
+            self.output.write(b"\r\x1b[2K")
+            self.output.write(self._status_line.encode("ascii"))
+            self.output.write(b"\n")
         if self._frequency_ruler is not None:
             self.output.write(b"\r\x1b[2K")
             self.output.write(self._frequency_ruler.encode("ascii"))
@@ -342,6 +416,9 @@ class WaterfallTerminalViewer:
         high_cut_hz: int | None = None,
         show_tuned_marker: bool = True,
         show_passband: bool = False,
+        show_cursor: bool = False,
+        cursor_khz: float | None = None,
+        keyboard_enabled: bool = False,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if max_dbm <= min_dbm:
@@ -360,10 +437,14 @@ class WaterfallTerminalViewer:
         self.high_cut_hz = high_cut_hz
         self.show_tuned_marker = show_tuned_marker
         self.show_passband = show_passband
+        self.show_cursor = show_cursor
+        self.initial_cursor_khz = cursor_khz
+        self.keyboard_enabled = keyboard_enabled
         self.refresh_interval = 1.0 / refresh_hz
         self.clock = clock
         self._last_draw: float | None = None
         self._frequency_range: tuple[float, float] | None = None
+        self._cursor: WaterfallCursor | None = None
         self._lock = Lock()
         self._generation = 0
         self._drawn_generation = 0
@@ -374,12 +455,91 @@ class WaterfallTerminalViewer:
         with self._lock:
             return self._generation > self._drawn_generation
 
+    @property
+    def cursor_frequency_khz(self) -> float | None:
+        with self._lock:
+            return None if self._cursor is None else self._cursor.frequency_khz
+
+    @staticmethod
+    def _format_cursor_status(
+        cursor: WaterfallCursor | None,
+        tuned_khz: float | None,
+        *,
+        keyboard_enabled: bool,
+    ) -> str | None:
+        if cursor is None:
+            return None
+        parts = [
+            f"Cursor {cursor.frequency_khz:.3f} kHz",
+            f"step {cursor.bin_width_hz:.3f} Hz",
+        ]
+        if tuned_khz is not None:
+            parts.insert(1, f"tuned {cursor.frequency_khz - tuned_khz:+.3f} kHz")
+        if keyboard_enabled:
+            parts.append("h/l 1 bin H/L 10 0 reset q quit")
+        return " | ".join(parts)
+
+    def cursor_status(self) -> str:
+        with self._lock:
+            return self._format_cursor_status(
+                self._cursor,
+                self.tuned_khz,
+                keyboard_enabled=self.keyboard_enabled,
+            ) or ""
+
+    def move_cursor_bins(self, delta: int) -> bool:
+        with self._lock:
+            if self._cursor is None:
+                return False
+            cursor = self._cursor.moved_bins(delta)
+            if cursor == self._cursor:
+                return False
+            self._cursor = cursor
+            self._generation += 1
+            return True
+
+    def reset_cursor(self) -> bool:
+        with self._lock:
+            if self._cursor is None:
+                return False
+            preferred_khz = self.tuned_khz
+            cursor = WaterfallCursor.for_span(
+                start_khz=self._cursor.start_khz,
+                end_khz=self._cursor.end_khz,
+                bin_width_hz=self._cursor.bin_width_hz,
+                preferred_khz=preferred_khz,
+            )
+            if cursor == self._cursor:
+                return False
+            self._cursor = cursor
+            self._generation += 1
+            return True
+
     def append(self, frame: WaterfallFrame, *, draw: bool = True) -> None:
         now = self.clock()
         should_draw = False
         with self._lock:
             if frame.start_khz is not None and frame.span_khz is not None:
-                self._frequency_range = (frame.start_khz, frame.start_khz + frame.span_khz)
+                start_khz = frame.start_khz
+                end_khz = frame.start_khz + frame.span_khz
+                self._frequency_range = (start_khz, end_khz)
+                if self.show_cursor and frame.bin_width_hz is not None:
+                    if self._cursor is None:
+                        preferred_khz = self.initial_cursor_khz
+                        if preferred_khz is None:
+                            preferred_khz = self.tuned_khz
+                        self._cursor = WaterfallCursor.for_span(
+                            start_khz=start_khz,
+                            end_khz=end_khz,
+                            bin_width_hz=frame.bin_width_hz,
+                            preferred_khz=preferred_khz,
+                        )
+                    else:
+                        self._cursor = self._cursor.with_span(
+                            start_khz=start_khz,
+                            end_khz=end_khz,
+                            bin_width_hz=frame.bin_width_hz,
+                        )
             self.history.append(frame)
             self._generation += 1
             if draw and (self._last_draw is None or now - self._last_draw >= self.refresh_interval):
@@ -388,15 +548,24 @@ class WaterfallTerminalViewer:
         if should_draw:
             self.draw()
 
-    def _render_snapshot(self) -> tuple[RasterImage, tuple[float, float] | None, int]:
+    def _render_snapshot(
+        self,
+    ) -> tuple[RasterImage, tuple[float, float] | None, str | None, int]:
         with self._lock:
             rows = self.history.rows(newest_at_top=self.newest_at_top, pad_dbm=-255)
             frequency_range = self._frequency_range
+            cursor = self._cursor
+            cursor_khz = None if cursor is None else cursor.frequency_khz
+            status = self._format_cursor_status(
+                cursor,
+                self.tuned_khz,
+                keyboard_enabled=self.keyboard_enabled,
+            )
             generation = self._generation
         if not rows:
             raise ValueError("cannot render an empty waterfall history")
         image = render_dbm_rows(rows, min_dbm=self.min_dbm, max_dbm=self.max_dbm)
-        if frequency_range is not None and self.tuned_khz is not None:
+        if frequency_range is not None and (self.tuned_khz is not None or cursor_khz is not None):
             start_khz, end_khz = frequency_range
             image = apply_frequency_overlay(
                 image,
@@ -407,20 +576,25 @@ class WaterfallTerminalViewer:
                     low_cut_hz=self.low_cut_hz if self.show_passband else None,
                     high_cut_hz=self.high_cut_hz if self.show_passband else None,
                     show_tuned_marker=self.show_tuned_marker,
+                    cursor_khz=cursor_khz,
                 ),
             )
-        return image, frequency_range, generation
+        return image, frequency_range, status, generation
 
     def raster(self) -> RasterImage:
-        image, _frequency_range, _generation = self._render_snapshot()
+        image, _frequency_range, _status, _generation = self._render_snapshot()
         return image
 
     def draw(self) -> None:
-        image, frequency_range, generation = self._render_snapshot()
+        image, frequency_range, status, generation = self._render_snapshot()
         if frequency_range is not None:
             set_frequency_range = getattr(self.backend, "set_frequency_range", None)
             if set_frequency_range is not None:
                 set_frequency_range(*frequency_range)
+        if status is not None:
+            set_status_line = getattr(self.backend, "set_status_line", None)
+            if set_status_line is not None:
+                set_status_line(status)
         self.backend.draw(image)
         with self._lock:
             self._drawn_generation = max(self._drawn_generation, generation)
@@ -454,15 +628,63 @@ def preview_terminal_fixture(path: Path, viewer: WaterfallTerminalViewer) -> int
     return frames
 
 
+async def control_waterfall_cursor(
+    viewer: WaterfallTerminalViewer,
+    *,
+    redraw_requested: asyncio.Event,
+    stop_event: Event,
+    input_fd: int,
+) -> None:
+    """Read local cursor controls in cbreak mode and always restore terminal input."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[bytes] = asyncio.Queue()
+    decoder = CursorKeyDecoder()
+    previous_attributes = termios.tcgetattr(input_fd)
+    previous_blocking = os.get_blocking(input_fd)
+
+    def read_ready() -> None:
+        try:
+            data = os.read(input_fd, 64)
+        except BlockingIOError:
+            return
+        if data:
+            queue.put_nowait(data)
+        else:
+            stop_event.set()
+            queue.put_nowait(b"q")
+
+    try:
+        tty.setcbreak(input_fd, termios.TCSANOW)
+        os.set_blocking(input_fd, False)
+        loop.add_reader(input_fd, read_ready)
+        while not stop_event.is_set():
+            for action in decoder.feed(await queue.get()):
+                if action.kind == "move":
+                    if viewer.move_cursor_bins(action.bins):
+                        redraw_requested.set()
+                elif action.kind == "reset":
+                    if viewer.reset_cursor():
+                        redraw_requested.set()
+                elif action.kind == "quit":
+                    stop_event.set()
+                    return
+    finally:
+        loop.remove_reader(input_fd)
+        os.set_blocking(input_fd, previous_blocking)
+        termios.tcsetattr(input_fd, termios.TCSANOW, previous_attributes)
+
+
 async def view_live_waterfall(
     config: LiveWaterfallCaptureConfig,
     viewer: WaterfallTerminalViewer,
     *,
     allow_live: bool = False,
     websocket_connect: Callable[..., Any] | None = None,
+    keyboard_fd: int | None = None,
 ) -> Path:
     """Receive frames promptly while a bounded background renderer draws the latest state."""
     redraw_requested = asyncio.Event()
+    stop_event = Event()
     stopping = False
 
     def receive_frame(frame: WaterfallFrame) -> None:
@@ -492,11 +714,24 @@ async def view_live_waterfall(
         capture_live_waterfall(
             config,
             allow_live=allow_live,
+            stop_event=stop_event,
             frame_callback=receive_frame,
             websocket_connect=websocket_connect,
         )
     )
     render_task = asyncio.create_task(render_latest())
+    keyboard_task = (
+        asyncio.create_task(
+            control_waterfall_cursor(
+                viewer,
+                redraw_requested=redraw_requested,
+                stop_event=stop_event,
+                input_fd=keyboard_fd,
+            )
+        )
+        if keyboard_fd is not None
+        else None
+    )
     try:
         done, _pending = await asyncio.wait(
             (capture_task, render_task),
@@ -508,10 +743,14 @@ async def view_live_waterfall(
         return capture_task.result()
     finally:
         stopping = True
+        stop_event.set()
         redraw_requested.set()
         if not capture_task.done():
             capture_task.cancel()
             await asyncio.gather(capture_task, return_exceptions=True)
+        if keyboard_task is not None:
+            keyboard_task.cancel()
+            await asyncio.gather(keyboard_task, return_exceptions=True)
         try:
             await render_task
         finally:
@@ -536,6 +775,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--high-cut-hz", type=int, help="passband high edge relative to tuned frequency")
     parser.add_argument("--show-tuned-marker", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--show-passband", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--show-cursor", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--cursor-khz", type=float, help="initial local cursor frequency")
+    parser.add_argument("--keyboard", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--force", action="store_true", help="emit Kitty graphics even when capability detection fails")
     parser.add_argument("--host", default="10.0.0.40")
     parser.add_argument("--port", type=int, default=8073)
@@ -576,6 +818,8 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
         "label_columns_per_tick": waterfall.label_columns_per_tick,
         "show_tuned_marker": waterfall.show_tuned_marker,
         "show_passband": waterfall.show_passband,
+        "show_cursor": waterfall.show_cursor,
+        "keyboard": waterfall.keyboard,
         "tuned_khz": waterfall.tuned_khz,
         "low_cut_hz": waterfall.low_cut_hz,
         "high_cut_hz": waterfall.high_cut_hz,
@@ -635,6 +879,9 @@ def _viewer(args: argparse.Namespace, output: BinaryIO) -> WaterfallTerminalView
         high_cut_hz=args.high_cut_hz,
         show_tuned_marker=args.show_tuned_marker,
         show_passband=args.show_passband,
+        show_cursor=args.show_cursor,
+        cursor_khz=args.cursor_khz,
+        keyboard_enabled=args.keyboard and args.fixture is None,
     )
 
 
@@ -672,6 +919,8 @@ def main(argv: list[str] | None = None) -> int:
                     "high_cut_hz": viewer.high_cut_hz if viewer.show_passband else None,
                     "show_tuned_marker": viewer.show_tuned_marker,
                     "show_passband": viewer.show_passband,
+                    "show_cursor": viewer.show_cursor,
+                    "keyboard": args.keyboard,
                     "config": str(config_path) if config_path is not None else None,
                 }
             )
@@ -679,12 +928,27 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if not args.allow_live:
             raise LiveCaptureError("live terminal waterfall requires --allow-live; use --fixture or --dry-run without network")
+        keyboard_fd = sys.stdin.fileno() if args.keyboard and sys.stdin.isatty() else None
         if args.save_fixture is not None:
-            asyncio.run(view_live_waterfall(config, viewer, allow_live=True))
+            asyncio.run(
+                view_live_waterfall(
+                    config,
+                    viewer,
+                    allow_live=True,
+                    keyboard_fd=keyboard_fd,
+                )
+            )
         else:
             with tempfile.TemporaryDirectory(prefix="kiwi-wf-terminal-") as directory:
                 temp_config = _capture_config(args, Path(directory) / "waterfall.jsonl")
-                asyncio.run(view_live_waterfall(temp_config, viewer, allow_live=True))
+                asyncio.run(
+                    view_live_waterfall(
+                        temp_config,
+                        viewer,
+                        allow_live=True,
+                        keyboard_fd=keyboard_fd,
+                    )
+                )
         return 0
     except (LiveCaptureError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))

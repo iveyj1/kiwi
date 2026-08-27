@@ -13,6 +13,7 @@ from kiwi_client.waterfall import WaterfallFrame
 # Compact, deterministic waterfall palette: black -> blue -> cyan -> yellow -> white.
 TUNED_MARKER_RGB = (255, 255, 255)
 PASSBAND_MARKER_RGB = (255, 96, 0)
+CURSOR_MARKER_RGB = (255, 0, 255)
 
 _PALETTE = (
     (0.00, (0, 0, 0)),
@@ -33,6 +34,7 @@ class WaterfallOverlay:
     low_cut_hz: int | None = None
     high_cut_hz: int | None = None
     show_tuned_marker: bool = True
+    cursor_khz: float | None = None
 
     def __post_init__(self) -> None:
         if self.end_khz <= self.start_khz:
@@ -182,6 +184,10 @@ def apply_frequency_overlay(image: RasterImage, overlay: WaterfallOverlay) -> Ra
             column = _frequency_column(overlay.tuned_khz, overlay, image.width)
             if column is not None:
                 markers.append((column, TUNED_MARKER_RGB))
+    if overlay.cursor_khz is not None:
+        column = _frequency_column(overlay.cursor_khz, overlay, image.width)
+        if column is not None:
+            markers.append((column, CURSOR_MARKER_RGB))
     if not markers:
         return image
 
