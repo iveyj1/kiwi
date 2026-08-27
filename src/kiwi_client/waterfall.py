@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import struct
 from dataclasses import dataclass, replace
 
@@ -85,6 +86,63 @@ def decode_waterfall_interpolation(value: int) -> WaterfallInterpolation:
         method=_WF_INTERPOLATION_METHODS[method_index],
         cic_compensation=cic_compensation,
     )
+
+
+@dataclass(frozen=True)
+class WaterfallCursor:
+    """A selected source-bin center within one mapped waterfall span."""
+
+    start_khz: float
+    end_khz: float
+    bin_width_hz: float
+    bin_index: int
+    bin_count: int
+
+    @classmethod
+    def for_span(
+        cls,
+        *,
+        start_khz: float,
+        end_khz: float,
+        bin_width_hz: float,
+        preferred_khz: float | None = None,
+    ) -> "WaterfallCursor":
+        if end_khz <= start_khz:
+            raise ValueError("cursor end_khz must be greater than start_khz")
+        if bin_width_hz <= 0:
+            raise ValueError("cursor bin_width_hz must be positive")
+        bin_count = max(1, round((end_khz - start_khz) * 1000.0 / bin_width_hz))
+        first_center_khz = start_khz + bin_width_hz / 2000.0
+        target_khz = (start_khz + end_khz) / 2.0 if preferred_khz is None else preferred_khz
+        if not math.isfinite(target_khz):
+            raise ValueError("cursor preferred_khz must be finite")
+        raw_index = (target_khz - first_center_khz) * 1000.0 / bin_width_hz
+        bin_index = min(max(0, math.floor(raw_index + 0.5)), bin_count - 1)
+        return cls(
+            start_khz=start_khz,
+            end_khz=end_khz,
+            bin_width_hz=bin_width_hz,
+            bin_index=bin_index,
+            bin_count=bin_count,
+        )
+
+    @property
+    def frequency_khz(self) -> float:
+        return self.start_khz + (self.bin_index + 0.5) * self.bin_width_hz / 1000.0
+
+    def moved_bins(self, delta: int) -> "WaterfallCursor":
+        return replace(
+            self,
+            bin_index=min(max(0, self.bin_index + delta), self.bin_count - 1),
+        )
+
+    def with_span(self, *, start_khz: float, end_khz: float, bin_width_hz: float) -> "WaterfallCursor":
+        return self.for_span(
+            start_khz=start_khz,
+            end_khz=end_khz,
+            bin_width_hz=bin_width_hz,
+            preferred_khz=self.frequency_khz,
+        )
 
 
 @dataclass(frozen=True)

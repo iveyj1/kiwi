@@ -252,7 +252,8 @@ Suggested order:
 13. Done: add adaptive 1/2/5-based ruler labels with width-aware density, interval-derived precision, edge preservation, and overlap rejection.
 14. Done: add white tuned-frequency and orange passband-edge raster overlays, plus persistent `[waterfall]` defaults with explicit CLI precedence.
 15. Done: prevent terminal output backpressure from starving W/F networking by using a single coalescing worker renderer and Kiwi application keepalives instead of WebSocket ping timeouts.
-16. Next: evaluate overlay/ruler/default choices in normal use, add cursor/tune interaction, then decide whether to integrate a compact raster pane into the curses TUI, add a native desktop backend, or retain a standalone companion viewer.
+16. Done: add a source-bin cursor, precise frequency/offset/step status, local keyboard navigation/reset, and clean keyboard quit without mutating receiver tuning.
+17. Next: evaluate cursor/overlay/ruler choices, add fixture-tested W/F recenter and zoom commands, then coordinate selected tuning with the separate audio session before choosing integrated/native display direction.
 
 Notes:
 

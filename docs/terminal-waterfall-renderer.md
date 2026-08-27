@@ -4,7 +4,7 @@
 
 Provide an optional raster-image terminal waterfall viewer for KiwiSDR W/F data. This should make live waterfall output easier to interpret than the current ASCII row preview while preserving the fixture-first parser/model/render separation.
 
-The implementation in `src/kiwi_client/waterfall_raster.py` and `src/kiwi_client/waterfall_terminal.py` provides fixture and guarded live Kitty rendering plus an adaptive frequency ruler. Interactive pan/zoom, tuning overlays, and TUI integration remain future work.
+The implementation in `src/kiwi_client/waterfall_raster.py` and `src/kiwi_client/waterfall_terminal.py` provides fixture and guarded live Kitty rendering, an adaptive frequency ruler, tuned/passband overlays, and a local keyboard-controlled source-bin cursor. Receiver pan/zoom, audio tuning coordination, and TUI integration remain future work.
 
 ## Goals
 
@@ -81,7 +81,9 @@ Requirements:
 - Before the first placement, reserve the configured row rectangle and move back to its top-left anchor; otherwise a `C=1` image started from the shell's bottom line is clipped below the viewport until exit.
 - Reserve space only once, update at the stable anchor, and restore the cursor below the image when viewing finishes.
 - Render an adaptive terminal-text frequency ruler above the image when frame metadata is sufficient; use 1/2/5 major spacing, configurable width-aware density, precision derived from interval, and overlap rejection while keeping labels outside the 1024-bin raster.
-- Draw tuned frequency and optional passband edges as deterministic white/orange raster columns after history color rendering, without modifying stored dBm rows.
+- Draw tuned frequency, optional passband edges, and a source-bin cursor as deterministic white/orange/magenta raster columns after history color rendering, without modifying stored dBm rows.
+- Reserve a status row above the ruler for cursor frequency, tuned offset, source-bin step, and concise local keyboard help.
+- Decode cursor keys incrementally so split terminal escape sequences are handled; always restore cbreak-mode terminal settings on exit.
 - Avoid flooding terminal output; throttle updates if needed.
 - Provide clear error if Kitty support is unavailable.
 
@@ -192,4 +194,5 @@ Do not require a Kitty terminal in automated tests.
 7. Done: add fixture-backed frequency mapping, adaptive labels, and a zoom-7 local AM regression capture.
 8. Done: add tuned-frequency/passband overlays and persistent `[waterfall]` defaults with CLI precedence.
 9. Done: isolate live terminal rendering from the network event loop, coalesce redraw requests, disable redundant WebSocket protocol pings, and report connection closure without a traceback.
-10. Pending: add interactive cursor/tuning controls and evaluate whether full-height marker lines should gain alternate patterns.
+10. Done: add a source-bin cursor, precise status readout, local keyboard movement/reset, and clean keyboard quit without transmitting receiver commands.
+11. Pending: add fixture-tested receiver recenter/zoom commands, then coordinate selected tuning with the separate audio session.

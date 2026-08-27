@@ -70,6 +70,8 @@ SET agc=<0|1> hang=<0|1> thresh=<value> slope=<value> decay=<ms> manGain=<value>
 - `label_columns_per_tick` — target terminal width per adaptive frequency label; larger values reduce label density.
 - `tuned_khz` — optional white tuned-frequency overlay; live viewer defaults it to center frequency.
 - `low_cut_hz` / `high_cut_hz` — optional orange passband-edge overlays relative to tuned frequency.
+- `show_cursor` / `cursor_khz` — optional magenta local cursor snapped to a source-bin center; cursor movement does not tune the receiver.
+- `keyboard` — enable local cbreak-mode cursor controls and `q` exit for the standalone viewer.
 
 Kiwi command shapes:
 

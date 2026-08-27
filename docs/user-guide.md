@@ -92,6 +92,8 @@ interp = 13
 label_columns_per_tick = 18
 show_tuned_marker = true
 show_passband = true
+show_cursor = true
+keyboard = true
 low_cut_hz = -5000
 high_cut_hz = 5000
 
@@ -524,7 +526,18 @@ The viewer recognizes Kitty, Ghostty, and WezTerm identifiers. By default it res
 
 When the receiver supplies `bandwidth`, `wf_fft_size`, and `zoom_max` metadata, the raster viewer shows an adaptive terminal-text frequency ruler above the image. Mapping uses the server-reported frame start and zoom, so at zoom 0 a 30 MHz receiver correctly shows `0..30000 kHz` even if a different center was requested. Major labels use 1/2/5-based intervals, available terminal width controls label density, and overlapping interior labels are omitted. Edge-label precision increases automatically for narrower spans. `[waterfall].label_columns_per_tick` controls target density; larger values produce fewer labels.
 
-The live viewer defaults the tuned marker to `--center-khz`. A white vertical line marks tuned frequency. Orange vertical lines mark passband edges when `--show-passband` is enabled and low/high cuts are configured. Override them with `--tuned-khz`, `--low-cut-hz`, and `--high-cut-hz`; disable them with `--no-show-tuned-marker` or `--no-show-passband`. Fixture mode only draws overlays when a tuned frequency is explicitly supplied or configured, avoiding an unrelated live center marker.
+The live viewer defaults the tuned marker to `--center-khz`. A white vertical line marks tuned frequency. Orange vertical lines mark passband edges when `--show-passband` is enabled and low/high cuts are configured. A magenta line marks the local cursor at a source-bin center. Override the tuned/passband values with `--tuned-khz`, `--low-cut-hz`, and `--high-cut-hz`; disable overlays with `--no-show-tuned-marker`, `--no-show-passband`, or `--no-show-cursor`. `--cursor-khz` selects an initial cursor frequency. Fixture mode only draws a tuned overlay when a tuned frequency is explicitly supplied or configured, avoiding an unrelated live center marker.
+
+Live keyboard controls are local-only and do not send tuning or zoom commands:
+
+- `h`, left arrow: move cursor one source bin lower.
+- `l`, right arrow: move cursor one source bin higher.
+- `H`, shifted-left arrow: move ten bins lower.
+- `L`, shifted-right arrow: move ten bins higher.
+- `0`: reset cursor to the nearest source bin at tuned frequency.
+- `q`: stop cleanly.
+
+The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal settings are restored on every exit path.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 

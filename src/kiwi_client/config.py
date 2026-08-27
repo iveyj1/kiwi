@@ -82,6 +82,8 @@ interp = 13
 label_columns_per_tick = 18
 show_tuned_marker = true
 show_passband = false
+show_cursor = true
+keyboard = true
 
 [startup]
 state_file = "~/.local/state/kiwi-client/state.json"
@@ -218,6 +220,8 @@ class WaterfallConfig:
     label_columns_per_tick: int = 18
     show_tuned_marker: bool = True
     show_passband: bool = False
+    show_cursor: bool = True
+    keyboard: bool = True
     tuned_khz: float | None = None
     low_cut_hz: int | None = None
     high_cut_hz: int | None = None
@@ -406,6 +410,8 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
                 waterfall_data.get("show_tuned_marker", waterfall.show_tuned_marker)
             ),
             show_passband=bool(waterfall_data.get("show_passband", waterfall.show_passband)),
+            show_cursor=bool(waterfall_data.get("show_cursor", waterfall.show_cursor)),
+            keyboard=bool(waterfall_data.get("keyboard", waterfall.keyboard)),
             tuned_khz=None if tuned_khz is None else float(tuned_khz),
             low_cut_hz=None if low_cut_hz is None else int(low_cut_hz),
             high_cut_hz=None if high_cut_hz is None else int(high_cut_hz),

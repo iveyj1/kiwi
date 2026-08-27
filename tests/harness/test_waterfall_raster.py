@@ -6,6 +6,7 @@ import pytest
 from kiwi_client.waterfall import WaterfallFrame
 from kiwi_client.waterfall_raster import (
     RasterImage,
+    CURSOR_MARKER_RGB,
     PASSBAND_MARKER_RGB,
     TUNED_MARKER_RGB,
     WaterfallHistory,
@@ -91,6 +92,20 @@ def test_frequency_overlay_draws_tuned_and_passband_columns():
         pixels = [tuple(rendered.rgb[(row * 5 + column) * 3:(row * 5 + column + 1) * 3]) for column in range(5)]
         assert pixels == [(0, 0, 0), PASSBAND_MARKER_RGB, TUNED_MARKER_RGB, PASSBAND_MARKER_RGB, (0, 0, 0)]
     assert image.rgb == b"\x00" * 5 * 2 * 3
+
+
+def test_frequency_overlay_draws_cursor_after_tuned_marker():
+    image = RasterImage(width=5, height=1, rgb=b"\x00" * 15)
+    overlay = WaterfallOverlay(
+        start_khz=100.0,
+        end_khz=200.0,
+        tuned_khz=150.0,
+        cursor_khz=150.0,
+    )
+
+    rendered = apply_frequency_overlay(image, overlay)
+
+    assert tuple(rendered.rgb[6:9]) == CURSOR_MARKER_RGB
 
 
 def test_frequency_overlay_omits_markers_outside_visible_span():

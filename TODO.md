@@ -2,6 +2,25 @@
 
 ## Current slice
 
+Goal: Add a local waterfall cursor, precise frequency readout, and non-transmitting keyboard navigation.
+
+Done criteria:
+
+- Add a renderer-neutral cursor model mapped to source-bin centers and clamped to the current W/F span.
+- Preserve cursor frequency where possible when mapped frame context changes.
+- Draw a cursor marker distinguishable from tuned-frequency and passband overlays.
+- Show cursor frequency, offset from tuned frequency, and source-bin step in a terminal status row.
+- Support `h`/`l` or left/right for one-bin movement, `H`/`L` or shifted arrows for ten bins, `0` to reset to tuned frequency, and `q` for clean exit.
+- Keep this slice local-only: cursor movement must not send receiver tuning, zoom, or audio commands.
+- Restore terminal input mode on normal exit, transport failure, cancellation, and keyboard quit.
+- Add pure cursor, key-decoder, overlay, status-row, config, and fake-live harness coverage before user testing.
+- Update user/rendering docs and development log.
+- Work on `feature/wf-cursor-readout`; merge the tested slice into `wf1`, not `main`.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_raster.py tests/harness/test_waterfall_terminal.py tests/harness/test_config.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no initially. The user can evaluate keyboard feel in an attended local session after merge to `wf1`.
+
 Goal: Prevent terminal output backpressure from stalling the Kiwi W/F network session.
 
 Observed failure: while the Kitty graphics terminal was unfocused, image updates later jumped through accumulated history and `websockets` closed with `1011 keepalive ping timeout`. The synchronous PNG/terminal write currently runs inside the receive callback, so a blocked terminal can starve WebSocket receive, pong, and application keepalive work.
@@ -167,8 +186,8 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 - If temporal jumps become problematic, instrument receive cadence, coalesced redraw count, and draw duration before changing buffering; current behavior resembles the Kiwi browser client.
 - Evaluate adaptive ruler density, marker prominence, and persisted operating defaults during normal use.
-- Add cursor frequency readout and keyboard tune-to-cursor interaction.
-- Decide how the standalone W/F viewer should exchange tuning state with the audio controller.
+- Add fixture-tested keyboard recenter and zoom commands around the local cursor.
+- Decide how the standalone W/F viewer should exchange selected/tuned state with the audio controller before sending SND tuning commands.
 - Decide whether to add a native desktop raster backend, integrate a compact image pane into the curses TUI, or retain `kiwi-wf-terminal` as a companion view.
 
 ## Later

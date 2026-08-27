@@ -83,6 +83,8 @@ interp = 13
 label_columns_per_tick = 18
 show_tuned_marker = true
 show_passband = true
+show_cursor = true
+keyboard = true
 low_cut_hz = -5000
 high_cut_hz = 5000
 

@@ -2,6 +2,8 @@ import asyncio
 import base64
 import io
 import os
+import pty
+import termios
 import threading
 from pathlib import Path
 
@@ -11,12 +13,15 @@ from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.waterfall import WaterfallFrame
 from kiwi_client.waterfall_raster import PASSBAND_MARKER_RGB, TUNED_MARKER_RGB, RasterImage
 from kiwi_client.waterfall_terminal import (
+    CursorAction,
+    CursorKeyDecoder,
     KittyTerminalBackend,
     WaterfallTerminalViewer,
     _viewer,
     apply_waterfall_config,
     build_arg_parser,
     choose_frequency_tick_step,
+    control_waterfall_cursor,
     default_terminal_placement,
     encode_kitty_image,
     format_frequency_ruler,
@@ -106,6 +111,8 @@ high_cut_hz = 5000
     assert configured.terminal_rows == 30
     assert configured.label_columns_per_tick == 20
     assert configured.show_passband is True
+    assert configured.show_cursor is True
+    assert configured.keyboard is True
     assert configured.low_cut_hz == -5000
     assert configured.duration_seconds == 60.0
     assert configured.max_frames == 1500
@@ -125,6 +132,75 @@ def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
 
     assert viewer.backend.columns == 132
     assert viewer.backend.rows == 24
+
+
+def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
+    decoder = CursorKeyDecoder()
+
+    assert decoder.feed(b"hL0q") == (
+        CursorAction("move", -1),
+        CursorAction("move", 10),
+        CursorAction("reset"),
+        CursorAction("quit"),
+    )
+    assert decoder.feed(b"\x1b[") == ()
+    assert decoder.feed(b"D\x1b[C") == (
+        CursorAction("move", -1),
+        CursorAction("move", 1),
+    )
+    assert decoder.feed(b"\x1b[1;2D\x1b[1;2C") == (
+        CursorAction("move", -10),
+        CursorAction("move", 10),
+    )
+
+
+def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_terminal():
+    master_fd, input_fd = pty.openpty()
+    original_attributes = termios.tcgetattr(input_fd)
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=1,
+        min_dbm=-100,
+        max_dbm=0,
+        tuned_khz=150.0,
+        show_cursor=True,
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=100.0,
+            span_khz=100.0,
+            bin_width_hz=25_000.0,
+        ),
+        draw=False,
+    )
+    redraw_requested = asyncio.Event()
+    stop_event = threading.Event()
+
+    async def exercise() -> None:
+        task = asyncio.create_task(
+            control_waterfall_cursor(
+                viewer,
+                redraw_requested=redraw_requested,
+                stop_event=stop_event,
+                input_fd=input_fd,
+            )
+        )
+        await asyncio.sleep(0)
+        os.write(master_fd, b"hq")
+        await asyncio.wait_for(task, timeout=1.0)
+
+    try:
+        asyncio.run(exercise())
+        assert viewer.cursor_frequency_khz == pytest.approx(137.5)
+        assert redraw_requested.is_set()
+        assert stop_event.is_set()
+        assert termios.tcgetattr(input_fd) == original_attributes
+    finally:
+        os.close(master_fd)
+        os.close(input_fd)
 
 
 def test_terminal_capability_detection_is_explicit_and_conservative():
@@ -206,6 +282,21 @@ def test_kitty_backend_places_frequency_ruler_above_reserved_image():
     message = output.getvalue()
     ruler = format_frequency_ruler(0.0, 30000.0, columns=60).encode("ascii")
     assert message.startswith(b"\r\x1b[2K" + ruler + b"\n\n\n\n\x1b[3A\r\x1b_G")
+
+
+def test_kitty_backend_places_cursor_status_above_frequency_ruler():
+    output = io.BytesIO()
+    image = RasterImage(width=1, height=1, rgb=b"\x00\x00\x00")
+    backend = KittyTerminalBackend(output=output, environ={}, force=True, columns=60, rows=2)
+
+    backend.set_frequency_range(4882.8125, 5117.1875)
+    backend.set_status_line("Cursor 5000.000 kHz | step 228.882 Hz")
+    backend.draw(image)
+
+    message = output.getvalue()
+    assert message.startswith(b"\r\x1b[2KCursor 5000.000 kHz | step 228.882 Hz")
+    assert b"\n\r\x1b[2K4882.8 kHz" in message
+    assert message.index(b"Cursor 5000.000") < message.index(b"4882.8 kHz")
 
 
 def test_kitty_backend_reserves_visible_area_once_and_restores_cursor():
@@ -299,6 +390,37 @@ def test_live_viewer_coalesces_immediate_frames_and_draws_off_event_loop(tmp_pat
     assert len(backend.images) == 1
     assert backend.draw_threads == [backend.draw_threads[0]]
     assert backend.draw_threads[0] != event_loop_thread
+
+
+def test_viewer_cursor_initializes_at_source_bin_and_moves_without_tuning():
+    backend = FakeBackend()
+    viewer = WaterfallTerminalViewer(
+        backend=backend,
+        max_rows=1,
+        min_dbm=-100,
+        max_dbm=0,
+        tuned_khz=150.0,
+        show_cursor=True,
+    )
+    frame = WaterfallFrame(
+        sequence=1,
+        bins=(155,) * 4,
+        dbm=(-100,) * 4,
+        start_khz=100.0,
+        span_khz=100.0,
+        bin_width_hz=25_000.0,
+    )
+
+    viewer.append(frame, draw=False)
+
+    assert viewer.cursor_frequency_khz == pytest.approx(162.5)
+    assert viewer.move_cursor_bins(-1) is True
+    assert viewer.cursor_frequency_khz == pytest.approx(137.5)
+    assert "Cursor 137.500 kHz" in viewer.cursor_status()
+    assert "tuned -12.500 kHz" in viewer.cursor_status()
+    viewer.reset_cursor()
+    assert viewer.cursor_frequency_khz == pytest.approx(162.5)
+    assert viewer.tuned_khz == 150.0
 
 
 def test_viewer_raster_applies_configured_tuned_and_passband_overlays():
