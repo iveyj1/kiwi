@@ -225,7 +225,7 @@ or explicitly disabled for unrestricted receiver addresses:
 restricted = false
 ```
 
-Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed.
+Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed. `kiwi-wf-terminal` uses this same policy: in restricted mode, `--host` plus `--port` must exactly match an entry in `[receivers].allowed`; in unrestricted mode, arbitrary addresses pass the receiver-policy check. The standalone viewer still requires `--allow-live` before making a connection. Its `--dry-run` output reports the resolved restriction and allowlist.
 
 For long-running live playback/record/capture, the client sends periodic SND keepalives after initial setup. If a session still stops unexpectedly, check the TUI operation result/error and confirm both `duration_seconds` and `max_frames` are `0` if you intend no client-side limit.
 

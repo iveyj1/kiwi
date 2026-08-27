@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import io
+import json
 import os
 import pty
 import termios
@@ -17,6 +18,7 @@ from kiwi_client.waterfall_terminal import (
     CursorKeyDecoder,
     KittyTerminalBackend,
     WaterfallTerminalViewer,
+    _capture_config,
     _viewer,
     apply_waterfall_config,
     build_arg_parser,
@@ -142,6 +144,74 @@ def test_terminal_main_reports_output_oserror_without_traceback(monkeypatch, cap
     assert exc.value.code == 2
     assert "write could not complete without blocking" in captured.err
     assert "Traceback" not in captured.err
+
+
+def test_waterfall_capture_uses_configured_receiver_policy(tmp_path: Path):
+    restricted_path = tmp_path / "restricted.toml"
+    restricted_path.write_text(
+        """
+[receivers]
+restricted = true
+allowed = ["misdr.proxy.kiwisdr.com:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+    unrestricted_path = tmp_path / "unrestricted.toml"
+    unrestricted_path.write_text(
+        """
+[receivers]
+restricted = false
+allowed = []
+""".strip(),
+        encoding="utf-8",
+    )
+    parser = build_arg_parser()
+
+    restricted_args = apply_waterfall_config(
+        parser.parse_args(["--host", "misdr.proxy.kiwisdr.com"]),
+        load_config(restricted_path),
+    )
+    unrestricted_args = apply_waterfall_config(
+        parser.parse_args(["--host", "example.com"]),
+        load_config(unrestricted_path),
+    )
+    restricted_capture = _capture_config(restricted_args, tmp_path / "restricted.jsonl")
+    unrestricted_capture = _capture_config(unrestricted_args, tmp_path / "unrestricted.jsonl")
+
+    restricted_capture.validate()
+    unrestricted_capture.validate()
+    assert restricted_capture.receivers_restricted is True
+    assert restricted_capture.allowed_receivers == ("misdr.proxy.kiwisdr.com:8073",)
+    assert unrestricted_capture.receivers_restricted is False
+    assert unrestricted_capture.allowed_receivers == ()
+
+
+def test_terminal_dry_run_reports_configured_receiver_policy(tmp_path: Path, capsys):
+    path = tmp_path / "proxy.toml"
+    path.write_text(
+        """
+[receivers]
+restricted = true
+allowed = ["misdr.proxy.kiwisdr.com:8073"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    code = waterfall_terminal_main([
+        "--config",
+        str(path),
+        "--dry-run",
+        "--host",
+        "misdr.proxy.kiwisdr.com",
+        "--timestamp",
+        "123456",
+    ])
+
+    plan = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert plan["receiver"] == "misdr.proxy.kiwisdr.com:8073"
+    assert plan["receivers_restricted"] is True
+    assert plan["allowed_receivers"] == ["misdr.proxy.kiwisdr.com:8073"]
 
 
 def test_viewer_defaults_to_current_terminal_placement(monkeypatch):

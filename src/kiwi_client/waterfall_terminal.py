@@ -827,6 +827,8 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
     for name, value in defaults.items():
         if getattr(args, name) is None:
             setattr(args, name, value)
+    args.receivers_restricted = config.receivers.restricted
+    args.allowed_receivers = config.receivers.allowed
     return args
 
 
@@ -845,6 +847,8 @@ def _capture_config(args: argparse.Namespace, output: Path) -> LiveWaterfallCapt
         max_frames=args.max_frames,
         timestamp=args.timestamp,
         overwrite=args.overwrite,
+        receivers_restricted=args.receivers_restricted,
+        allowed_receivers=args.allowed_receivers,
     )
 
 
@@ -886,8 +890,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     config_path = discover_config_path(args.config)
-    config = load_config(config_path) if config_path is not None else load_config()
-    args = apply_waterfall_config(args, config)
+    app_config = load_config(config_path) if config_path is not None else load_config()
+    args = apply_waterfall_config(args, app_config)
     if args.fixture is not None and (args.dry_run or args.allow_live or args.save_fixture is not None):
         parser.error("--fixture cannot be combined with live or dry-run options")
     output = sys.stdout.buffer
@@ -899,10 +903,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         capture_output = args.save_fixture or Path("<temporary-wf-terminal.jsonl>")
-        config = _capture_config(args, capture_output)
+        capture_config = _capture_config(args, capture_output)
         if args.dry_run:
-            config.validate()
-            plan = config.dry_run_plan()
+            capture_config.validate()
+            plan = capture_config.dry_run_plan()
             plan.update(
                 {
                     "backend": args.backend,
@@ -918,6 +922,8 @@ def main(argv: list[str] | None = None) -> int:
                     "show_passband": viewer.show_passband,
                     "show_cursor": viewer.show_cursor,
                     "keyboard": args.keyboard,
+                    "receivers_restricted": app_config.receivers.restricted,
+                    "allowed_receivers": app_config.receivers.allowed,
                     "config": str(config_path) if config_path is not None else None,
                 }
             )
@@ -929,7 +935,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.save_fixture is not None:
             asyncio.run(
                 view_live_waterfall(
-                    config,
+                    capture_config,
                     viewer,
                     allow_live=True,
                     keyboard_fd=keyboard_fd,
