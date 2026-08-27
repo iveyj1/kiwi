@@ -556,6 +556,41 @@ Zoom 9 or 10 balances the two. The CLI refuses configurations that cannot work:
 a sweep too short to cross a bin boundary, a step too coarse to improve on the
 existing bound, or a zoom too low to center the reference.
 
+### Waterfall pane in the TUI
+
+The curses TUI has a colour waterfall pane, drawn with Unicode half blocks so
+each character row shows two waterfall frames. Commands, all in command mode:
+
+```text
+wf                        toggle the pane
+wf on | wf off            show or hide explicitly
+wf load <fixture.jsonl>   load W/F frames from a fixture
+wf scale <min> <max>      set the display dB range
+wf height <rows>          set pane height in character rows
+```
+
+For example:
+
+```text
+:wf load tests/fixtures/kiwi/local-wf-910-zoom8.jsonl
+:wf scale -95 -35
+:wf height 12
+```
+
+The pane is fed from fixtures for now; live W/F in the TUI is not wired up yet,
+because the background worker runs one operation at a time and live audio
+currently occupies it.
+
+Notes:
+
+- The pane needs a 256-colour terminal. On anything less it stays hidden and the
+  rest of the TUI works normally.
+- Colour depth is the terminal's 256-colour palette, not 24-bit. ncurses here has
+  no extended colour pair support, so the pane quantises to 24 levels.
+- Bins are reduced to pane width at draw time with max-hold, so narrow carriers
+  survive and the pane can be resized without reloading.
+- `wf height 12` shows 24 frames, since each character row holds two.
+
 Expected future operations:
 
 - Show live waterfall inside the TUI or richer UI

@@ -2,7 +2,31 @@
 
 ## Current slice
 
-Goal: none active. The waterfall display and bin-mapping slice is complete.
+Goal: Colour waterfall pane in the curses TUI.
+
+Done criteria:
+
+- Shared display model holds recent dBm rows at full resolution and quantises to palette levels, with no curses or terminal knowledge.
+- Bin-to-pane-width reduction happens at draw time, so the pane can be resized without reloading.
+- Half-block cells pack two waterfall frames into each character row.
+- Palette maps levels onto the xterm-256 colour cube without calling `init_color`, so terminals that refuse palette changes still work.
+- Drawing groups equal-coloured runs into single curses calls.
+- The pane degrades to hidden, not broken, when the terminal lacks 256 colours.
+- `locale.setlocale` is called before curses so the half-block glyph renders.
+- `wf`, `wf load`, `wf scale`, `wf height` are available in command mode and appear in the hints.
+- Harness tests cover the model, palette, pane cells, and drawing with a fake window; no terminal required.
+
+Test command: `python3 -m pytest tests/waterfall/test_waterfall_display.py tests/harness/test_tui.py && python3 -m pytest`
+
+Live-radio needed: no; the pane is fed from fixtures.
+
+Docs to update: `docs/user-guide.md`, `docs/waterfall-rendering.md`, `docs/dev-log.md`.
+
+Follow-on, not in this slice:
+
+- Live W/F feed into the pane. Blocked on `BackgroundOperation` running one operation at a time, so live audio and live waterfall cannot both run. Needs either a second worker slot or an explicit mutually-exclusive policy.
+- Frequency axis under the pane, now that bin/frequency mapping exists.
+- Terminal graphics backend for a standalone high-resolution view. Kitty and ghostty support the Kitty graphics protocol, foot supports Sixel, so it needs runtime detection with the half-block pane as fallback.
 
 ## Done in previous slices
 

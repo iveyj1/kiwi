@@ -4,7 +4,11 @@ import curses
 import json
 import time
 
-from kiwi_client.client_app import ClientController, ClientState
+import pytest
+
+from kiwi_client import tui
+
+from kiwi_client.client_app import ClientCommandError, ClientController, ClientState
 from kiwi_client.config import load_config
 from kiwi_client.tui import (
     InputMode,
@@ -1025,3 +1029,150 @@ def test_tui_uses_periodic_input_timeout_for_status_refresh():
 
     assert "stdscr.timeout(250)" in source
     assert "if ch == -1:" in source
+
+
+# --- waterfall pane ---
+
+
+def test_waterfall_pane_starts_hidden_and_empty():
+    state = tui.WaterfallPaneState()
+
+    assert state.visible is False
+    assert len(state.buffer) == 0
+
+
+def test_wf_toggle_flips_visibility():
+    state = tui.WaterfallPaneState()
+
+    response, _ = tui.handle_waterfall_command("wf", state)
+    assert response == {"type": "waterfall", "visible": True}
+    assert state.visible is True
+
+    response, _ = tui.handle_waterfall_command("wf toggle", state)
+    assert response == {"type": "waterfall", "visible": False}
+
+
+def test_wf_on_and_off_are_explicit():
+    state = tui.WaterfallPaneState()
+    tui.handle_waterfall_command("wf on", state)
+    assert state.visible is True
+    tui.handle_waterfall_command("wf off", state)
+    assert state.visible is False
+
+
+def test_wf_load_reads_a_real_fixture_and_shows_the_pane():
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command(
+        "wf load tests/fixtures/kiwi/local-wf-910-zoom8.jsonl", state
+    )
+
+    assert response["loaded"] == 60
+    assert "60 W/F frames" in message
+    assert state.buffer.width == 1024
+    assert state.visible is True, "loading should reveal the pane"
+
+
+def test_wf_load_reports_a_missing_fixture_without_raising():
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command("wf load nope.jsonl", state)
+
+    assert response["type"] == "error"
+    assert "no such fixture" in message
+    assert len(state.buffer) == 0
+
+
+def test_wf_load_rejects_a_fixture_with_no_waterfall_frames():
+    state = tui.WaterfallPaneState()
+
+    with pytest.raises(ClientCommandError, match="no W/F frames"):
+        state.load_fixture(Path("tests/fixtures/kiwi/snd-basic.jsonl"))
+
+
+def test_wf_scale_sets_the_display_range():
+    state = tui.WaterfallPaneState()
+
+    _, message = tui.handle_waterfall_command("wf scale -95 -35", state)
+
+    assert (state.min_dbm, state.max_dbm) == (-95.0, -35.0)
+    assert "-95..-35" in message
+
+
+def test_wf_scale_rejects_an_inverted_or_bad_range():
+    state = tui.WaterfallPaneState()
+    response, _ = tui.handle_waterfall_command("wf scale -35 -95", state)
+    assert response["type"] == "error"
+    response, _ = tui.handle_waterfall_command("wf scale low high", state)
+    assert response["type"] == "error"
+    assert (state.min_dbm, state.max_dbm) == (-110.0, -20.0), "a rejected scale must not apply"
+
+
+def test_wf_height_sets_pane_rows():
+    state = tui.WaterfallPaneState()
+    tui.handle_waterfall_command("wf height 12", state)
+    assert state.height == 12
+    response, _ = tui.handle_waterfall_command("wf height 0", state)
+    assert response["type"] == "error"
+    assert state.height == 12
+
+
+def test_unknown_wf_subcommand_is_reported():
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command("wf sideways", state)
+
+    assert response["type"] == "error"
+    assert "unknown wf subcommand" in message
+
+
+def test_non_wf_commands_are_not_intercepted():
+    assert tui.handle_waterfall_command("tune 5000", tui.WaterfallPaneState()) is None
+    assert tui.handle_waterfall_command("", tui.WaterfallPaneState()) is None
+
+
+def test_handle_tui_key_routes_wf_commands_to_the_pane():
+    controller = ClientController()
+    state = tui.WaterfallPaneState()
+    input_state = tui.TuiInputState(mode=tui.InputMode.COMMAND, command="wf on")
+
+    response, _ = tui.handle_tui_key(10, input_state, controller, waterfall=state)
+
+    assert response == {"type": "waterfall", "visible": True}
+    assert state.visible is True
+
+
+def test_handle_tui_key_without_a_pane_passes_wf_to_the_controller():
+    """Existing callers that pass no pane must keep their old behaviour."""
+    controller = ClientController()
+    input_state = tui.TuiInputState(mode=tui.InputMode.COMMAND, command="wf on")
+
+    response, message = tui.handle_tui_key(10, input_state, controller)
+
+    assert response is None
+    assert "error" in (message or "")
+
+
+def test_hint_columns_balance_block_heights():
+    """Alternating pairing wastes rows; the split should balance the two columns."""
+    categories = [("A", ["1", "2", "3", "4", "5"]), ("B", ["1"]), ("C", ["1"]), ("D", ["1"])]
+
+    lines = tui.format_hint_categories_two_columns(categories)
+
+    # Blocks are 6, 2, 2, 2 lines. A balanced split is 6 against 6.
+    assert len(lines) == 6
+
+
+def test_hint_columns_handle_a_single_category():
+    lines = tui.format_hint_categories_two_columns([("Only", ["one"])])
+
+    assert lines == ["Only", "    one"]
+
+
+def test_hint_columns_handle_no_categories():
+    assert tui.format_hint_categories_two_columns([]) == []
+
+
+def test_command_hint_overview_stays_within_its_screen_budget():
+    """The overview competes with the dashboard for rows; keep it compact."""
+    assert len(render_command_hints("").splitlines()) <= 25

@@ -293,6 +293,20 @@ The reasoning, beyond the offset itself. W/F is lossy by design: 8-bit levels qu
 
 Milestone 9's long-integration and correlation work needs phase, which the waterfall discards entirely, so this was never going to work from W/F data regardless of the offset. Corrected an earlier dev-log and TODO claim that beacon-detection frequency estimates would be the first thing to need sub-bin waterfall accuracy; `docs/roadmap.md` already specified Milestone 8 as audio-based, so the architecture was right and only these notes were wrong.
 
+Added a colour waterfall pane to the curses TUI, fed from fixtures. Three new modules keep the layers apart: `waterfall_display.py` holds the buffer, dBm-to-level quantisation and half-block cell packing with no terminal knowledge; `waterfall_palette.py` maps levels onto the xterm-256 colour cube; `waterfall_pane.py` builds pane-sized cells and draws them through injected curses primitives, so drawing is testable with a fake window.
+
+Each character row shows two waterfall frames using the upper half block with foreground as the upper frame and background as the lower, so a 12-row pane displays 24 frames. Bin reduction to pane width happens at draw time rather than on the way into the buffer, so the buffer keeps full resolution and the pane can be resized without reloading. Drawing groups equal-coloured runs into single curses calls; a 100-cell row of one colour becomes one call rather than 100.
+
+Two constraints found by checking before designing. Curses colour is capped at the terminal's 256-colour palette: `init_extended_pair` is absent from the local Python curses build, so 24-bit colour is unreachable from a curses pane even on a truecolor terminal, and an earlier claim in this session that half blocks would give 24-bit was wrong for the TUI case. And `tui.py` never called `locale.setlocale`, which would have made the half-block glyph render as garbage; that is now set before curses starts. Palette entries come from the 6x6x6 colour cube rather than `init_color`, so terminals that refuse palette changes still work. 24 levels need 576 colour pairs against the 32767 local terminals report.
+
+The pane hides itself rather than failing when the terminal lacks 256 colours, and `draw_waterfall_pane` swallows the curses write error that occurs at the window's last cell rather than unwinding the TUI.
+
+Commands `wf`, `wf load`, `wf scale` and `wf height` are handled in the TUI rather than the controller, because they touch display state only; anything that tunes or streams still belongs to the controller. `handle_tui_key` takes the pane as an optional keyword argument, so existing callers and tests are unaffected and `wf` still falls through to the controller when no pane is passed.
+
+Rebalanced `format_hint_categories_two_columns`. It paired hint blocks by alternating index, which pairs a tall category against a short one and wastes rows; adding one Waterfall category pushed the overview from 25 to 30 lines and broke the existing screen-budget test. It now splits the blocks at the point that balances total column height, which brought the overview to 24 lines including the new category and made the columns read top-to-bottom instead of interleaved.
+
+Live W/F into the pane is deliberately not wired up. `BackgroundOperation` runs one operation at a time and live audio occupies it, so that needs either a second worker slot or an explicit mutually-exclusive policy. Full suite: 357 passed.
+
 ## YYYY-MM-DD
 
 ### Finding

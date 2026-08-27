@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import curses
+import locale
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
@@ -25,6 +26,10 @@ from kiwi_client.client_app import (
     normalize_receiver_address,
     command_aliases,
 )
+from kiwi_client.fixtures import load_jsonl_events
+from kiwi_client.waterfall import parse_waterfall_uncompressed
+from kiwi_client.waterfall_display import DEFAULT_LEVELS, WaterfallImageBuffer
+from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
 from kiwi_client.config import (
     KiwiClientConfig,
     add_allowed_receiver_to_config,
@@ -87,6 +92,12 @@ COMMAND_HINTS = [
     CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>", "Tuning"),
     CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>", "Tuning"),
     CommandHint("step-pair", "cycle step pair", "step-pair <+/-n>", "Tuning"),
+    CommandHint(
+        "wf",
+        "waterfall pane",
+        "wf [on|off|toggle] | wf load <fixture.jsonl> | wf scale <min_db> <max_db> | wf height <rows>",
+        "Waterfall",
+    ),
     CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
     CommandHint("volume-step", "step local volume", "volume-step <delta_percent>", "Audio controls"),
     CommandHint(
@@ -114,6 +125,94 @@ COMMAND_HINTS = [
     CommandHint("help", "list commands", "help", "Other"),
     CommandHint("quit", "quit TUI", "quit", "Other"),
 ]
+
+
+@dataclass
+class WaterfallPaneState:
+    """Display-only state for the TUI waterfall pane.
+
+    This is rendering state, not receiver lifecycle, so it lives in the TUI
+    rather than the controller. The buffer holds full-resolution dBm rows;
+    reduction to pane width happens at draw time so the pane can be resized.
+    """
+
+    buffer: WaterfallImageBuffer = field(default_factory=lambda: WaterfallImageBuffer(max_rows=128))
+    visible: bool = False
+    height: int = 8
+    min_dbm: float = -110.0
+    max_dbm: float = -20.0
+    source: str = ""
+
+    def load_fixture(self, path: Path, *, calibration_db: float = 0.0) -> int:
+        """Replace buffer contents with W/F frames from a JSONL fixture.
+
+        Returns the number of frames loaded. Frames arrive oldest-first in a
+        fixture, and the buffer stores newest-first, so ordering is handled by
+        appending in file order.
+        """
+        frames = 0
+        buffer = WaterfallImageBuffer(max_rows=self.buffer.max_rows)
+        for event in load_jsonl_events(path):
+            if event.dir != "rx" or event.stream != "wf" or event.type != "binary":
+                continue
+            frame = parse_waterfall_uncompressed(event.binary_payload)
+            buffer.append(frame.dbm, calibration_db=calibration_db)
+            frames += 1
+        if not frames:
+            raise ClientCommandError(f"no W/F frames in fixture: {path}")
+        self.buffer = buffer
+        self.source = str(path)
+        self.visible = True
+        return frames
+
+
+def handle_waterfall_command(command: str, waterfall: WaterfallPaneState) -> tuple[dict[str, Any], str] | None:
+    """Handle TUI-local `wf` subcommands, or return None if not one.
+
+    Kept out of the controller because these only touch display state. Anything
+    that tunes or streams belongs in the controller instead.
+    """
+    parts = command.split()
+    if not parts or parts[0] != "wf":
+        return None
+    if len(parts) == 1 or parts[1] == "toggle":
+        waterfall.visible = not waterfall.visible
+        return {"type": "waterfall", "visible": waterfall.visible}, ""
+    action = parts[1]
+    if action == "off":
+        waterfall.visible = False
+        return {"type": "waterfall", "visible": False}, ""
+    if action == "on":
+        waterfall.visible = True
+        return {"type": "waterfall", "visible": True}, ""
+    if action == "load":
+        if len(parts) < 3:
+            return {"type": "error", "error": "usage: wf load <fixture.jsonl>"}, "usage: wf load <fixture.jsonl>"
+        path = Path(parts[2])
+        if not path.exists():
+            return {"type": "error", "error": f"no such fixture: {path}"}, f"no such fixture: {path}"
+        frames = waterfall.load_fixture(path)
+        return (
+            {"type": "waterfall", "loaded": frames, "source": str(path)},
+            f"loaded {frames} W/F frames from {path.name}",
+        )
+    if action == "scale":
+        if len(parts) < 4:
+            return {"type": "error", "error": "usage: wf scale <min_db> <max_db>"}, "usage: wf scale <min_db> <max_db>"
+        try:
+            low, high = float(parts[2]), float(parts[3])
+        except ValueError:
+            return {"type": "error", "error": "wf scale needs two numbers"}, "wf scale needs two numbers"
+        if high <= low:
+            return {"type": "error", "error": "wf scale max must exceed min"}, "wf scale max must exceed min"
+        waterfall.min_dbm, waterfall.max_dbm = low, high
+        return {"type": "waterfall", "min_dbm": low, "max_dbm": high}, f"waterfall scale {low:g}..{high:g} dB"
+    if action == "height":
+        if len(parts) < 3 or not parts[2].isdigit() or int(parts[2]) < 1:
+            return {"type": "error", "error": "usage: wf height <rows>"}, "usage: wf height <rows>"
+        waterfall.height = int(parts[2])
+        return {"type": "waterfall", "height": waterfall.height}, f"waterfall height {waterfall.height} rows"
+    return {"type": "error", "error": f"unknown wf subcommand: {action}"}, f"unknown wf subcommand: {action}"
 
 
 def render_tui_hints(
@@ -233,25 +332,38 @@ def render_command_hints(command_text: str) -> str:
 
 
 def format_hint_categories_two_columns(categories: list[tuple[str, list[str]]], *, column_width: int = 52) -> list[str]:
-    """Format categorized hints into two compact text columns."""
-    blocks: list[list[str]] = []
-    for category, items in categories:
-        block = [category, *[f"    {item}" for item in items]]
-        blocks.append(block)
-    left_blocks = blocks[0::2]
-    right_blocks = blocks[1::2]
+    """Format categorized hints into two compact text columns.
+
+    Blocks are split into a left and a right column at the point that balances
+    total height, rather than by alternating index. Alternating pairs a tall
+    category against a short one and wastes rows, which matters because the
+    hint overview competes with the dashboard for screen space.
+    """
+    blocks: list[list[str]] = [[category, *[f"    {item}" for item in items]] for category, items in categories]
+    if not blocks:
+        return []
+
+    heights = [len(block) for block in blocks]
+    total = sum(heights)
+    split, running, best = len(blocks), 0, None
+    for index in range(1, len(blocks) + 1):
+        running += heights[index - 1]
+        cost = max(running, total - running)
+        if best is None or cost < best:
+            best, split = cost, index
+
+    left_blocks, right_blocks = blocks[:split], blocks[split:]
+    left_lines = [line for block in left_blocks for line in block]
+    right_lines = [line for block in right_blocks for line in block]
+
     lines: list[str] = []
-    for index in range(max(len(left_blocks), len(right_blocks))):
-        left = left_blocks[index] if index < len(left_blocks) else []
-        right = right_blocks[index] if index < len(right_blocks) else []
-        height = max(len(left), len(right))
-        for row in range(height):
-            left_text = left[row] if row < len(left) else ""
-            right_text = right[row] if row < len(right) else ""
-            if right_text:
-                lines.append(f"{left_text:<{column_width}}{right_text}")
-            else:
-                lines.append(left_text.rstrip())
+    for index in range(max(len(left_lines), len(right_lines))):
+        left_text = left_lines[index] if index < len(left_lines) else ""
+        right_text = right_lines[index] if index < len(right_lines) else ""
+        if right_text:
+            lines.append(f"{left_text:<{column_width}}{right_text}")
+        else:
+            lines.append(left_text.rstrip())
     return lines
 
 
@@ -577,6 +689,8 @@ def handle_tui_key(
     input_state: TuiInputState,
     controller: ClientController,
     config: KiwiClientConfig | None = None,
+    *,
+    waterfall: WaterfallPaneState | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Handle one curses key and return an optional response/message."""
     config = config or load_config()
@@ -649,6 +763,13 @@ def handle_tui_key(
             return {"type": "help", "commands": available_commands()}, ""
         if command.lower() in {"quit", "exit", "q", "qu"}:
             return request_tui_quit(controller, config=config)
+        if waterfall is not None:
+            try:
+                handled = handle_waterfall_command(command, waterfall)
+            except ClientCommandError as exc:
+                return None, f"error: {exc}"
+            if handled is not None:
+                return handled
         try:
             response = controller.execute(command)
             message = persist_added_receivers_to_config(response, config)
@@ -756,6 +877,9 @@ def persist_tui_state(controller: ClientController, config: KiwiClientConfig | N
 
 def run_tui(controller: ClientController | None = None, *, config: KiwiClientConfig | None = None) -> None:
     """Run a small curses command UI."""
+    # ncurses needs the locale set before it will render non-ASCII glyphs.
+    # Without this the waterfall half-block character comes out as garbage.
+    locale.setlocale(locale.LC_ALL, "")
     config = config or load_config()
     startup_state, presets = startup_state_and_presets(config)
     receiver_presets = startup_receiver_presets(config)
@@ -811,12 +935,33 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def setup_waterfall_colors(levels: int = DEFAULT_LEVELS) -> bool:
+    """Initialise curses colour pairs for the waterfall pane.
+
+    Returns False when the terminal cannot support the pane, so the TUI keeps
+    working without colour rather than failing to start.
+    """
+    try:
+        if not curses.has_colors():
+            return False
+        curses.start_color()
+        curses.use_default_colors()
+        if curses.COLORS < 256:
+            return False
+        init_waterfall_pairs(curses.init_pair, levels=levels, max_pairs=curses.COLOR_PAIRS)
+        return True
+    except (curses.error, RuntimeError):
+        return False
+
+
 def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) -> None:
     curses.curs_set(1)
     stdscr.timeout(250)
     last_response: dict[str, Any] | None = None
     message = "Keymap mode. Press ':' for commands. Use explicit --allow-live for live operations."
     input_state = TuiInputState()
+    waterfall = WaterfallPaneState()
+    waterfall_colors = setup_waterfall_colors()
 
     while controller.running:
         stdscr.erase()
@@ -830,13 +975,16 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
         hints = render_tui_hints(input_state, config, controller)
         height, width = stdscr.getmaxyx()
         hint_lines = hints.splitlines()
-        dashboard_limit = max(0, height - len(hint_lines) - 4)
+        pane_rows = waterfall.height + 1 if (waterfall.visible and waterfall_colors and len(waterfall.buffer)) else 0
+        dashboard_limit = max(0, height - len(hint_lines) - pane_rows - 4)
         row = 0
         for line in dashboard.splitlines()[:dashboard_limit]:
             stdscr.addnstr(row, 0, line, max(0, width - 1))
             row += 1
         if row < height - 3:
             row += 1
+        if pane_rows:
+            row = _draw_waterfall(stdscr, waterfall, top=row, width=width, height=height)
         for line in hint_lines[: max(0, height - row - 2)]:
             stdscr.addnstr(row, 0, line, max(0, width - 1))
             row += 1
@@ -847,7 +995,7 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
         ch = stdscr.getch()
         if ch == -1:
             continue
-        response, new_message = handle_tui_key(ch, input_state, controller, config)
+        response, new_message = handle_tui_key(ch, input_state, controller, config, waterfall=waterfall)
         if response is not None:
             last_response = response
         if new_message is not None:
@@ -856,3 +1004,23 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _draw_waterfall(stdscr, waterfall: WaterfallPaneState, *, top: int, width: int, height: int) -> int:
+    """Draw the waterfall pane and return the next free screen row."""
+    available = max(0, height - top - 3)
+    rows = min(waterfall.height, available)
+    if rows < 1:
+        return top
+    span = waterfall.buffer.width
+    label = f"Waterfall: {rows * 2} frames x {span} bins -> {width - 1} cols  [{waterfall.min_dbm:g}..{waterfall.max_dbm:g} dB]"
+    stdscr.addnstr(top, 0, label, max(0, width - 1))
+    cells = pane_cells(
+        waterfall.buffer,
+        width=max(1, width - 1),
+        height=rows,
+        min_dbm=waterfall.min_dbm,
+        max_dbm=waterfall.max_dbm,
+    )
+    drawn = draw_waterfall_pane(stdscr, cells, top=top + 1, color_pair=curses.color_pair)
+    return top + 1 + drawn

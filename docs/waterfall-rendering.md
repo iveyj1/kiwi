@@ -18,6 +18,10 @@ See [Waterfall display specification](waterfall-spec.md) for the current fixture
 - Raw intensity mapping `sample - 255` gives plausible uncalibrated values for the fixture: about `-200..-25 dBm`, median near `-87 dBm`, with stable bright bins near the low-bin edge and around bins 529/538.
 - The first bin is `-200 dBm` in both local rows; bin orientation and exact frequency mapping remain open until center/span/start metadata is incorporated.
 
+- A colour half-block pane is integrated into the curses TUI via `waterfall_display.py` (model), `waterfall_palette.py` (xterm-256 ramp), and `waterfall_pane.py` (cells and drawing). Two frames per character row, 24 levels, fed from fixtures.
+- Curses colour is limited to the terminal's 256-colour palette. `init_extended_pair` is unavailable in the local Python curses build, so 24-bit colour is not reachable from a curses pane even on a truecolor terminal. A future standalone renderer writing raw escapes could do better.
+- A half-block cell needs one colour pair per (upper, lower) level combination, so 24 levels need 576 pairs. Local terminals report 32767 or more.
+
 ## Questions to resolve
 
 - Bin order
