@@ -15,16 +15,18 @@ import tempfile
 import termios
 import time
 import tty
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Event, Lock
 from typing import Any, BinaryIO, Callable, Mapping, Protocol
 
-from kiwi_client.commands import encode_waterfall_view
+from kiwi_client.commands import encode_modulation, encode_waterfall_view
 from kiwi_client.config import KiwiClientConfig, discover_config_path, load_config
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.live_capture import LiveCaptureError
+from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
+from kiwi_client.playback import AudioSink, NullAudioSink, SoundDeviceSink
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
     WaterfallCursor,
@@ -73,6 +75,9 @@ class CursorKeyDecoder:
         ord("+"): CursorAction("zoom", 1),
         ord("="): CursorAction("zoom", 1),
         ord("-"): CursorAction("zoom", -1),
+        ord("a"): CursorAction("audio-toggle"),
+        10: CursorAction("audio-tune"),
+        13: CursorAction("audio-tune"),
         ord("q"): CursorAction("quit"),
     }
 
@@ -432,6 +437,8 @@ class WaterfallTerminalViewer:
         step_pair_index: int = 0,
         zoom: int = 0,
         zoom_max: int = 14,
+        cw_offset_hz: int = -800,
+        frequency_decimals: int = 3,
         keyboard_enabled: bool = False,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -462,6 +469,9 @@ class WaterfallTerminalViewer:
         self.step_pair_index = step_pair_index % len(self.step_pairs_hz)
         self.zoom = zoom
         self.zoom_max = zoom_max
+        self.cw_offset_hz = cw_offset_hz
+        self.frequency_decimals = frequency_decimals
+        self.audio_status = "OFF"
         self.keyboard_enabled = keyboard_enabled
         self.refresh_interval = 1.0 / refresh_hz
         self.clock = clock
@@ -471,6 +481,11 @@ class WaterfallTerminalViewer:
         self._lock = Lock()
         self._generation = 0
         self._drawn_generation = 0
+
+    @property
+    def has_history(self) -> bool:
+        with self._lock:
+            return bool(len(self.history))
 
     @property
     def needs_draw(self) -> bool:
@@ -491,6 +506,7 @@ class WaterfallTerminalViewer:
         mode: str,
         main_step_hz: float,
         small_step_hz: float,
+        audio_status: str,
         keyboard_enabled: bool,
     ) -> str | None:
         if cursor is None:
@@ -499,11 +515,12 @@ class WaterfallTerminalViewer:
             f"Cursor {cursor.frequency_khz:.4f} kHz",
             f"{mode} step {main_step_hz:g}/{small_step_hz:g} Hz",
             f"resolution {cursor.bin_width_hz:.3f} Hz",
+            f"audio {audio_status}",
         ]
         if tuned_khz is not None:
             parts.insert(1, f"tuned {cursor.frequency_khz - tuned_khz:+.3f} kHz")
         if keyboard_enabled:
-            parts.append("h/l main H/L small t/T pair c center +/- zoom 0 reset q quit")
+            parts.append("h/l main H/L small t/T pair c center +/- zoom a audio Enter tune 0 reset q quit")
         return " | ".join(parts)
 
     def cursor_status(self) -> str:
@@ -515,6 +532,7 @@ class WaterfallTerminalViewer:
                 mode=self.mode,
                 main_step_hz=main_step_hz,
                 small_step_hz=small_step_hz,
+                audio_status=self.audio_status,
                 keyboard_enabled=self.keyboard_enabled,
             ) or ""
 
@@ -541,6 +559,39 @@ class WaterfallTerminalViewer:
             self.step_pair_index = index
             self._generation += 1
             return True
+
+    def audio_start_frequencies(self) -> tuple[float, float] | None:
+        with self._lock:
+            if self.tuned_khz is None:
+                return None
+            radio_frequency_khz = self.tuned_khz
+            if self.mode == "cw":
+                radio_frequency_khz += self.cw_offset_hz / 1000.0
+            return self.tuned_khz, radio_frequency_khz
+
+    def set_audio_status(self, status: str) -> None:
+        with self._lock:
+            if status == self.audio_status:
+                return
+            self.audio_status = status
+            self._generation += 1
+
+    def audio_tune_command(self) -> str | None:
+        with self._lock:
+            if self._cursor is None or self.low_cut_hz is None or self.high_cut_hz is None:
+                return None
+            self.tuned_khz = self._cursor.frequency_khz
+            radio_frequency_khz = self.tuned_khz
+            if self.mode == "cw":
+                radio_frequency_khz += self.cw_offset_hz / 1000.0
+            self._generation += 1
+            return encode_modulation(
+                self.mode,
+                self.low_cut_hz,
+                self.high_cut_hz,
+                radio_frequency_khz,
+                frequency_decimals=self.frequency_decimals,
+            )
 
     def recenter_command(self) -> str | None:
         with self._lock:
@@ -629,6 +680,7 @@ class WaterfallTerminalViewer:
                 mode=self.mode,
                 main_step_hz=main_step_hz,
                 small_step_hz=small_step_hz,
+                audio_status=self.audio_status,
                 keyboard_enabled=self.keyboard_enabled,
             )
             generation = self._generation
@@ -698,6 +750,97 @@ def preview_terminal_fixture(path: Path, viewer: WaterfallTerminalViewer) -> int
     return frames
 
 
+class WaterfallAudioController:
+    """Own one optional SND task without coupling it to W/F transport."""
+
+    def __init__(
+        self,
+        *,
+        viewer: WaterfallTerminalViewer,
+        config: LiveSndPlaybackConfig,
+        redraw_requested: asyncio.Event,
+        sink_factory: Callable[[], AudioSink] = SoundDeviceSink,
+        runner: Callable[..., Any] = play_live_snd,
+    ) -> None:
+        self.viewer = viewer
+        self.config = config
+        self.redraw_requested = redraw_requested
+        self.sink_factory = sink_factory
+        self.runner = runner
+        self.command_queue: queue.Queue[str] = queue.Queue()
+        self.stop_event: Event | None = None
+        self.task: asyncio.Task | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.task is not None and not self.task.done()
+
+    def start(self) -> bool:
+        if self.enabled:
+            return False
+        frequencies = self.viewer.audio_start_frequencies()
+        if frequencies is not None:
+            frequency_khz, radio_frequency_khz = frequencies
+            self.config = replace(
+                self.config,
+                frequency_khz=frequency_khz,
+                radio_frequency_khz=radio_frequency_khz,
+            )
+        self.stop_event = Event()
+        self.viewer.set_audio_status("STARTING")
+        self.redraw_requested.set()
+        self.task = asyncio.create_task(self._run(self.stop_event))
+        return True
+
+    async def _run(self, stop_event: Event) -> None:
+        self.viewer.set_audio_status("ON")
+        self.redraw_requested.set()
+        try:
+            await self.runner(
+                self.config,
+                self.sink_factory(),
+                allow_live=True,
+                stop_event=stop_event,
+                command_queue=self.command_queue,
+            )
+        except Exception as exc:
+            self.viewer.set_audio_status(f"ERROR {exc}")
+            self.redraw_requested.set()
+            return
+        self.viewer.set_audio_status("OFF" if stop_event.is_set() else "ENDED")
+        self.redraw_requested.set()
+
+    async def stop(self) -> bool:
+        if not self.enabled or self.stop_event is None or self.task is None:
+            self.viewer.set_audio_status("OFF")
+            return False
+        self.viewer.set_audio_status("STOPPING")
+        self.redraw_requested.set()
+        self.stop_event.set()
+        await self.task
+        return True
+
+    async def toggle(self) -> None:
+        if self.enabled:
+            await self.stop()
+        else:
+            self.start()
+
+    def tune_to_cursor(self) -> bool:
+        if not self.enabled:
+            return False
+        command = self.viewer.audio_tune_command()
+        if command is None:
+            return False
+        self.command_queue.put(command)
+        self.redraw_requested.set()
+        return True
+
+    async def finish(self) -> None:
+        if self.enabled:
+            await self.stop()
+
+
 async def control_waterfall_cursor(
     viewer: WaterfallTerminalViewer,
     *,
@@ -705,6 +848,7 @@ async def control_waterfall_cursor(
     stop_event: Event,
     input_fd: int,
     command_queue: queue.Queue[str] | None = None,
+    audio_controller: WaterfallAudioController | None = None,
 ) -> None:
     """Read local cursor controls in cbreak mode and always restore terminal input."""
     loop = asyncio.get_running_loop()
@@ -748,6 +892,10 @@ async def control_waterfall_cursor(
                     command = viewer.zoom_command(action.bins)
                     if command is not None:
                         command_queue.put(command)
+                elif action.kind == "audio-toggle" and audio_controller is not None:
+                    await audio_controller.toggle()
+                elif action.kind == "audio-tune" and audio_controller is not None:
+                    audio_controller.tune_to_cursor()
                 elif action.kind == "quit":
                     stop_event.set()
                     return
@@ -763,11 +911,26 @@ async def view_live_waterfall(
     allow_live: bool = False,
     websocket_connect: Callable[..., Any] | None = None,
     keyboard_fd: int | None = None,
+    audio_config: LiveSndPlaybackConfig | None = None,
+    audio_start: bool = False,
+    audio_sink_factory: Callable[[], AudioSink] = SoundDeviceSink,
+    audio_runner: Callable[..., Any] = play_live_snd,
 ) -> Path:
     """Receive frames promptly while a bounded background renderer draws the latest state."""
     redraw_requested = asyncio.Event()
     stop_event = Event()
     command_queue: queue.Queue[str] = queue.Queue()
+    audio_controller = (
+        WaterfallAudioController(
+            viewer=viewer,
+            config=audio_config,
+            redraw_requested=redraw_requested,
+            sink_factory=audio_sink_factory,
+            runner=audio_runner,
+        )
+        if audio_config is not None
+        else None
+    )
     stopping = False
 
     def receive_frame(frame: WaterfallFrame) -> None:
@@ -779,7 +942,7 @@ async def view_live_waterfall(
         while True:
             await redraw_requested.wait()
             redraw_requested.clear()
-            if not viewer.needs_draw:
+            if not viewer.needs_draw or not viewer.has_history:
                 if stopping:
                     return
                 continue
@@ -812,11 +975,14 @@ async def view_live_waterfall(
                 stop_event=stop_event,
                 input_fd=keyboard_fd,
                 command_queue=command_queue,
+                audio_controller=audio_controller,
             )
         )
         if keyboard_fd is not None
         else None
     )
+    if audio_start and audio_controller is not None:
+        audio_controller.start()
     try:
         done, _pending = await asyncio.wait(
             (capture_task, render_task),
@@ -836,6 +1002,8 @@ async def view_live_waterfall(
         if keyboard_task is not None:
             keyboard_task.cancel()
             await asyncio.gather(keyboard_task, return_exceptions=True)
+        if audio_controller is not None:
+            await audio_controller.finish()
         try:
             await render_task
         finally:
@@ -865,6 +1033,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", help="mode whose configured main/small cursor step pairs are used")
     parser.add_argument("--step-pair", type=int, help="initial zero-based configured mode step-pair index")
     parser.add_argument("--keyboard", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--audio", action=argparse.BooleanOptionalAction, default=None, help="start coordinated SND audio")
+    parser.add_argument("--null-audio", action="store_true", help="run SND session but discard audio samples")
     parser.add_argument("--force", action="store_true", help="emit Kitty graphics even when capability detection fails")
     parser.add_argument("--host", default="10.0.0.40")
     parser.add_argument("--port", type=int, default=8073)
@@ -907,6 +1077,7 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
         "show_passband": waterfall.show_passband,
         "show_cursor": waterfall.show_cursor,
         "keyboard": waterfall.keyboard,
+        "audio": waterfall.audio,
         "mode": str(config.default_state.get("mode", "am")),
         "step_pair": waterfall.cursor_step_pair,
         "tuned_khz": waterfall.tuned_khz,
@@ -924,6 +1095,17 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
         raise ValueError(f"no configured cursor step pairs for mode: {mode}")
     args.mode = mode
     args.cursor_step_pairs = config.tuning.mode_step_pairs[mode]
+    default_low_cut_hz, default_high_cut_hz = config.tuning.mode_passbands[mode]
+    if args.low_cut_hz is None:
+        args.low_cut_hz = default_low_cut_hz
+    if args.high_cut_hz is None:
+        args.high_cut_hz = default_high_cut_hz
+    args.cw_offset_hz = config.tuning.cw_offset_hz
+    args.frequency_decimals = config.tuning.command_frequency_decimals
+    args.audio_startup_mute_ms = config.audio.startup_mute_ms
+    args.audio_startup_fade_in_ms = config.audio.startup_fade_in_ms
+    args.audio_stop_fade_out_ms = config.audio.stop_fade_out_ms
+    args.user = str(config.default_state.get("user", "kiwi-client"))
     args.receivers_restricted = config.receivers.restricted
     args.allowed_receivers = config.receivers.allowed
     return args
@@ -944,6 +1126,32 @@ def _capture_config(args: argparse.Namespace, output: Path) -> LiveWaterfallCapt
         max_frames=args.max_frames,
         timestamp=args.timestamp,
         overwrite=args.overwrite,
+        receivers_restricted=args.receivers_restricted,
+        allowed_receivers=args.allowed_receivers,
+    )
+
+
+def _audio_config(args: argparse.Namespace) -> LiveSndPlaybackConfig:
+    frequency_khz = args.tuned_khz if args.tuned_khz is not None else args.center_khz
+    radio_frequency_khz = frequency_khz
+    if args.mode == "cw":
+        radio_frequency_khz += args.cw_offset_hz / 1000.0
+    return LiveSndPlaybackConfig(
+        host=args.host,
+        port=args.port,
+        user=args.user,
+        frequency_khz=frequency_khz,
+        radio_frequency_khz=radio_frequency_khz,
+        frequency_decimals=args.frequency_decimals,
+        mode=args.mode,
+        low_cut_hz=args.low_cut_hz,
+        high_cut_hz=args.high_cut_hz,
+        duration_seconds=args.duration_seconds,
+        max_frames=args.max_frames,
+        startup_mute_ms=args.audio_startup_mute_ms,
+        startup_fade_in_ms=args.audio_startup_fade_in_ms,
+        stop_fade_out_ms=args.audio_stop_fade_out_ms,
+        timestamp=args.timestamp,
         receivers_restricted=args.receivers_restricted,
         allowed_receivers=args.allowed_receivers,
     )
@@ -983,6 +1191,8 @@ def _viewer(args: argparse.Namespace, output: BinaryIO) -> WaterfallTerminalView
         step_pairs_hz=args.cursor_step_pairs,
         step_pair_index=args.step_pair,
         zoom=args.zoom,
+        cw_offset_hz=args.cw_offset_hz,
+        frequency_decimals=args.frequency_decimals,
         keyboard_enabled=args.keyboard and args.fixture is None,
     )
 
@@ -1005,8 +1215,10 @@ def main(argv: list[str] | None = None) -> int:
 
         capture_output = args.save_fixture or Path("<temporary-wf-terminal.jsonl>")
         capture_config = _capture_config(args, capture_output)
+        audio_config = _audio_config(args)
         if args.dry_run:
             capture_config.validate()
+            audio_config.validate()
             plan = capture_config.dry_run_plan()
             plan.update(
                 {
@@ -1026,6 +1238,9 @@ def main(argv: list[str] | None = None) -> int:
                     "cursor_step_pair": viewer.step_pair_index,
                     "cursor_step_pairs_hz": viewer.step_pairs_hz,
                     "keyboard": args.keyboard,
+                    "audio_start": args.audio,
+                    "audio_null_sink": args.null_audio,
+                    "audio_plan": audio_config.dry_run_plan(),
                     "receivers_restricted": app_config.receivers.restricted,
                     "allowed_receivers": app_config.receivers.allowed,
                     "config": str(config_path) if config_path is not None else None,
@@ -1043,6 +1258,9 @@ def main(argv: list[str] | None = None) -> int:
                     viewer,
                     allow_live=True,
                     keyboard_fd=keyboard_fd,
+                    audio_config=audio_config,
+                    audio_start=args.audio,
+                    audio_sink_factory=NullAudioSink if args.null_audio else SoundDeviceSink,
                 )
             )
         else:
@@ -1054,6 +1272,9 @@ def main(argv: list[str] | None = None) -> int:
                         viewer,
                         allow_live=True,
                         keyboard_fd=keyboard_fd,
+                        audio_config=audio_config,
+                        audio_start=args.audio,
+                        audio_sink_factory=NullAudioSink if args.null_audio else SoundDeviceSink,
                     )
                 )
         return 0
