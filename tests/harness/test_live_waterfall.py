@@ -9,6 +9,16 @@ from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall, main
 
 WF_PAYLOAD = b"W/F\x00" + (7).to_bytes(4, "little") + (0x00020003).to_bytes(4, "little") + (42).to_bytes(4, "little") + bytes([0, 55, 128, 200, 255])
+LOCAL_FIXTURE = Path("tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl")
+
+
+def _local_wf_payload() -> bytes:
+    """Return the first real 1024-bin W/F payload from the local capture fixture."""
+    events = load_jsonl_events(LOCAL_FIXTURE)
+    return next(event.binary_payload for event in events if event.type == "binary")
+
+
+LOCAL_WF_PAYLOAD = _local_wf_payload()
 
 
 class FakeWaterfallWebSocket:
@@ -39,6 +49,47 @@ class FakeConnect:
     def __call__(self, uri, **kwargs):
         self.calls.append((uri, kwargs))
         return self.websocket
+
+
+def test_live_waterfall_config_rejects_invalid_ascii_columns(tmp_path: Path):
+    config = LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "wf.jsonl", ascii_columns=0)
+
+    with pytest.raises(LiveCaptureError, match="columns must be >= 1"):
+        config.validate()
+
+
+def test_live_waterfall_config_rejects_unknown_reduction(tmp_path: Path):
+    config = LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "wf.jsonl", ascii_reduction="median")
+
+    with pytest.raises(LiveCaptureError, match="reduction must be one of"):
+        config.validate()
+
+
+def test_capture_live_waterfall_reduces_status_row_to_configured_columns(tmp_path: Path):
+    output = tmp_path / "wf.jsonl"
+    config = LiveWaterfallCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=output,
+        timestamp=123456,
+        max_frames=1,
+        render_mindb=-200,
+        render_maxdb=-25,
+        ascii_columns=100,
+    )
+    fake_connect = FakeConnect([LOCAL_WF_PAYLOAD])
+    metrics = []
+
+    asyncio.run(
+        capture_live_waterfall(
+            config,
+            allow_live=True,
+            status_callback=metrics.append,
+            websocket_connect=fake_connect,
+        )
+    )
+
+    assert len(metrics[-1]["ascii_row"]) == 100
 
 
 def test_live_waterfall_config_dry_run_plan(tmp_path: Path):

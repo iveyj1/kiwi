@@ -162,6 +162,33 @@ Implemented first renderer in `src/kiwi_client/waterfall_render.py`:
 
 2. Fixed-scale dBm-to-ramp mapping with clamp behavior.
 
+3. Bin-to-column reduction via `reduce_bins(values, columns, reduction=...)`.
+
+### Bin-to-column reduction
+
+A W/F frame carries 1024 bins but a terminal is 80-200 columns wide. Without
+reduction one frame soft-wraps across several physical rows and stops reading as
+a waterfall at all. Reduction runs before ramp mapping and is shared by every
+current and future backend (ASCII, half-block, Sixel, PNG).
+
+Rules:
+
+- Bucket edges are `i * len(values) // columns`, so every bin lands in exactly
+  one bucket and bucket sizes differ by at most one bin. No bin is dropped or
+  double-counted.
+- `max` is the default aggregation. A narrow carrier occupying one bin survives
+  decimation; `mean` would bury it in the surrounding noise floor. `mean` is
+  offered for noise-floor and band-conditions viewing.
+- Reduction never upsamples. A requested column count at or above the bin count
+  returns the input unchanged.
+- The function is pure and deterministic. Terminal width is resolved only in the
+  CLI layer, by `terminal_columns()` / `resolve_columns()`, and passed inward as
+  an explicit count so capture configs and dry-run plans stay reproducible.
+
+Note that reduction is a display concern only. It does not improve frequency
+resolution: at zoom 0 with `bandwidth=30000000` one bin already spans about
+29.3 kHz, and only zoom and `wf_fft_size` change that.
+
 Implemented user-visible offline preview:
 
 - `python3 -m kiwi_client.waterfall_preview tests/fixtures/kiwi/wf-basic.jsonl`

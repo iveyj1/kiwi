@@ -464,6 +464,34 @@ Useful controls:
 - `--min-db` / `--max-db`: receiver waterfall scale commands.
 - `--render-min-db` / `--render-max-db`: local ASCII display scale; defaults to receiver scale.
 - `--ramp " .:-=+*#%@"`: ASCII colormap from dim to bright.
+- `--columns N`: display columns per frame; defaults to the detected terminal width.
+- `--reduction max|mean`: how bins are aggregated into a column; default `max`.
+
+### Display columns
+
+A W/F frame normally carries 1024 bins. Rendering one character per bin makes a
+single frame wrap across several physical terminal rows, which is unreadable as
+a waterfall. `kiwi-wf-preview`, `kiwi-wf-capture`, and `kiwi-wf-live` therefore
+reduce bins to the detected terminal width by default, so one frame is one row.
+
+```bash
+# One row per frame at the current terminal width (default).
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --min-db -200 --max-db -25
+
+# Fixed width, useful for reproducible output in scripts and notes.
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --columns 100
+
+# One character per bin, the previous behavior.
+kiwi-wf-preview tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --columns 0
+```
+
+`--reduction max` is the default because a narrow carrier occupying one bin
+survives decimation. `--reduction mean` averages instead, which shows the noise
+floor more evenly but buries single-bin signals — useful for judging band
+conditions, not for spotting beacons.
+
+Reduction never upsamples: if the requested column count is at least the bin
+count, the row is rendered one character per bin unchanged.
 
 Installed script names:
 
