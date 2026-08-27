@@ -500,6 +500,62 @@ kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local
 kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
 
+### Measuring the bin center offset
+
+`kiwi-wf-sweep` measures the W/F bin center offset directly, against a reference
+of known exact frequency, instead of inferring it from broadcast carriers whose
+own tolerance is +/-20 Hz.
+
+It steps the receive window past the reference in small increments. Each window
+position constrains the offset, and the constraints intersect to a narrow range
+once the peak crosses a bin boundary. Precision is set by the step size, not by
+the reference's frequency error.
+
+Plan first, without connecting:
+
+```bash
+kiwi-wf-sweep --dry-run --output sweeps/wwvb.jsonl --reference-khz 60 --zoom 9
+```
+
+Run it:
+
+```bash
+kiwi-wf-sweep --allow-live --host 10.0.0.40 \
+  --output sweeps/wwvb.jsonl --reference-khz 60 --zoom 9
+```
+
+Re-analyse a saved sweep offline, with no network access:
+
+```bash
+kiwi-wf-sweep --analyse sweeps/wwvb.jsonl --reference-khz 60
+```
+
+Choosing a reference:
+
+- **WWVB at 60 kHz** is cesium-referenced, so its frequency error is negligible.
+  It needs `--zoom 8` or higher, because lower zooms cannot center 60 kHz and
+  clamp the window against 0 Hz, where bin 0 is dead in every frame.
+- **WWV at 5000/10000/15000/20000 kHz** is equally accurate and sits mid-band,
+  avoiding the LF noise floor. Running one sweep at 60 kHz and another at
+  10 MHz puts `start` at very different values, which tests whether the offset
+  depends on `start` at all.
+- **The receiver's own signal generator** (`SET gen=`) would be ideal, being
+  locked to the same ADC clock as the FFT. Check first whether it is global to
+  the receiver rather than per-connection; if global, it injects a tone into
+  every other user's receiver.
+
+Choosing a zoom trades two effects against each other:
+
+- Higher zoom narrows the bins, so less atmospheric noise lands in each one:
+  about +3 dB of SNR per zoom step.
+- Higher zoom also halves the number of window positions per bin, coarsening
+  the sweep. At zoom 14 there is one position per bin and the sweep cannot
+  work at all.
+
+Zoom 9 or 10 balances the two. The CLI refuses configurations that cannot work:
+a sweep too short to cross a bin boundary, a step too coarse to improve on the
+existing bound, or a zoom too low to center the reference.
+
 Expected future operations:
 
 - Show live waterfall inside the TUI or richer UI

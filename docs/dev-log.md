@@ -261,6 +261,20 @@ Recorded that accuracy is not what the choice trades off: the whole admissible w
 
 Clarified in the protocol notes what the offset is actually between, since that was not stated: the naive bin index `(f - start_hz) / bin_hz` for a carrier of known frequency, and the measured index of its energy peak.
 
+Added `src/kiwi_client/waterfall_sweep.py` / `kiwi-wf-sweep` to measure the bin center offset directly rather than inferring it from broadcast carriers. Against a reference of known exact frequency it steps the window past the tone and takes one constraint per window position; the intersection collapses once the peak crosses a bin boundary. Precision is set by the step size, not by the reference's frequency error, so it is bounded by `2**(zoom_max - zoom)` positions per bin: 32 at zoom 9. Against a synthetic sweep with a planted 0.83 offset the tool returns `(0.8260, 0.8573]`, 0.031 bins wide, about four times narrower than the 0.133 bins the AM carriers give.
+
+Frames are grouped by the `x_bin_server` the receiver reports rather than by the retune command that produced them. That avoids correlating frames with commands and tolerates the receiver quantising a requested `cf` to its own grid, so the sweep does not need `cf` control finer than the receiver's own step.
+
+Analysis averages frames rather than max-holding them. Max-hold is right for finding strong stable carriers but latches onto noise peaks exactly when the reference is weak, which is the regime a 60 kHz reference will be in. Every earlier analysis in this project used max-hold; that was fine for AM broadcast carriers and would have been wrong here.
+
+Three configurations are rejected at validation rather than producing a fixture that turns out to say nothing: a sweep too short to cross a bin boundary, a step coarser than 0.1 bins which could not improve on the existing bound, and a zoom too low to center the reference. The first was found by reading the dry-run plan of the original defaults, which swept only 0.84 bins.
+
+Recorded the zoom trade-off. Higher zoom narrows bins and collects less atmospheric noise, roughly 3 dB per step, which matters for a weak LF reference; but positions per bin halve at the same rate, so sweep resolution coarsens just as fast, and at zoom 14 there is one position per bin and the method fails entirely. Zoom 9 or 10 balances them.
+
+Noted candidate references. WWVB at 60 kHz is cesium-referenced and needs zoom 8 or higher, since lower zooms cannot center it and clamp against 0 Hz where bin 0 is dead in every frame at every zoom. Its BPSK modulation at +/-45 degrees leaves about half the power in the discrete carrier line so it remains usable. WWV at 10 MHz would place `start` several hundred times higher than a 60 kHz sweep, testing whether the offset depends on `start` at all. The receiver's own signal generator would be ideal, being locked to the same ADC clock as the FFT so clock error cancels, but whether `SET gen=` is global or per-connection is unverified and a global generator would inject a tone into every other connected user.
+
+Tests: 23 pure-analysis tests build synthetic sweeps with planted offsets from 0.0 to 1.5 and check recovery, precision matching the step size, SNR rejection, and the contradictory-input and nothing-detected error paths. 16 harness tests cover guardrails, the dry-run plan, the CLI including offline `--analyse` mode, and a live loop against a fake receiver that tracks `SET zoom/cf` and synthesises frames for whatever window it is tuned to. Full suite: 299 passed.
+
 ## YYYY-MM-DD
 
 ### Finding

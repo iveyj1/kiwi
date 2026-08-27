@@ -188,6 +188,29 @@ Parabolic interpolation of the same peaks in the dB domain gives a mean of 0.895
 
 Accuracy is not what is at stake in the choice: the whole admissible window spans 0.133 bins, which is about 7 Hz at zoom 8 and 1 Hz at zoom 11. Bin-selection robustness is. `tests/waterfall/test_frequency_mapping.py` asserts the configured value stays more than 0.05 bins clear of both edges.
 
+#### Measuring the offset directly
+
+`src/kiwi_client/waterfall_sweep.py` (`kiwi-wf-sweep`) narrows the offset without depending on broadcast-carrier tolerance. Against a reference of known exact frequency it steps the window past the tone, taking one constraint per window position; the intersection collapses once the peak crosses a bin boundary.
+
+Precision is set by the step size rather than by the reference's frequency error, and is bounded by the number of window positions per bin, `2**(zoom_max - zoom)`:
+
+| zoom | bin width | positions/bin | best precision |
+| --- | --- | --- | --- |
+| 8 | 114.4 Hz | 64 | 0.016 bins |
+| 9 | 57.2 Hz | 32 | 0.031 bins |
+| 10 | 28.6 Hz | 16 | 0.063 bins |
+| 14 | 1.8 Hz | 1 | unusable |
+
+Against a synthetic sweep with a planted offset the tool recovers a window 0.031 bins wide at zoom 9, about four times narrower than the 0.133 bins the AM carriers give.
+
+Two effects trade off when choosing zoom. Narrower bins collect less atmospheric noise, worth roughly 3 dB of SNR per zoom step, which matters for a weak LF reference. But positions per bin halve at the same rate, so the sweep coarsens just as fast. Zoom 9 or 10 balances them.
+
+Candidate references, in order of preference:
+
+- **WWVB at 60 kHz**, cesium-referenced. Requires zoom 8 or higher, since lower zooms cannot center it and clamp against 0 Hz where bin 0 is dead. Its BPSK phase modulation at +/-45 degrees leaves roughly half the power in the discrete carrier line, and the AM ducking puts sidebands about 1 Hz out, which stays inside one bin down to about zoom 12.
+- **WWV at 5, 10, 15 or 20 MHz**, equally accurate and clear of the LF noise floor. A sweep at 60 kHz and another at 10 MHz place `start` at values differing by a factor of several hundred, testing whether the offset depends on `start` at all.
+- **The receiver's own signal generator** via `SET gen=`, locked to the same ADC clock as the FFT so any clock error cancels. Whether `gen` is global to the receiver or per-connection is unverified; if global it injects a tone into every other connected user, which the project's live-radio rules do not permit.
+
 Evidence for the mapping, all fixture-backed and network-free in `tests/waterfall/test_frequency_mapping.py`:
 
 - All 11 AM channels from 860 to 960 kHz in the zoom-8 capture peak on the predicted bin.

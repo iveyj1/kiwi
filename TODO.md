@@ -2,6 +2,28 @@
 
 ## Current slice
 
+Goal: Measure the W/F bin center offset against a known-exact reference.
+
+Done criteria:
+
+- `kiwi-wf-sweep` steps the receive window past a reference tone and intersects one offset constraint per window position.
+- Frames are grouped by reported `x_bin_server`, so the receiver may quantise `cf` freely.
+- Analysis averages frames rather than max-holding, so a weak reference is not lost to noise peaks.
+- Validation rejects a sweep too short to cross a bin boundary, a step too coarse to improve on the existing 0.133 bin bound, and a zoom too low to center the reference.
+- `--analyse` re-reads a saved sweep with no network access.
+- Harness tests recover a planted offset to one window position without a receiver.
+- Live capture: a WWVB sweep at 60 kHz, zoom 9 or 10.
+- Optional cross-check: a WWV sweep at 10 MHz, which places `start` several hundred times higher.
+- `PROVISIONAL_BIN_CENTER_OFFSET` and `docs/kiwi-protocol.md` are updated from the measured result.
+
+Test command: `python3 -m pytest tests/waterfall/ tests/harness/test_waterfall_sweep_cli.py && python3 -m pytest`
+
+Live-radio needed: yes, but only after the harness tests pass. Short guarded sweeps against a local receiver; no generator use until `SET gen=` scope is known.
+
+Docs to update: `docs/kiwi-protocol.md`, `docs/user-guide.md`, `docs/dev-log.md`.
+
+## Done in previous slices
+
 Goal: Reduce W/F bins to display columns so one frame renders as one row.
 
 Done criteria:
@@ -21,8 +43,6 @@ Test command: `python3 -m pytest tests/harness/test_waterfall_render.py tests/ha
 Live-radio needed: no; rendering and CLI behavior only, using existing fixtures.
 
 Docs to update: `docs/waterfall-spec.md`, `docs/waterfall-rendering.md`, `docs/user-guide.md`, `docs/dev-log.md`.
-
-## Done in previous slices
 
 Goal: Waterfall fixture inspection and sequence semantics.
 
