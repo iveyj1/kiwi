@@ -277,13 +277,17 @@ Harness coverage verifies `ping_interval=None`, clean closure conversion, ingest
 
 Cursor tests cover bin-center snapping, movement/clamping, context changes, magenta overlay precedence, split escape-sequence decoding, status/ruler layout, config defaults, pseudo-terminal movement/quit, and exact terminal restoration. Targeted cursor/config tests: 68 passed before the pseudo-terminal case was added. Full harness: 265 passed in 3.85 seconds. No live connection was used.
 
+The blocking regression duplicates a pseudo-terminal input descriptor as output and verifies keyboard startup leaves the shared blocking status unchanged. A CLI harness also verifies output `BlockingIOError` is reported without `Traceback`. Targeted terminal tests: 28 passed; full harness: 266 passed in 3.16 seconds.
+
 User follow-up after repeating normal operation: the viewer is much improved and no further connection crash was reported. Time progression remains somewhat jumpy, but matches familiar Kiwi browser-client behavior and is therefore provisionally treated as receiver delivery/render cadence rather than a terminal-client backlog. Timing instrumentation remains available as a future fixture-backed diagnostic if needed. The observed `4882.8`, `5000`, and `5117.2 kHz` ruler labels are expected at center 5000 kHz / zoom 7: the mapped span is 234.375 kHz, giving edges near 5000 ±117.1875 kHz.
 
 Checkpointed the completed raster viewer on integration branch `wf1` as commit `6358c1b` and started cursor work on `feature/wf-cursor-readout`, following the new feature-branch workflow while leaving `main` closed.
 
 Added renderer-neutral `WaterfallCursor` state snapped to source-bin centers, clamped movement, and nearest-frequency preservation across mapped-span changes. The raster overlay now uses magenta for the local cursor, distinct from white tuned frequency and orange passband edges. A second terminal text row reports cursor frequency, tuned offset, source-bin width, and controls.
 
-Added incremental keyboard decoding for `h`/`l`, arrows, `H`/`L`, shifted arrows, `0`, and `q`. Live input uses cbreak mode, restores prior termios and blocking state in `finally`, and only changes local cursor/display state. It does not send W/F recenter, zoom, SND tuning, or admin commands. Cursor changes enter the existing one-bit redraw/coalescing path.
+Added incremental keyboard decoding for `h`/`l`, arrows, `H`/`L`, shifted arrows, `0`, and `q`. Live input uses cbreak mode, restores prior termios state in `finally`, and only changes local cursor/display state. It does not send W/F recenter, zoom, SND tuning, or admin commands. Cursor changes enter the existing one-bit redraw/coalescing path.
+
+The first user run exposed `BlockingIOError: [Errno 11] write could not complete without blocking`. Cursor input had called `os.set_blocking(input_fd, False)`. Shell stdin and stdout may be duplicates sharing one open-file description, so the `O_NONBLOCK` status also affected graphics output and made the renderer fail with `EAGAIN`. Removed all keyboard changes to descriptor blocking mode: asyncio `add_reader()` already calls the read callback only when input is ready. Cbreak attributes are still restored. Main now also converts any unrelated output `OSError` into a concise CLI error instead of a traceback.
 
 ### Follow-up
 

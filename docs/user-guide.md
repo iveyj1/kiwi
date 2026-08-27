@@ -537,7 +537,7 @@ Live keyboard controls are local-only and do not send tuning or zoom commands:
 - `0`: reset cursor to the nearest source bin at tuned frequency.
 - `q`: stop cleanly.
 
-The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal settings are restored on every exit path.
+The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 

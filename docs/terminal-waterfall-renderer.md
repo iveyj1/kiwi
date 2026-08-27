@@ -84,6 +84,7 @@ Requirements:
 - Draw tuned frequency, optional passband edges, and a source-bin cursor as deterministic white/orange/magenta raster columns after history color rendering, without modifying stored dBm rows.
 - Reserve a status row above the ruler for cursor frequency, tuned offset, source-bin step, and concise local keyboard help.
 - Decode cursor keys incrementally so split terminal escape sequences are handled; always restore cbreak-mode terminal settings on exit.
+- Use asyncio readiness notification without changing `O_NONBLOCK` on the input descriptor, because shell stdin/stdout may share one open-file description and therefore shared file-status flags.
 - Avoid flooding terminal output; throttle updates if needed.
 - Provide clear error if Kitty support is unavailable.
 
