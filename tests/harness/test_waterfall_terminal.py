@@ -21,6 +21,8 @@ from kiwi_client.waterfall_terminal import (
     KittyTerminalBackend,
     WaterfallAudioController,
     WaterfallTerminalViewer,
+    _assign_session_timestamp,
+    _audio_config,
     _capture_config,
     _viewer,
     apply_waterfall_config,
@@ -151,6 +153,34 @@ def test_terminal_main_reports_output_oserror_without_traceback(monkeypatch, cap
     assert exc.value.code == 2
     assert "write could not complete without blocking" in captured.err
     assert "Traceback" not in captured.err
+
+
+def test_combined_waterfall_and_delayed_audio_share_one_session_timestamp(tmp_path: Path):
+    args = apply_waterfall_config(
+        build_arg_parser().parse_args(["--host", "10.0.0.40"]),
+        default_config(),
+    )
+
+    _assign_session_timestamp(args, clock=lambda: 123456.9)
+    waterfall = _capture_config(args, tmp_path / "wf.jsonl")
+    audio = _audio_config(args)
+
+    assert args.timestamp == 123456
+    assert waterfall.timestamp == audio.timestamp == 123456
+    assert waterfall.websocket_uri() == "ws://10.0.0.40:8073/123456/W/F"
+    assert audio.websocket_uri() == "ws://10.0.0.40:8073/123456/SND"
+
+
+def test_explicit_combined_session_timestamp_is_preserved(tmp_path: Path):
+    args = apply_waterfall_config(
+        build_arg_parser().parse_args(["--timestamp", "777"]),
+        default_config(),
+    )
+
+    _assign_session_timestamp(args, clock=lambda: 123456.9)
+
+    assert _capture_config(args, tmp_path / "wf.jsonl").timestamp == 777
+    assert _audio_config(args).timestamp == 777
 
 
 def test_waterfall_capture_uses_configured_receiver_policy(tmp_path: Path):

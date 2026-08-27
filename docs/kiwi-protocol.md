@@ -82,6 +82,7 @@ Initial reference facts from `kiwiclient/kiwi/client.py` and `kiwiclient/test/ki
 - Normal non-camping mono defaults to compression enabled unless the client sends `SET compression=0`; fixture-first tests should start with uncompressed mono and add compressed ADPCM later.
 - The reference fake server emits synthetic SND frames but uses zero S-meter, so it does not prove S-meter endianness.
 - Project W/F sessions disable the `websockets` library's protocol-level ping timer (`ping_interval=None`) and use Kiwi `SET keepalive` commands. Browser WebSocket clients do not originate protocol pings, and a user-observed background-terminal output stall caused the library's default 20-second ping timeout to close an otherwise valid W/F stream with code 1011. Fake-connector coverage verifies this connection option and clean closure reporting.
+- Combined browser operation opens `SND` and `W/F` with the same `kiwi.conn_tstamp` (`web/kiwi/kiwi_util.js`, `open_websocket()`), identifying one paired client session. The standalone combined viewer now resolves one timestamp before either config is built and reuses it even when SND starts later via `a`. Before this fix, delayed SND generated a new timestamp and `misdr.proxy.kiwisdr.com:8073` closed the existing W/F socket with code 1005. Harness coverage verifies generated SND/W/F URIs share one id and preserves explicit `--timestamp`.
 
 First fixture coverage:
 

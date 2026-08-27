@@ -1111,6 +1111,16 @@ def apply_waterfall_config(args: argparse.Namespace, config: KiwiClientConfig) -
     return args
 
 
+def _assign_session_timestamp(
+    args: argparse.Namespace,
+    *,
+    clock: Callable[[], float] = time.time,
+) -> None:
+    """Assign one Kiwi session id shared by delayed W/F and SND connections."""
+    if args.timestamp is None:
+        args.timestamp = int(clock())
+
+
 def _capture_config(args: argparse.Namespace, output: Path) -> LiveWaterfallCaptureConfig:
     return LiveWaterfallCaptureConfig(
         host=args.host,
@@ -1203,6 +1213,7 @@ def main(argv: list[str] | None = None) -> int:
     config_path = discover_config_path(args.config)
     app_config = load_config(config_path) if config_path is not None else load_config()
     args = apply_waterfall_config(args, app_config)
+    _assign_session_timestamp(args)
     if args.fixture is not None and (args.dry_run or args.allow_live or args.save_fixture is not None):
         parser.error("--fixture cannot be combined with live or dry-run options")
     output = sys.stdout.buffer
