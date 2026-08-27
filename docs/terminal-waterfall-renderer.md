@@ -143,7 +143,7 @@ Live W/F capture loop
 
 The live viewer should reuse guarded W/F capture/session logic:
 
-- local receiver allowlist by default,
+- configured `[receivers].restricted` / `[receivers].allowed` policy (local allowlist by built-in default),
 - `--allow-live` required,
 - duration/frame caps,
 - no admin commands,

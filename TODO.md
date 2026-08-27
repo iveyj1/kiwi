@@ -2,6 +2,22 @@
 
 ## Current slice
 
+Goal: Make `kiwi-wf-terminal` honor configured receiver restrictions and allowlists.
+
+Observed failure: adding `misdr.proxy.kiwisdr.com:8073` under `[receivers].allowed` did not affect the standalone W/F client. Configuration discovery loaded the TOML, but `_capture_config()` omitted `config.receivers.restricted` and `config.receivers.allowed`, so `LiveWaterfallCaptureConfig` silently fell back to its built-in local-only guard values.
+
+Done criteria:
+
+- Add config/CLI harness coverage proving an explicitly configured receiver validates in restricted mode.
+- Prove `restricted=false` is also propagated rather than replaced by the capture default.
+- Pass receiver policy into both temporary-display and `--save-fixture` W/F capture configurations.
+- Keep `--allow-live` as a separate explicit network gate.
+- Update user/development docs and merge `fix/wf-receiver-config` into `wf1`; do not touch `main`.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_terminal.py tests/harness/test_config.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no. This is deterministic config propagation and validation; do not connect to the external proxy as part of the fix.
+
 Goal: Prevent cursor input setup from making terminal graphics output nonblocking.
 
 Observed failure: live cursor mode raised `BlockingIOError: [Errno 11] write could not complete without blocking` from the background renderer. `control_waterfall_cursor()` calls `os.set_blocking(input_fd, False)`; when shell stdin/stdout are duplicated from the same terminal open-file description, that changes the shared `O_NONBLOCK` status and makes graphics writes fail with `EAGAIN`.
