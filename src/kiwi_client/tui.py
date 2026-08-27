@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import curses
 import locale
+import queue
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
@@ -95,7 +96,7 @@ COMMAND_HINTS = [
     CommandHint(
         "wf",
         "waterfall pane",
-        "wf [on|off|toggle] | wf load <fixture.jsonl> | wf scale <min_db> <max_db> | wf height <rows>",
+        "wf [on|off|toggle] | wf live [zoom] [center_khz] | wf stop | wf load <f> | wf scale <min> <max> | wf height <n>",
         "Waterfall",
     ),
     CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
@@ -166,7 +167,35 @@ class WaterfallPaneState:
         return frames
 
 
-def handle_waterfall_command(command: str, waterfall: WaterfallPaneState) -> tuple[dict[str, Any], str] | None:
+def drain_waterfall_rows(controller: ClientController, waterfall: WaterfallPaneState, *, limit: int = 64) -> int:
+    """Move rows from the controller's queue into the pane buffer.
+
+    The W/F worker runs at up to 23 fps while the TUI redraws about four times a
+    second, so rows are queued by the worker and drained here rather than being
+    sampled from status metrics, which would drop most frames.
+    """
+    moved = 0
+    while moved < limit:
+        try:
+            row, _x_bin = controller.waterfall_rows.get_nowait()
+        except queue.Empty:
+            break
+        try:
+            waterfall.buffer.append(row)
+        except ValueError:
+            # Width changed, which means the receiver was retuned to a new zoom.
+            # Start a fresh buffer rather than refusing the new geometry.
+            waterfall.buffer = WaterfallImageBuffer(max_rows=waterfall.buffer.max_rows)
+            waterfall.buffer.append(row)
+        moved += 1
+    return moved
+
+
+def handle_waterfall_command(
+    command: str,
+    waterfall: WaterfallPaneState,
+    controller: ClientController | None = None,
+) -> tuple[dict[str, Any], str] | None:
     """Handle TUI-local `wf` subcommands, or return None if not one.
 
     Kept out of the controller because these only touch display state. Anything
@@ -179,6 +208,15 @@ def handle_waterfall_command(command: str, waterfall: WaterfallPaneState) -> tup
         waterfall.visible = not waterfall.visible
         return {"type": "waterfall", "visible": waterfall.visible}, ""
     action = parts[1]
+    if action in {"live", "stop"}:
+        if controller is None:
+            return {"type": "error", "error": "no controller for live waterfall"}, "no controller for live waterfall"
+        if action == "stop":
+            return controller.execute("wf-stop"), "waterfall stopped"
+        response = controller.execute(" ".join(["wf-live", *parts[2:], "--allow-live"]))
+        waterfall.visible = True
+        waterfall.buffer = WaterfallImageBuffer(max_rows=waterfall.buffer.max_rows)
+        return response, "live waterfall started"
     if action == "off":
         waterfall.visible = False
         return {"type": "waterfall", "visible": False}, ""
@@ -765,7 +803,7 @@ def handle_tui_key(
             return request_tui_quit(controller, config=config)
         if waterfall is not None:
             try:
-                handled = handle_waterfall_command(command, waterfall)
+                handled = handle_waterfall_command(command, waterfall, controller)
             except ClientCommandError as exc:
                 return None, f"error: {exc}"
             if handled is not None:
@@ -964,6 +1002,7 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
     waterfall_colors = setup_waterfall_colors()
 
     while controller.running:
+        drain_waterfall_rows(controller, waterfall)
         stdscr.erase()
         dashboard = render_dashboard(
             controller.state,

@@ -42,7 +42,7 @@ class LiveWaterfallCaptureConfig:
 
     host: str
     port: int
-    output: Path
+    output: Path | None = None
     center_khz: float = 5000.0
     zoom: int = 0
     maxdb: int = 0
@@ -90,7 +90,7 @@ class LiveWaterfallCaptureConfig:
             raise LiveCaptureError(f"ASCII waterfall reduction must be one of {REDUCTIONS}")
         if self.compression:
             raise LiveCaptureError("first live W/F capture must use wf_comp=0 for existing parser coverage")
-        if self.output.exists() and not self.overwrite:
+        if self.output is not None and self.output.exists() and not self.overwrite:
             raise LiveCaptureError(f"output already exists; use --overwrite to replace: {self.output}")
 
     @property
@@ -124,7 +124,7 @@ class LiveWaterfallCaptureConfig:
         return {
             "receiver": self.receiver,
             "websocket_uri": self.websocket_uri(),
-            "output": str(self.output),
+            "output": str(self.output) if self.output else None,
             "center_khz": self.center_khz,
             "zoom": self.zoom,
             "maxdb": self.maxdb,
@@ -167,7 +167,7 @@ async def capture_live_waterfall(
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
     websocket_connect: Callable[..., Any] | None = None,
-) -> Path:
+) -> Path | None:
     """Run one guarded live W/F capture and write a JSONL fixture."""
     config.validate()
     if not allow_live:
@@ -180,7 +180,7 @@ async def capture_live_waterfall(
             raise LiveCaptureError("live waterfall capture requires optional dependency: pip install '.[live]'") from exc
         websocket_connect = websockets.connect
 
-    writer = JsonlCaptureWriter(_capture_metadata(config))
+    writer = JsonlCaptureWriter(_capture_metadata(config)) if config.output is not None else None
     start = time.monotonic()
     frames = 0
     last_keepalive = start
@@ -192,7 +192,8 @@ async def capture_live_waterfall(
         close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
     ) as websocket:
         for command in [encode_auth(), *config.setup_commands()]:
-            writer.add_tx_cmd(time.monotonic() - start, command, stream="wf")
+            if writer is not None:
+                writer.add_tx_cmd(time.monotonic() - start, command, stream="wf")
             await websocket.send(command)
 
         while snd_loop_allowed(start, frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
@@ -201,7 +202,8 @@ async def capture_live_waterfall(
             now = time.monotonic()
             if keepalive_due(now, last_keepalive, sent_setup=True):
                 command = encode_keepalive()
-                writer.add_tx_cmd(now - start, command, stream="wf")
+                if writer is not None:
+                    writer.add_tx_cmd(now - start, command, stream="wf")
                 await websocket.send(command)
                 last_keepalive = now
             remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
@@ -214,7 +216,8 @@ async def capture_live_waterfall(
             t = time.monotonic() - start
             if isinstance(message, str):
                 text = message
-                writer.add_rx_msg(t, text, stream="wf")
+                if writer is not None:
+                    writer.add_rx_msg(t, text, stream="wf")
                 params = parse_msg(text).params
                 raise_for_kiwi_error(params, receiver=config.receiver)
                 continue
@@ -222,12 +225,14 @@ async def capture_live_waterfall(
             payload = bytes(message)
             if payload.startswith(b"MSG"):
                 text = payload.decode("utf-8", errors="replace")
-                writer.add_rx_msg(t, text, stream="wf")
+                if writer is not None:
+                    writer.add_rx_msg(t, text, stream="wf")
                 params = parse_msg(text).params
                 raise_for_kiwi_error(params, receiver=config.receiver)
                 continue
 
-            writer.add_rx_binary(t, payload, stream="wf")
+            if writer is not None:
+                writer.add_rx_binary(t, payload, stream="wf")
             if payload.startswith(b"W/F"):
                 frame = parse_waterfall_uncompressed(payload)
                 status = sequence.observe(frame)
@@ -239,6 +244,9 @@ async def capture_live_waterfall(
                         "sequence_gaps": status.missing_count,
                         "out_of_order": status.out_of_order,
                         "repeated_zero_sequence": status.repeated_zero,
+                        "dbm_row": frame.dbm,
+                        "x_bin_server": frame.x_bin_server,
+                        "flags_x_zoom_server": frame.flags_x_zoom_server,
                         "ascii_row": render_ascii_waterfall_row(
                             frame,
                             min_dbm=config.ascii_mindb,
@@ -250,7 +258,8 @@ async def capture_live_waterfall(
                     }
                     status_callback(metrics)
 
-    writer.write(config.output)
+    if writer is not None:
+        writer.write(config.output)
     return config.output
 
 

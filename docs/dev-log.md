@@ -307,6 +307,22 @@ Rebalanced `format_hint_categories_two_columns`. It paired hint blocks by altern
 
 Live W/F into the pane is deliberately not wired up. `BackgroundOperation` runs one operation at a time and live audio occupies it, so that needs either a second worker slot or an explicit mutually-exclusive policy. Full suite: 357 passed.
 
+Wired a live W/F feed into the TUI waterfall pane. The controller now owns a second `BackgroundOperation` slot, `waterfall_background`, so a live waterfall and live playback run at the same time instead of competing for the single shared worker. That removes the constraint the roadmap had flagged as blocking TUI waterfall integration.
+
+Rows move from the worker thread to the display through a bounded `queue.Queue` on the controller, drained by the TUI on each redraw. Sampling the worker's status metrics instead would have dropped most frames, since W/F arrives at up to 23 fps while the TUI redraws about four times a second. The queue is bounded at 256 rows so a display that stops draining cannot grow without limit; excess rows are dropped rather than blocking the worker.
+
+`LiveWaterfallCaptureConfig.output` is now optional. The live display feed passes `output=None`, which skips the `JsonlCaptureWriter` entirely rather than just skipping the final write, because the writer accumulates every event in memory and this stream runs open-ended. `capture_live_waterfall` returns `Path | None` accordingly. Capture behaviour with an output path set is unchanged.
+
+W/F status metrics now carry `dbm_row`, `x_bin_server` and `flags_x_zoom_server` alongside the existing `ascii_row`, so a display can consume decoded rows without re-parsing payloads.
+
+Retuning to a different zoom changes the bin count mid-feed. The drain helper starts a fresh buffer on a width mismatch rather than refusing the row, so the pane never mixes rows of different spans in one image.
+
+`wf live [zoom] [center_khz]` and `wf stop` are routed from the TUI to the controller, while the display-only subcommands stay local; lifecycle policy remains controller-owned per the architecture rule. `wf live` defaults to zoom 8 at the currently tuned frequency.
+
+Tests use a fake operations layer that emits synthetic rows through the status callback, so the whole path from controller command to pane cells is covered without a receiver. An end-to-end check with synthetic carriers at bins 180, 512 and 790 placed them in pane columns 15, 45 and 69 against predicted 16, 45 and 69, the difference being max-hold correctly catching a deliberate one-bin drift. Full suite: 368 passed.
+
+Not yet confirmed against a live receiver.
+
 ## YYYY-MM-DD
 
 ### Finding

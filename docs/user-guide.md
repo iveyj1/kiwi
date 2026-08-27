@@ -562,12 +562,26 @@ The curses TUI has a colour waterfall pane, drawn with Unicode half blocks so
 each character row shows two waterfall frames. Commands, all in command mode:
 
 ```text
-wf                        toggle the pane
-wf on | wf off            show or hide explicitly
-wf load <fixture.jsonl>   load W/F frames from a fixture
-wf scale <min> <max>      set the display dB range
-wf height <rows>          set pane height in character rows
+wf                          toggle the pane
+wf on | wf off              show or hide explicitly
+wf live [zoom] [center_khz] start a live waterfall feed
+wf stop                     stop the live feed
+wf load <fixture.jsonl>     load W/F frames from a fixture
+wf scale <min> <max>        set the display dB range
+wf height <rows>            set pane height in character rows
 ```
+
+Live feed, which needs `[live] allow_live = true` in config:
+
+```text
+:wf live 9 910
+:wf scale -95 -35
+:wf stop
+```
+
+`wf live` defaults to zoom 8 at the currently tuned frequency. It runs in its
+own background worker, separate from the audio worker, so a live waterfall and
+live playback can run at the same time.
 
 For example:
 
@@ -576,10 +590,6 @@ For example:
 :wf scale -95 -35
 :wf height 12
 ```
-
-The pane is fed from fixtures for now; live W/F in the TUI is not wired up yet,
-because the background worker runs one operation at a time and live audio
-currently occupies it.
 
 Notes:
 
@@ -590,6 +600,9 @@ Notes:
 - Bins are reduced to pane width at draw time with max-hold, so narrow carriers
   survive and the pane can be resized without reloading.
 - `wf height 12` shows 24 frames, since each character row holds two.
+- The live feed writes no fixture. Use `kiwi-wf-capture` when you want one.
+- Changing zoom mid-feed changes the bin count; the pane starts a fresh buffer
+  rather than mixing rows of different spans.
 
 Expected future operations:
 

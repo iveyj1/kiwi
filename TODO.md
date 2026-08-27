@@ -22,10 +22,14 @@ Live-radio needed: no; the pane is fed from fixtures.
 
 Docs to update: `docs/user-guide.md`, `docs/waterfall-rendering.md`, `docs/dev-log.md`.
 
+Also done:
+
+- Live W/F feed into the pane. The controller now owns a second `BackgroundOperation` slot, so live waterfall and live playback run together instead of competing for one worker. Rows are handed from the worker thread to the display through a bounded queue and drained on each redraw, so frames are not lost to the redraw interval.
+
 Follow-on, not in this slice:
 
-- Live W/F feed into the pane. Blocked on `BackgroundOperation` running one operation at a time, so live audio and live waterfall cannot both run. Needs either a second worker slot or an explicit mutually-exclusive policy.
 - Frequency axis under the pane, now that bin/frequency mapping exists.
+- Live-radio confirmation of the feed against a local receiver, to judge what zoom and span read well.
 - Terminal graphics backend for a standalone high-resolution view. Kitty and ghostty support the Kitty graphics protocol, foot supports Sixel, so it needs runtime detection with the half-block pane as fallback.
 
 ## Done in previous slices

@@ -1176,3 +1176,151 @@ def test_hint_columns_handle_no_categories():
 def test_command_hint_overview_stays_within_its_screen_budget():
     """The overview competes with the dashboard for rows; keep it compact."""
     assert len(render_command_hints("").splitlines()) <= 25
+
+
+# --- live waterfall feed ---
+
+
+class FakeWaterfallOperations:
+    """Operations stub that emits synthetic W/F rows through the status callback."""
+
+    def __init__(self, rows=None, width=1024):
+        self.rows = rows if rows is not None else [[-90.0] * width for _ in range(5)]
+        self.calls = []
+
+    def waterfall(self, config, *, stop_event=None, status_callback=None):
+        self.calls.append(config)
+        for index, row in enumerate(self.rows):
+            if status_callback is not None:
+                status_callback({"dbm_row": tuple(row), "x_bin_server": 1000 + index, "wf_frames": index + 1})
+        return {"path": None, "receiver": config.receiver, "zoom": config.zoom}
+
+    def play(self, *a, **k):
+        raise AssertionError("play should not be called")
+
+    def record(self, *a, **k):
+        raise AssertionError("record should not be called")
+
+    def capture(self, *a, **k):
+        raise AssertionError("capture should not be called")
+
+
+def _wait_for_worker(controller, timeout=2.0):
+    controller.waterfall_background.join(timeout=timeout)
+
+
+def test_waterfall_worker_uses_a_separate_slot_from_audio():
+    """A live waterfall must not consume the playback worker slot."""
+    controller = ClientController()
+
+    assert controller.waterfall_background is not controller.background
+
+
+def test_wf_live_publishes_rows_onto_the_controller_queue():
+    operations = FakeWaterfallOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+
+    controller.execute("wf-live 8 910 --allow-live")
+    _wait_for_worker(controller)
+
+    assert controller.waterfall_rows.qsize() == 5
+    config = operations.calls[0]
+    assert config.zoom == 8 and config.center_khz == 910.0
+    assert config.output is None, "the live display feed must not accumulate a fixture"
+    assert config.max_frames == 0, "the display feed should be open ended"
+
+
+def test_wf_live_requires_allow_live():
+    controller = ClientController(operations=FakeWaterfallOperations())
+
+    with pytest.raises(ClientCommandError):
+        controller.execute("wf-live 8 910")
+
+
+def test_drain_moves_queued_rows_into_the_pane_buffer():
+    operations = FakeWaterfallOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+    state = tui.WaterfallPaneState()
+
+    controller.execute("wf-live 8 910 --allow-live")
+    _wait_for_worker(controller)
+    moved = tui.drain_waterfall_rows(controller, state)
+
+    assert moved == 5
+    assert len(state.buffer) == 5
+    assert state.buffer.width == 1024
+    assert controller.waterfall_rows.empty()
+
+
+def test_drain_restarts_the_buffer_when_row_width_changes():
+    """Retuning to another zoom changes bin count; the pane must not refuse it."""
+    controller = ClientController(operations=FakeWaterfallOperations(), allow_live_default=True)
+    state = tui.WaterfallPaneState()
+    state.buffer.append([-90.0] * 512)
+
+    controller.waterfall_rows.put(((-80.0,) * 1024, 1))
+    moved = tui.drain_waterfall_rows(controller, state)
+
+    assert moved == 1
+    assert state.buffer.width == 1024
+    assert len(state.buffer) == 1, "the mismatched history should be dropped, not mixed"
+
+
+def test_drain_is_bounded_per_call():
+    controller = ClientController(operations=FakeWaterfallOperations(), allow_live_default=True)
+    state = tui.WaterfallPaneState()
+    for _ in range(20):
+        controller.waterfall_rows.put(((-90.0,) * 8, 0))
+
+    moved = tui.drain_waterfall_rows(controller, state, limit=5)
+
+    assert moved == 5
+    assert controller.waterfall_rows.qsize() == 15
+
+
+def test_row_queue_is_bounded_so_an_undrained_display_cannot_grow_forever():
+    controller = ClientController(operations=FakeWaterfallOperations(), allow_live_default=True)
+
+    for _ in range(controller.waterfall_rows.maxsize + 50):
+        controller._publish_waterfall_row({"dbm_row": (-90.0,) * 8, "x_bin_server": 0})
+
+    assert controller.waterfall_rows.qsize() == controller.waterfall_rows.maxsize
+
+
+def test_publish_ignores_metrics_without_a_row():
+    controller = ClientController(operations=FakeWaterfallOperations())
+
+    controller._publish_waterfall_row({"wf_frames": 3})
+
+    assert controller.waterfall_rows.empty()
+
+
+def test_wf_live_command_routes_through_the_tui_and_shows_the_pane():
+    operations = FakeWaterfallOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command("wf live 9 760", state, controller)
+    _wait_for_worker(controller)
+
+    assert response["type"] == "waterfall-status"
+    assert "live waterfall started" in message
+    assert state.visible is True
+    assert operations.calls[0].zoom == 9
+
+
+def test_wf_stop_routes_to_the_controller():
+    controller = ClientController(operations=FakeWaterfallOperations(), allow_live_default=True)
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command("wf stop", state, controller)
+
+    assert response["type"] == "waterfall-status"
+    assert "stopped" in message
+
+
+def test_wf_live_without_a_controller_reports_instead_of_crashing():
+    response, message = tui.handle_waterfall_command("wf live", tui.WaterfallPaneState())
+
+    assert response["type"] == "error"
+    assert "no controller" in message

@@ -252,7 +252,7 @@ Suggested order:
 Notes:
 
 - The waterfall view may initially be separate from the TUI/control surface.
-- Current `BackgroundOperation` supports one operation at a time, so live audio plus live waterfall should wait for a multi-operation/session design or use a standalone waterfall process first.
+- Resolved: the controller now owns a second `BackgroundOperation` slot for the waterfall, so live audio and live waterfall run concurrently. The TUI pane is fed from that worker through a bounded row queue.
 
 ## Milestone 8 — Beacon detection
 

@@ -22,6 +22,7 @@ from typing import Any, Iterable, Protocol
 from kiwi_client.commands import AgcSettings, encode_agc, encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
+from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
@@ -195,6 +196,14 @@ class ClientOperations(Protocol):
         status_callback: StatusCallback | None = None,
     ) -> dict[str, Any]: ...
 
+    def waterfall(
+        self,
+        config: LiveWaterfallCaptureConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]: ...
+
     def capture(
         self,
         config: LiveSndCaptureConfig,
@@ -206,6 +215,23 @@ class ClientOperations(Protocol):
 
 class LiveClientOperations:
     """Default operations that call guarded live play/record/capture modules."""
+
+    def waterfall(
+        self,
+        config: LiveWaterfallCaptureConfig,
+        *,
+        stop_event: Event | None = None,
+        status_callback: StatusCallback | None = None,
+    ) -> dict[str, Any]:
+        path = asyncio.run(
+            capture_live_waterfall(
+                config,
+                allow_live=True,
+                stop_event=stop_event,
+                status_callback=status_callback,
+            )
+        )
+        return {"path": str(path) if path else None, "receiver": config.receiver, "zoom": config.zoom}
 
     def play(
         self,
@@ -257,6 +283,9 @@ class LiveClientOperations:
         return {"path": str(path)}
 
 
+WATERFALL_ROW_QUEUE_SIZE = 256
+
+
 class ClientController:
     """Apply simple user commands to client state and produce plans."""
 
@@ -273,6 +302,12 @@ class ClientController:
         self.state = state or ClientState()
         self.operations = operations or LiveClientOperations()
         self.background = background or BackgroundOperation()
+        # A second slot so a live waterfall can run alongside audio. The single
+        # shared slot would otherwise make them mutually exclusive.
+        self.waterfall_background = BackgroundOperation()
+        # Bounded hand-off from the W/F worker thread to whatever displays it.
+        # Bounded so a display that stops draining cannot grow without limit.
+        self.waterfall_rows: queue.Queue[tuple] = queue.Queue(maxsize=WATERFALL_ROW_QUEUE_SIZE)
         self.allow_live_default = allow_live_default
         self.volume_control = volume_control or SystemVolumeControl()
         self.presets: dict[Any, dict[str, Any]] = dict(presets or {})
@@ -445,6 +480,18 @@ class ClientController:
             self._require_arg_count(positional, 0, "play-bg --allow-live [--null-sink]")
             self._require_allow_live(flags, "play-plan")
             return self._start_playback_background("--null-sink" in flags)
+        if command == "wf-live":
+            positional, flags = self._parse_flags(args, {"--allow-live"})
+            if len(positional) > 2:
+                raise ClientCommandError("usage: wf-live [zoom] [center_khz] --allow-live")
+            self._require_allow_live(flags, "wf-live")
+            zoom = int(positional[0]) if positional else 8
+            center = float(positional[1]) if len(positional) > 1 else self.state.frequency_khz
+            return self._start_waterfall_background(zoom, center)
+        if command == "wf-stop":
+            return self._stop_waterfall_background()
+        if command == "wf-status":
+            return {"type": "waterfall-status", "operation": self.waterfall_background.status().as_dict()}
         if command == "stop":
             return self._stop_background()
         if command == "wait":
@@ -623,6 +670,58 @@ class ClientController:
             ),
         )
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
+
+    def _waterfall_config(self, zoom: int, center_khz: float) -> LiveWaterfallCaptureConfig:
+        """Build a live W/F config for the display feed.
+
+        `output=None` means no fixture is written and no events accumulate in
+        memory, which matters because this stream runs open-ended.
+        """
+        return LiveWaterfallCaptureConfig(
+            host=self.state.receiver.split(":")[0],
+            port=int(self.state.receiver.split(":")[1]) if ":" in self.state.receiver else 8073,
+            output=None,
+            center_khz=center_khz,
+            zoom=zoom,
+            speed=4,
+            duration_seconds=self.state.duration_seconds,
+            max_frames=0,
+            receivers_restricted=self.state.receivers_restricted,
+            allowed_receivers=tuple(self.state.allowed_receivers) if self.state.allowed_receivers else None,
+        )
+
+    def _publish_waterfall_row(self, metrics: dict) -> None:
+        """Hand one decoded W/F row to the display, dropping it if nobody drains."""
+        row = metrics.get("dbm_row")
+        if row is None:
+            return
+        try:
+            self.waterfall_rows.put_nowait((row, metrics.get("x_bin_server")))
+        except queue.Full:
+            pass
+
+    def _start_waterfall_background(self, zoom: int, center_khz: float) -> dict[str, Any]:
+        config = self._waterfall_config(zoom, center_khz)
+        config.validate()
+
+        def target(stop_event, command_queue, status_callback):
+            def on_status(metrics: dict) -> None:
+                self._publish_waterfall_row(metrics)
+                status_callback(metrics)
+
+            return self.operations.waterfall(config, stop_event=stop_event, status_callback=on_status)
+
+        status = self.waterfall_background.start("waterfall", target)
+        return {
+            "type": "waterfall-status",
+            "operation": status.as_dict(),
+            "zoom": zoom,
+            "center_khz": center_khz,
+        }
+
+    def _stop_waterfall_background(self) -> dict[str, Any]:
+        status = self.waterfall_background.stop()
+        return {"type": "waterfall-status", "operation": status.as_dict()}
 
     def _stop_background(self) -> dict[str, Any]:
         status = self.background.stop()
