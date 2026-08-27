@@ -35,6 +35,21 @@ Receiver `10.0.0.40:8073` may occasionally have max users. If that happens, use 
 
 Do not use public KiwiSDR receivers unless explicitly requested.
 
+## Branch and merge policy
+
+Integrate on the long-lived `wf0` branch.
+
+`main` is closed as of 2026-08-27. Do not commit to it, merge into it, or treat
+it as the integration target, even though it is still the repository's default
+branch. Tooling that defaults to the default branch points at the wrong place
+here.
+
+Branch feature work off `wf0` and merge back into `wf0`.
+
+Do not push to `origin` unless explicitly asked.
+
+Ask before treating `main` as open again.
+
 ## Harness-first rule
 
 Prefer test harnesses before live radio testing.
