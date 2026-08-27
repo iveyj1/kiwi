@@ -247,7 +247,7 @@ Suggested order:
 8. Done: add a standalone live W/F preview.
 9. Done: reduce bins to display columns so one frame renders as one row, with `max` or `mean` aggregation.
 10. Done: bin-to-frequency mapping. `WaterfallSpan` / `WaterfallSessionMetadata` / `apply_span()` derive window geometry from `bandwidth`, `wf_fft_size`, `zoom_max`, `zoom`, and `x_bin_server`, verified against real AM carriers in two zoomed local fixtures. Carries a provisional, unexplained `0.83` bin center offset.
-11. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer. See `docs/terminal-waterfall-renderer.md`, whose Kitty-first backend order does not match the local terminal.
+11. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer. See `docs/terminal-waterfall-renderer.md`. The developer uses several terminals on this machine, including kitty and ghostty, which support the Kitty graphics protocol, and foot, which supports Sixel instead. Any graphics backend therefore needs runtime capability detection and a text fallback rather than a fixed protocol choice.
 
 Notes:
 
