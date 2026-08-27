@@ -1,6 +1,6 @@
 """Fixture-backed W/F bin-to-frequency calibration.
 
-These tests lock in the mapping derived from two local captures by checking it
+These tests lock in the mapping derived from three local captures by checking it
 against real AM broadcast carriers on their known 10 kHz channels. They need no
 receiver and no network.
 """
@@ -12,15 +12,21 @@ import pytest
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
+    PROVISIONAL_BIN_CENTER_OFFSET,
     WaterfallSessionMetadata,
+    WaterfallSpan,
     apply_span,
     parse_waterfall_uncompressed,
 )
 
-# (fixture, tuned centre kHz, expected zoom, AM channels inside the window)
+# (fixture, tuned center kHz, expected zoom, AM channels inside the window)
 CAPTURES = [
     ("tests/fixtures/kiwi/local-wf-910-zoom8.jsonl", 910.0, 8, range(860, 970, 10)),
     ("tests/fixtures/kiwi/local-wf-760-zoom9.jsonl", 760.0, 9, range(740, 790, 10)),
+    # Zoom 11 spans only 14.6 kHz, so 910 kHz is the sole AM channel in the
+    # window. Its value is proving the bin center offset is constant in bins
+    # rather than in Hz: bins here are 8x narrower than at zoom 8.
+    ("tests/fixtures/kiwi/local-wf-910-zoom11.jsonl", 910.0, 11, [910]),
 ]
 
 
@@ -130,3 +136,41 @@ def test_sequence_stays_zero_across_a_full_capture():
 
     assert len(frames) == 60
     assert {frame.sequence for frame in frames} == {0}
+
+
+def test_bin_center_offset_is_constant_in_bins_not_hz():
+    """Zoom 11 discriminates the two hypotheses; its bins are 8x narrower than zoom 8.
+
+    If the offset were a fixed frequency error it would appear as many bins at
+    zoom 11. It does not, so it is a fixed bin-index offset.
+    """
+    wide_metadata, _ = _load("tests/fixtures/kiwi/local-wf-910-zoom8.jsonl")
+    narrow_metadata, narrow_frames = _load("tests/fixtures/kiwi/local-wf-910-zoom11.jsonl")
+    wide, narrow = wide_metadata.span(), narrow_metadata.span()
+    x_bin = narrow_frames[0].x_bin_server
+    hold = _max_hold(narrow_frames)
+
+    # Same offset in Hz as at zoom 8 would be this many bins at zoom 11.
+    as_hz = PROVISIONAL_BIN_CENTER_OFFSET * wide.bin_width_hz / narrow.bin_width_hz
+    assert as_hz > 6, "zoom 11 must magnify a Hz-constant offset enough to discriminate"
+
+    hz_hypothesis = WaterfallSpan(
+        bandwidth_hz=narrow.bandwidth_hz, zoom=narrow.zoom, bin_center_offset=as_hz
+    )
+    measured = max(range(1024), key=lambda i: hold[i])
+
+    assert measured == round(narrow.bin_for_frequency(x_bin, 910_000))
+    assert measured != round(hz_hypothesis.bin_for_frequency(x_bin, 910_000))
+
+
+def test_zoom11_window_holds_only_the_tuned_channel():
+    """Guards the single-carrier calibration above against a mis-tuned capture."""
+    metadata, frames = _load("tests/fixtures/kiwi/local-wf-910-zoom11.jsonl")
+    span = metadata.span()
+    x_bin = frames[0].x_bin_server
+
+    low = span.bin_frequency_hz(x_bin, 0)
+    high = span.bin_frequency_hz(x_bin, 1023)
+    channels = [khz for khz in range(530, 1710, 10) if low <= khz * 1000 <= high]
+
+    assert channels == [910]

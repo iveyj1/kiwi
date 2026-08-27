@@ -48,11 +48,15 @@ capture is re-run with different settings, rename the file to match.
 | `local-wf-5000-zoom0.jsonl` | `10.0.0.40:8073` | 5000 kHz | 0 | 2 | First real W/F capture; full 30 MHz span. |
 | `local-wf-910-zoom8.jsonl` | `10.0.0.40:8073` | 910 kHz | 8 | 60 | Bin/frequency calibration against AM carriers 860-960 kHz. |
 | `local-wf-760-zoom9.jsonl` | `10.0.0.40:8073` | 760 kHz | 9 | 60 | Independent calibration check at a different zoom, 740-780 kHz. |
+| `local-wf-910-zoom11.jsonl` | `10.0.0.40:8073` | 910 kHz | 11 | 60 | Proves the bin center offset is constant in bins, not Hz; bins are 8x narrower than zoom 8. |
 
-The two zoomed captures back `tests/waterfall/test_frequency_mapping.py`. They are
+The three zoomed captures back `tests/waterfall/test_frequency_mapping.py`. They are
 larger than the "keep fixtures small" rule would normally allow, because the
 calibration needs many frames and real carriers across a wide window. Do not
 replace them without re-running that test.
+
+Keep captures short. 60 frames is enough for the calibration; an uncapped run at
+`wf_speed=4` reaches 12 MB in six minutes, which does not belong in git.
 
 ## Policy
 

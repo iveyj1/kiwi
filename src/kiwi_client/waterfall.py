@@ -15,12 +15,22 @@ DEFAULT_WF_FFT_SIZE = 1024
 DEFAULT_ZOOM_MAX = 14
 ZOOM_FLAG_MASK = 0x0F
 
-# Provisional. Two local captures (zoom 8 at 910 kHz, zoom 9 at 760 kHz) both put
-# known AM carriers 0.83 bins below where `start_hz + index * bin_width` predicts.
-# The captures bound the offset to 0.75 < offset <= 0.90, which excludes both a
-# clean half-bin and a clean whole-bin center convention, so the cause is not yet
-# understood. See docs/kiwi-protocol.md.
-PROVISIONAL_BIN_CENTER_OFFSET = 0.83
+# Provisional. Known AM carriers peak this many bins below where
+# `start_hz + index * bin_width` predicts. Measured across three local captures
+# (zoom 8 at 910 kHz, zoom 9 at 760 kHz, zoom 11 at 910 kHz) by parabolic
+# interpolation of 17 carrier peaks: mean 0.895 bins, sd 0.192, 95% interval
+# 0.803..0.986.
+#
+# The offset is constant in BINS, not in Hz: the zoom 11 capture has bins 8x
+# narrower than zoom 8, and a Hz-constant offset would have shown up there as
+# 6.6 bins rather than the observed 1.0.
+#
+# The cause is still unknown, and an exact whole-bin offset of 1.0 cannot be
+# ruled out, because parabolic interpolation in the dB domain carries a
+# window-dependent bias comparable to the gap. Any value in 0.75..0.90 puts
+# every measured carrier on the same bin, so this choice does not affect bin
+# selection, only sub-bin frequency readout. See docs/kiwi-protocol.md.
+PROVISIONAL_BIN_CENTER_OFFSET = 0.89
 
 
 @dataclass(frozen=True)

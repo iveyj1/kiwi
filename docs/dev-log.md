@@ -243,6 +243,16 @@ Answered the "2-character wide carrier" question from the fixture. Display colum
 
 Other observations from the same captures: `seq` stayed `0` for all 60 frames at `wf_fps=23`, so repeated zero is not a slow-rate artifact; `SET wf_speed=4` produced `MSG wf_fps=23`; and the receiver reported `rx_chans=8 wf_chans=3 wf_share=1 zoom_cap=11` against the June capture's `rx_chans=4 wf_chans=4 zoom_cap=14`, so either it was reconfigured or the address fronts more than one host. `zoom_cap`, not `zoom_max`, is the effective zoom ceiling.
 
+Captured `tests/fixtures/kiwi/local-wf-910-zoom11.jsonl` (center 910 kHz, zoom 11, 60 frames) specifically to discriminate whether the bin center offset is constant in bins or in Hz. Zoom 11 bins are 14.3 Hz against zoom 8's 114.4 Hz, so a fixed frequency error would have shown up as about 6.6 bins. The measured offset was 1.0 bins. **The offset is constant in bins.**
+
+Tightened the magnitude by parabolic interpolation of carrier peaks in the dB domain across all three zoomed captures, 17 carriers total: mean 0.895 bins, sd 0.192, standard error 0.047, 95% interval 0.803 to 0.986. This agrees with the independent rounding-based bound of `0.75 < offset <= 0.90` derived earlier. Raised `PROVISIONAL_BIN_CENTER_OFFSET` from 0.83 to 0.89.
+
+Kept it provisional. The cause is still unknown, and an exact whole-bin offset of 1.0 cannot be ruled out: it sits just outside the 95% interval, but parabolic interpolation carries a window-dependent bias of comparable size and the receiver's FFT window is unknown. Recorded that the choice does not affect bin selection at all, since any value in 0.75..0.90 puts every measured carrier on the same bin; only sub-bin frequency readout depends on it. Identifying the FFT window is the likely path to closing this.
+
+Added two tests beyond extending the existing parametrized set: one asserting the Hz-constant hypothesis predicts the wrong bin at zoom 11 while the bin-constant one predicts the right bin, and one asserting the zoom-11 window contains exactly one 10 kHz AM channel, so that single-carrier calibration cannot silently pass on a mis-tuned capture. Full suite: 258 passed.
+
+Process note: an uncapped `kiwi-wf-live --save-fixture` run at `wf_speed=4` reached 12 MB and 8112 frames in six minutes. A `git add -A` swept a partially-written 191 KB snapshot of it into a commit; it was removed by amending before the commit was final. Two lessons recorded: stage fixture paths explicitly rather than using `git add -A` while a capture may be running, and cap capture length, since the calibration needs only 60 frames.
+
 ## YYYY-MM-DD
 
 ### Finding
