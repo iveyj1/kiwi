@@ -2,25 +2,7 @@
 
 ## Current slice
 
-Goal: Measure the W/F bin center offset against a known-exact reference.
-
-Done criteria:
-
-- `kiwi-wf-sweep` steps the receive window past a reference tone and intersects one offset constraint per window position.
-- Frames are grouped by reported `x_bin_server`, so the receiver may quantise `cf` freely.
-- Analysis averages frames rather than max-holding, so a weak reference is not lost to noise peaks.
-- Validation rejects a sweep too short to cross a bin boundary, a step too coarse to improve on the existing 0.133 bin bound, and a zoom too low to center the reference.
-- `--analyse` re-reads a saved sweep with no network access.
-- Harness tests recover a planted offset to one window position without a receiver.
-- Live capture: a WWVB sweep at 60 kHz, zoom 9 or 10.
-- Optional cross-check: a WWV sweep at 10 MHz, which places `start` several hundred times higher.
-- `PROVISIONAL_BIN_CENTER_OFFSET` and `docs/kiwi-protocol.md` are updated from the measured result.
-
-Test command: `python3 -m pytest tests/waterfall/ tests/harness/test_waterfall_sweep_cli.py && python3 -m pytest`
-
-Live-radio needed: yes, but only after the harness tests pass. Short guarded sweeps against a local receiver; no generator use until `SET gen=` scope is known.
-
-Docs to update: `docs/kiwi-protocol.md`, `docs/user-guide.md`, `docs/dev-log.md`.
+Goal: none active. The waterfall display and bin-mapping slice is complete.
 
 ## Done in previous slices
 
@@ -80,7 +62,8 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 ## Next
 
-- Explain the provisional `0.83` bin center offset in `WaterfallSpan`. Constancy in bins is settled by the zoom-11 capture, and the data admits only `0.762 < offset <= 0.895`, excluding both a half-bin (0.5) and a whole-bin (1.0) convention. Remaining question is the cause; identifying the receiver's FFT window is the likely next step.
+- Parked: explain why the W/F bin center offset is not constant across window positions. Live WWVB and WWV sweeps both show peak transitions 35 window positions apart where the model requires 32, and a per-position offset range of 1.062 bins, which no constant can produce. Both references agree to 0.003 bins despite a 300x difference in `start`, so it depends on window position rather than frequency. Bin width and `unit_hz` are each independently confirmed, which makes the discrepancy genuinely puzzling; the likely answer is that the passband does not move by exactly one `unit_hz` per reported `x_bin_server` count. Needs the KiwiSDR BeagleBone/DSP sources, not more black-box captures. Evidence in `docs/evidence/`, details in `docs/kiwi-protocol.md`.
+  Nothing depends on this today: `0.83` still puts every measured carrier on the correct bin. Revisit only if sub-bin frequency readout is needed, for example for beacon detection frequency estimates.
 - Confirm the `flags_x_zoom_server` bit layout beyond the low zoom bits; only `8` (zoom 8) and `0x40009` (zoom 9) have been observed.
 - Show a frequency axis in the W/F previews now that bin/frequency mapping exists.
 - Decide how `wf_cal=-13` should be applied to displayed dBm values.

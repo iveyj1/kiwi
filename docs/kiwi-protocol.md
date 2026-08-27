@@ -165,6 +165,8 @@ signal in bin i = start_hz + (i + BIN_CENTER_OFFSET) * bin_hz
 
 The window center reproduces the tuned `cf` value to within a few Hz: 909.998 kHz and 759.999 kHz for captures tuned to 910 and 760.
 
+> **The constant-offset model is known to be incomplete.** Live sweeps against WWVB and WWV show the offset varies with window position, so no single constant describes it. `0.83` remains in the code as the best working constant for bin selection, and every measured carrier still lands on its predicted bin, but the value below should be read as an approximation rather than a physical constant. See "The offset is not constant across window positions" at the end of this section.
+
 **`BIN_CENTER_OFFSET = 0.83` is provisional and unexplained.**
 
 What the offset is between: for a carrier of known frequency, the *naive* bin index `(f - start_hz) / bin_hz` and the *measured* index of its energy peak. Known AM carriers peak about 0.83 bins below the naive prediction. Stated as frequency instead, the signal in bin `i` sits at `start_hz + (i + 0.83) * bin_hz`.
@@ -210,6 +212,35 @@ Candidate references, in order of preference:
 - **WWVB at 60 kHz**, cesium-referenced. Requires zoom 8 or higher, since lower zooms cannot center it and clamp against 0 Hz where bin 0 is dead. Its BPSK phase modulation at +/-45 degrees leaves roughly half the power in the discrete carrier line, and the AM ducking puts sidebands about 1 Hz out, which stays inside one bin down to about zoom 12.
 - **WWV at 5, 10, 15 or 20 MHz**, equally accurate and clear of the LF noise floor. A sweep at 60 kHz and another at 10 MHz place `start` at values differing by a factor of several hundred, testing whether the offset depends on `start` at all.
 - **The receiver's own signal generator** via `SET gen=`, locked to the same ADC clock as the FFT so any clock error cancels. Whether `gen` is global to the receiver or per-connection is unverified; if global it injects a tone into every other connected user, which the project's live-radio rules do not permit.
+
+#### The offset is not constant across window positions
+
+Two live sweeps were run against `10.0.0.40:8073` on 2026-08-27, both at zoom 9 with 40 window positions: WWVB at 60 kHz and WWV at 10 MHz. Compact records are committed at `docs/evidence/sweep-wwvb-60khz-zoom9.json` and `docs/evidence/sweep-wwv-10mhz-zoom9.json`, and `tests/waterfall/test_waterfall_sweep.py` asserts the findings below.
+
+Both sweeps admit **no constant offset at all**. The measurements are:
+
+| | WWVB 60 kHz | WWV 10 MHz |
+| --- | --- | --- |
+| mean offset | +0.907 bins | +0.903 bins |
+| offset range across sweep | 1.062 bins | 1.062 bins |
+| model positions per bin | 32.0 | 32.0 |
+| **observed positions per bin** | **35.0** | **35.0** |
+
+Two independent facts each rule out a constant:
+
+- **The per-position offsets span 1.062 bins.** A constant offset can only produce a span below 1.0, because the offset equals the constant plus a quantisation residual in `[-0.5, +0.5)`.
+- **Peak bin transitions fall 35 window positions apart**, where a constant offset requires exactly `2**(zoom_max - zoom)` = 32. The effective offset drifts about 0.094 bins between consecutive transitions.
+
+Both references give **identical** structure, matching to about 0.003 bins at every position, despite 60 kHz versus 10 MHz and `start` values differing by a factor of roughly 300 (17148 versus 5576006). So the effect depends on window position, not on frequency or on absolute `start`.
+
+This is genuinely puzzling, because two other measurements independently confirm the pieces the sweep contradicts:
+
+- Bin width is confirmed as `bandwidth / (1024 * 2**zoom)` by AM carrier spacing: 11 carriers spanning 100 kHz across 874 bins at zoom 8, and 5 spanning 40 kHz across 699 bins at zoom 9.
+- `unit_hz` is confirmed as `bandwidth / (1024 * 2**zoom_max)` by window centre recovery, which reproduces the tuned `cf` to within a few Hz at zooms 8, 9 and 11.
+
+Given both, `bin_width / unit_hz` must be exactly 32, yet stepping `start` by 35 counts is what moves the peak by one bin. The likely explanation is that the receiver's actual passband does not move by exactly one `unit_hz` per reported `x_bin_server` count during retuning, which would make `x_bin_server` an accurate label for a window but not a linear measure of its position. Confirming that needs the KiwiSDR BeagleBone and DSP sources rather than more black-box captures.
+
+Deferred deliberately. Nothing currently depends on sub-bin accuracy, and the working constant still puts every measured carrier on the correct bin. Revisit if sub-bin frequency readout is ever needed, for example for beacon-detection frequency estimates.
 
 Evidence for the mapping, all fixture-backed and network-free in `tests/waterfall/test_frequency_mapping.py`:
 

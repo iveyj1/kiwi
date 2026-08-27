@@ -1,0 +1,317 @@
+{
+  "bandwidth_hz": 30000000.0,
+  "fft_size": 1024,
+  "reference_hz": 60000.0,
+  "samples": [
+    {
+      "floor_dbm": -96.56818181818181,
+      "frame_count": 22,
+      "peak_bin": 512,
+      "peak_dbm": -68.5909090909091,
+      "x_bin_server": 17148
+    },
+    {
+      "floor_dbm": -94.3157894736842,
+      "frame_count": 19,
+      "peak_bin": 512,
+      "peak_dbm": -72.47368421052632,
+      "x_bin_server": 17149
+    },
+    {
+      "floor_dbm": -95.9047619047619,
+      "frame_count": 21,
+      "peak_bin": 512,
+      "peak_dbm": -73.52380952380952,
+      "x_bin_server": 17150
+    },
+    {
+      "floor_dbm": -95.8,
+      "frame_count": 20,
+      "peak_bin": 512,
+      "peak_dbm": -68.7,
+      "x_bin_server": 17151
+    },
+    {
+      "floor_dbm": -94.44736842105263,
+      "frame_count": 19,
+      "peak_bin": 512,
+      "peak_dbm": -67.42105263157895,
+      "x_bin_server": 17152
+    },
+    {
+      "floor_dbm": -94.28571428571429,
+      "frame_count": 21,
+      "peak_bin": 512,
+      "peak_dbm": -70.19047619047619,
+      "x_bin_server": 17153
+    },
+    {
+      "floor_dbm": -93.52631578947368,
+      "frame_count": 19,
+      "peak_bin": 512,
+      "peak_dbm": -68.57894736842105,
+      "x_bin_server": 17154
+    },
+    {
+      "floor_dbm": -92.275,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -74.05,
+      "x_bin_server": 17155
+    },
+    {
+      "floor_dbm": -92.82499999999999,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -73.35,
+      "x_bin_server": 17157
+    },
+    {
+      "floor_dbm": -94.19047619047619,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -78.47619047619048,
+      "x_bin_server": 17158
+    },
+    {
+      "floor_dbm": -96.05263157894737,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -78.26315789473684,
+      "x_bin_server": 17159
+    },
+    {
+      "floor_dbm": -95.7,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.2,
+      "x_bin_server": 17160
+    },
+    {
+      "floor_dbm": -95.25,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -72.35,
+      "x_bin_server": 17161
+    },
+    {
+      "floor_dbm": -96.4,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -65.9,
+      "x_bin_server": 17162
+    },
+    {
+      "floor_dbm": -95.7,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.75,
+      "x_bin_server": 17163
+    },
+    {
+      "floor_dbm": -95.85,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -66.55,
+      "x_bin_server": 17164
+    },
+    {
+      "floor_dbm": -96.05,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -74.75,
+      "x_bin_server": 17165
+    },
+    {
+      "floor_dbm": -90.4,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.45,
+      "x_bin_server": 17167
+    },
+    {
+      "floor_dbm": -95.7,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.4,
+      "x_bin_server": 17168
+    },
+    {
+      "floor_dbm": -95.85,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -73.65,
+      "x_bin_server": 17169
+    },
+    {
+      "floor_dbm": -96.0,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.8,
+      "x_bin_server": 17170
+    },
+    {
+      "floor_dbm": -95.55,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -71.15,
+      "x_bin_server": 17171
+    },
+    {
+      "floor_dbm": -94.7,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.25,
+      "x_bin_server": 17172
+    },
+    {
+      "floor_dbm": -95.69047619047619,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -74.23809523809524,
+      "x_bin_server": 17173
+    },
+    {
+      "floor_dbm": -96.07499999999999,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -69.4,
+      "x_bin_server": 17174
+    },
+    {
+      "floor_dbm": -94.0,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -67.52631578947368,
+      "x_bin_server": 17176
+    },
+    {
+      "floor_dbm": -95.35714285714286,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -74.14285714285714,
+      "x_bin_server": 17177
+    },
+    {
+      "floor_dbm": -96.2,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.95,
+      "x_bin_server": 17178
+    },
+    {
+      "floor_dbm": -94.55,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.2,
+      "x_bin_server": 17179
+    },
+    {
+      "floor_dbm": -94.65,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -68.6,
+      "x_bin_server": 17180
+    },
+    {
+      "floor_dbm": -95.9,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -67.95,
+      "x_bin_server": 17181
+    },
+    {
+      "floor_dbm": -94.89473684210526,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -72.73684210526316,
+      "x_bin_server": 17182
+    },
+    {
+      "floor_dbm": -95.8,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -73.1,
+      "x_bin_server": 17183
+    },
+    {
+      "floor_dbm": -95.8,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -78.95,
+      "x_bin_server": 17184
+    },
+    {
+      "floor_dbm": -94.11904761904762,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -72.14285714285714,
+      "x_bin_server": 17186
+    },
+    {
+      "floor_dbm": -95.02631578947368,
+      "frame_count": 19,
+      "peak_bin": 511,
+      "peak_dbm": -68.63157894736842,
+      "x_bin_server": 17187
+    },
+    {
+      "floor_dbm": -95.69047619047619,
+      "frame_count": 21,
+      "peak_bin": 511,
+      "peak_dbm": -70.0952380952381,
+      "x_bin_server": 17188
+    },
+    {
+      "floor_dbm": -95.05,
+      "frame_count": 20,
+      "peak_bin": 511,
+      "peak_dbm": -72.0,
+      "x_bin_server": 17189
+    },
+    {
+      "floor_dbm": -94.3,
+      "frame_count": 20,
+      "peak_bin": 510,
+      "peak_dbm": -69.15,
+      "x_bin_server": 17190
+    },
+    {
+      "floor_dbm": -94.83333333333333,
+      "frame_count": 18,
+      "peak_bin": 510,
+      "peak_dbm": -70.11111111111111,
+      "x_bin_server": 17191
+    }
+  ],
+  "summary": {
+    "best_snr_db": 30.5,
+    "bin_transitions": [
+      [
+        17155,
+        512,
+        511
+      ],
+      [
+        17190,
+        511,
+        510
+      ]
+    ],
+    "bin_width_hz": 57.220458984375,
+    "constant_offset_fits": false,
+    "crossed_bin_boundary": true,
+    "model_positions_per_bin": 32.0,
+    "observed_positions_per_bin": 35.0,
+    "offset_max": 1.4822500000000218,
+    "offset_mean": 0.9072500000000219,
+    "offset_min": 0.41975000000002183,
+    "offset_range": 1.0625,
+    "reference_hz": 60000.0,
+    "usable_positions": 40,
+    "window_positions": 40,
+    "zoom": 9
+  },
+  "zoom": 9,
+  "zoom_max": 14
+}

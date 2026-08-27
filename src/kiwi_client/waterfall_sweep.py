@@ -184,10 +184,58 @@ class SweepResult:
             high = min(high, offset + 0.5)
         if low >= high:
             raise ValueError(
-                "sweep samples give contradictory offsets; the reference may be mis-specified "
-                f"or drowned in noise (window {low:.3f}..{high:.3f})"
+                "sweep samples give contradictory offsets, so no single constant fits them "
+                f"(window {low:.3f}..{high:.3f}). The offset is known not to be constant across "
+                "window positions on at least one local receiver; see bin_transitions() and "
+                "docs/kiwi-protocol.md. Other causes are a mis-specified reference or a peak "
+                "lost in noise."
             )
         return (low, high)
+
+    def bin_transitions(self, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> tuple[tuple[int, int, int], ...]:
+        """Return `(x_bin_server, from_bin, to_bin)` for each peak bin change.
+
+        Under a constant offset these are spaced by exactly one bin, that is
+        `2**(zoom_max - zoom)` window positions. Spacing that differs from that
+        is direct evidence the offset varies with window position.
+        """
+        usable = self.usable(min_snr_db)
+        transitions = []
+        for previous, current in zip(usable, usable[1:]):
+            if current.peak_bin != previous.peak_bin:
+                transitions.append((current.x_bin_server, previous.peak_bin, current.peak_bin))
+        return tuple(transitions)
+
+    def positions_per_bin(self) -> float:
+        """Return how many window positions the model puts in one bin."""
+        return self.span.bin_width_hz / self.span.unit_hz
+
+    def observed_positions_per_bin(self, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> float | None:
+        """Return the measured spacing between peak bin transitions, or None.
+
+        Requires at least two transitions. Disagreement with
+        `positions_per_bin()` means a constant offset cannot describe the data.
+        """
+        transitions = self.bin_transitions(min_snr_db)
+        if len(transitions) < 2:
+            return None
+        spans = [b[0] - a[0] for a, b in zip(transitions, transitions[1:])]
+        return sum(spans) / len(spans)
+
+    def offset_statistics(self, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> dict[str, float]:
+        """Return per-position offset statistics, valid whether or not a constant fits."""
+        usable = self.usable(min_snr_db)
+        if not usable:
+            raise ValueError(f"no sweep sample reached {min_snr_db} dB SNR; the reference was not detected")
+        offsets = [self.naive_index(sample) - sample.peak_bin for sample in usable]
+        ordered = sorted(offsets)
+        return {
+            "count": float(len(offsets)),
+            "mean": sum(offsets) / len(offsets),
+            "min": ordered[0],
+            "max": ordered[-1],
+            "range": ordered[-1] - ordered[0],
+        }
 
     def crossed_bin_boundary(self, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> bool:
         """Return whether the peak changed bin during the sweep.
@@ -198,23 +246,48 @@ class SweepResult:
         return len({sample.peak_bin for sample in self.usable(min_snr_db)}) > 1
 
     def summary(self, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> dict[str, Any]:
-        """Return a JSON-serialisable summary of what the sweep established."""
+        """Return a JSON-serialisable summary of what the sweep established.
+
+        A sweep whose samples admit no single constant offset still summarises,
+        reporting `constant_offset_fits: false` plus the statistics and
+        transition spacing that describe the failure. Only a sweep that detected
+        nothing at all raises.
+        """
         usable = self.usable(min_snr_db)
-        low, high = self.offset_window(min_snr_db)
-        return {
+        statistics = self.offset_statistics(min_snr_db)
+        observed = self.observed_positions_per_bin(min_snr_db)
+        payload: dict[str, Any] = {
             "reference_hz": self.reference_hz,
             "zoom": self.span.zoom,
             "bin_width_hz": self.span.bin_width_hz,
             "window_positions": len(self.samples),
             "usable_positions": len(usable),
             "crossed_bin_boundary": self.crossed_bin_boundary(min_snr_db),
-            "offset_low": low,
-            "offset_high": high,
-            "offset_center": (low + high) / 2,
-            "offset_width_bins": high - low,
-            "offset_width_hz": (high - low) * self.span.bin_width_hz,
             "best_snr_db": max((sample.snr_db for sample in usable), default=0.0),
+            "offset_mean": statistics["mean"],
+            "offset_min": statistics["min"],
+            "offset_max": statistics["max"],
+            "offset_range": statistics["range"],
+            "model_positions_per_bin": self.positions_per_bin(),
+            "observed_positions_per_bin": observed,
+            "bin_transitions": [list(item) for item in self.bin_transitions(min_snr_db)],
         }
+        try:
+            low, high = self.offset_window(min_snr_db)
+        except ValueError:
+            payload["constant_offset_fits"] = False
+            return payload
+        payload.update(
+            {
+                "constant_offset_fits": True,
+                "offset_low": low,
+                "offset_high": high,
+                "offset_center": (low + high) / 2,
+                "offset_width_bins": high - low,
+                "offset_width_hz": (high - low) * self.span.bin_width_hz,
+            }
+        )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -379,6 +452,58 @@ def load_sweep_fixture(path: Path, *, reference_khz: float) -> SweepResult:
     return analyse_sweep_frames(frames, span=span, reference_hz=reference_khz * 1000.0)
 
 
+def export_samples(result: SweepResult, path: Path, *, min_snr_db: float = DEFAULT_MIN_SNR_DB) -> Path:
+    """Write a compact record of a sweep: geometry plus one row per window position.
+
+    A raw sweep fixture runs to megabytes because it keeps every frame. This
+    keeps only what the offset analysis consumes, so a result can be committed
+    as evidence and re-examined later.
+    """
+    payload = {
+        "reference_hz": result.reference_hz,
+        "bandwidth_hz": result.span.bandwidth_hz,
+        "zoom": result.span.zoom,
+        "fft_size": result.span.fft_size,
+        "zoom_max": result.span.zoom_max,
+        "summary": result.summary(min_snr_db),
+        "samples": [
+            {
+                "x_bin_server": s.x_bin_server,
+                "frame_count": s.frame_count,
+                "peak_bin": s.peak_bin,
+                "peak_dbm": s.peak_dbm,
+                "floor_dbm": s.floor_dbm,
+            }
+            for s in result.samples
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def load_exported_samples(path: Path) -> SweepResult:
+    """Rebuild a `SweepResult` from a record written by `export_samples()`."""
+    payload = json.loads(path.read_text())
+    span = WaterfallSpan(
+        bandwidth_hz=payload["bandwidth_hz"],
+        zoom=payload["zoom"],
+        fft_size=payload["fft_size"],
+        zoom_max=payload["zoom_max"],
+    )
+    samples = tuple(
+        SweepSample(
+            x_bin_server=row["x_bin_server"],
+            frame_count=row["frame_count"],
+            peak_bin=row["peak_bin"],
+            peak_dbm=row["peak_dbm"],
+            floor_dbm=row["floor_dbm"],
+        )
+        for row in payload["samples"]
+    )
+    return SweepResult(reference_hz=payload["reference_hz"], span=span, samples=samples)
+
+
 def _capture_metadata(config: WaterfallSweepConfig) -> WaterfallCaptureMetadata:
     return WaterfallCaptureMetadata(
         receiver=config.receiver,
@@ -502,6 +627,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-snr-db", type=float, default=DEFAULT_MIN_SNR_DB)
     parser.add_argument("--duration-seconds", type=float, default=DEFAULT_DURATION_SECONDS)
     parser.add_argument("--timestamp", type=int)
+    parser.add_argument(
+        "--export-samples",
+        type=Path,
+        help="write a compact per-position record, small enough to commit as evidence",
+    )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-live", action="store_true")
@@ -549,10 +679,34 @@ def format_sweep_report(result: SweepResult, min_snr_db: float) -> str:
     if len(usable) < len(result.samples):
         lines.append(f"  (* = below {min_snr_db} dB SNR, excluded)")
     lines.append("")
+    statistics = result.offset_statistics(min_snr_db)
+    model = result.positions_per_bin()
+    observed = result.observed_positions_per_bin(min_snr_db)
+    lines.append(
+        f"offset mean {statistics['mean']:+.3f}  min {statistics['min']:+.3f}  "
+        f"max {statistics['max']:+.3f}  range {statistics['range']:.3f} bins"
+    )
+    transitions = result.bin_transitions(min_snr_db)
+    if transitions:
+        spacing = [b[0] - a[0] for a, b in zip(transitions, transitions[1:])]
+        lines.append(
+            f"peak bin transitions at x_bin {[t[0] for t in transitions]}"
+            + (f", spacing {spacing} positions" if spacing else "")
+        )
+    lines.append(f"model puts one bin at {model:.1f} positions"
+                 + (f"; observed {observed:.1f}" if observed is not None else ""))
+    lines.append("")
     try:
         low, high = result.offset_window(min_snr_db)
-    except ValueError as exc:
-        lines.append(f"RESULT: {exc}")
+    except ValueError:
+        lines.append("RESULT: no single constant offset fits these samples.")
+        if statistics["range"] > 1.0:
+            lines.append(f"  Per-position offsets span {statistics['range']:.3f} bins. A constant offset")
+            lines.append("  can only produce a span below 1.0, so the offset varies with window position.")
+        if observed is not None and abs(observed - model) > 0.5:
+            lines.append(f"  Peak transitions are {observed:.1f} positions apart but a constant offset")
+            lines.append(f"  requires exactly {model:.1f}. See docs/kiwi-protocol.md.")
+        lines.append(f"  Mean offset over the sweep is {statistics['mean']:+.3f} bins.")
         return "\n".join(lines)
     lines.append(f"offset in ({low:.4f}, {high:.4f}]  width {high - low:.4f} bins "
                  f"({(high - low) * result.span.bin_width_hz:.2f} Hz)")
@@ -572,6 +726,8 @@ def main(argv: list[str] | None = None) -> int:
             result = load_sweep_fixture(args.analyse, reference_khz=args.reference_khz)
         except LiveCaptureError as exc:
             parser.error(str(exc))
+        if args.export_samples is not None:
+            export_samples(result, args.export_samples, min_snr_db=args.min_snr_db)
         if args.json:
             print(json.dumps(result.summary(args.min_snr_db), indent=2, sort_keys=True))
         else:

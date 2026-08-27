@@ -225,3 +225,152 @@ def test_sample_window_uses_averaged_not_peak_frames():
 
     assert sample.peak_bin == true_bin
     assert sample.frame_count == 10
+
+
+def _inconsistent_sweep():
+    """Build a sweep whose peak transitions are spaced wider than one bin.
+
+    This reproduces the shape seen on a local receiver, where transitions fall
+    35 window positions apart while the model requires 32, so no constant
+    offset can fit.
+    """
+    span = _span(9)
+    base = round((REFERENCE_HZ - span.span_hz / 2) / span.unit_hz)
+    frames = []
+    for step in range(44):
+        x_bin = base + step
+        peak = 512 - (step >= 7) - (step >= 42)
+        frames.append(_frame(x_bin, peak))
+    return span, frames
+
+
+def test_offset_window_reports_that_no_constant_fits():
+    span, frames = _inconsistent_sweep()
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    with pytest.raises(ValueError, match="no single constant fits them"):
+        result.offset_window()
+
+
+def test_offset_statistics_survive_an_inconsistent_sweep():
+    """Statistics must stay available when the constant model fails; that is the diagnosis."""
+    span, frames = _inconsistent_sweep()
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    stats = result.offset_statistics()
+
+    assert stats["count"] == 44
+    # A constant offset can only span below 1.0 bin; exceeding it is the tell.
+    assert stats["range"] > 1.0
+
+
+def test_observed_positions_per_bin_exposes_the_discrepancy():
+    span, frames = _inconsistent_sweep()
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    assert result.positions_per_bin() == 32.0
+    assert result.observed_positions_per_bin() == 35.0
+    assert [t[0] - result.samples[0].x_bin_server for t in result.bin_transitions()] == [7, 42]
+
+
+def test_observed_positions_per_bin_needs_two_transitions():
+    span, frames = _synthetic_sweep(0.83, steps=8)
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    assert result.observed_positions_per_bin() is None
+
+
+def test_summary_does_not_raise_when_no_constant_fits():
+    """A sweep that measured something must still summarise, so --json keeps working."""
+    import json
+
+    span, frames = _inconsistent_sweep()
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    payload = json.loads(json.dumps(result.summary()))
+
+    assert payload["constant_offset_fits"] is False
+    assert "offset_low" not in payload
+    assert payload["observed_positions_per_bin"] == 35.0
+    # The absolute mean depends on the sweep's starting phase, so check the
+    # summary agrees with the statistics rather than pinning a magic number.
+    assert payload["offset_mean"] == pytest.approx(result.offset_statistics()["mean"])
+
+
+def test_summary_marks_a_consistent_sweep_as_fitting():
+    span, frames = _synthetic_sweep(0.83)
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    assert result.summary()["constant_offset_fits"] is True
+
+
+def test_exported_samples_round_trip(tmp_path):
+    from kiwi_client.waterfall_sweep import export_samples, load_exported_samples
+
+    span, frames = _inconsistent_sweep()
+    result = analyse_sweep_frames(frames, span=span, reference_hz=REFERENCE_HZ)
+
+    path = export_samples(result, tmp_path / "sweep.json")
+    reloaded = load_exported_samples(path)
+
+    assert reloaded.samples == result.samples
+    assert reloaded.span == result.span
+    assert reloaded.reference_hz == result.reference_hz
+    assert reloaded.observed_positions_per_bin() == 35.0
+
+
+# --- Real receiver evidence -------------------------------------------------
+# These read compact records exported from live sweeps against WWVB and WWV.
+# They pin the finding that the bin center offset is NOT constant across window
+# positions on the tested receiver, so it cannot be repaired by choosing a
+# better constant. See docs/kiwi-protocol.md.
+
+EVIDENCE = [
+    ("docs/evidence/sweep-wwvb-60khz-zoom9.json", 60_000.0),
+    ("docs/evidence/sweep-wwv-10mhz-zoom9.json", 10_000_000.0),
+]
+
+
+@pytest.mark.parametrize("path,reference_hz", EVIDENCE)
+def test_real_sweeps_admit_no_constant_offset(path, reference_hz):
+    from pathlib import Path
+
+    from kiwi_client.waterfall_sweep import load_exported_samples
+
+    result = load_exported_samples(Path(path))
+
+    assert result.reference_hz == reference_hz
+    assert result.offset_statistics()["range"] > 1.0, "a constant offset cannot span more than one bin"
+    with pytest.raises(ValueError, match="no single constant fits them"):
+        result.offset_window()
+
+
+@pytest.mark.parametrize("path,reference_hz", EVIDENCE)
+def test_real_sweeps_show_35_positions_per_bin_not_32(path, reference_hz):
+    """Both references, at start values differing by a factor of ~300, give 35."""
+    from pathlib import Path
+
+    from kiwi_client.waterfall_sweep import load_exported_samples
+
+    result = load_exported_samples(Path(path))
+
+    assert result.positions_per_bin() == 32.0
+    assert result.observed_positions_per_bin() == 35.0
+
+
+def test_the_two_real_sweeps_agree_with_each_other():
+    """60 kHz and 10 MHz trace the same offset pattern, so it is not frequency-dependent."""
+    from pathlib import Path
+
+    from kiwi_client.waterfall_sweep import load_exported_samples
+
+    low_band = load_exported_samples(Path(EVIDENCE[0][0]))
+    high_band = load_exported_samples(Path(EVIDENCE[1][0]))
+
+    assert low_band.samples[0].x_bin_server != high_band.samples[0].x_bin_server
+    assert low_band.offset_statistics()["mean"] == pytest.approx(
+        high_band.offset_statistics()["mean"], abs=0.01
+    )
+    assert low_band.offset_statistics()["range"] == pytest.approx(
+        high_band.offset_statistics()["range"], abs=0.01
+    )
