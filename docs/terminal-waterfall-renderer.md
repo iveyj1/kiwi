@@ -196,4 +196,5 @@ Do not require a Kitty terminal in automated tests.
 8. Done: add tuned-frequency/passband overlays and persistent `[waterfall]` defaults with CLI precedence.
 9. Done: isolate live terminal rendering from the network event loop, coalesce redraw requests, disable redundant WebSocket protocol pings, and report connection closure without a traceback.
 10. Done: add a source-bin cursor, precise status readout, local keyboard movement/reset, and clean keyboard quit without transmitting receiver commands.
-11. Pending: add fixture-tested receiver recenter/zoom commands, then coordinate selected tuning with the separate audio session.
+11. Pending: change cursor movement from source-bin increments to configured round frequency steps. Preserve exact selected frequency in the model and map it to the nearest raster column; bin width remains display resolution, not tuning step.
+12. Pending: add fixture-tested receiver recenter/zoom commands, then coordinate exact selected tuning with the separate audio session.
