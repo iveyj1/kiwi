@@ -218,7 +218,8 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 - If temporal jumps become problematic, instrument receive cadence, coalesced redraw count, and draw duration before changing buffering; current behavior resembles the Kiwi browser client.
 - Evaluate adaptive ruler density, marker prominence, and persisted operating defaults during normal use.
-- Add fixture-tested keyboard recenter and zoom commands around the local cursor.
+- Replace bin-sized cursor movement with configured round frequency steps before cursor-driven tuning; map the exact selected frequency to the nearest raster column while reporting bin width only as display resolution.
+- Add fixture-tested keyboard recenter and zoom commands around the exact-frequency cursor.
 - Decide how the standalone W/F viewer should exchange selected/tuned state with the audio controller before sending SND tuning commands.
 - Decide whether to add a native desktop raster backend, integrate a compact image pane into the curses TUI, or retain `kiwi-wf-terminal` as a companion view.
 
