@@ -37,6 +37,11 @@ Each real capture should document:
 - Capture duration
 - Why the fixture exists
 
+## Captured W/F regression fixtures
+
+- `local-wf-5000-zoom0.jsonl`: two full-band frames from `10.0.0.40:8073`; covers zoom-0 layout and repeated sequence zero.
+- `local-wf-am-855-zoom7.jsonl`: five frames centered near 855 kHz at zoom 7 and speed 4; covers nonzero start/zoom mapping and known local carriers near 760 and 950 kHz.
+
 ## Policy
 
 Keep ordinary regression fixtures small.

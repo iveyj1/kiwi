@@ -31,6 +31,18 @@ def test_default_config_has_keymaps_and_steps():
     assert config.tuning.mode_step_pairs["usb"] == ((1000, 100),)
     assert config.tuning.mode_step_pairs["lsb"] == ((1000, 100),)
     assert config.tuning.mode_step_pairs["cw"] == ((100, 10),)
+    assert config.waterfall.center_khz == 5000.0
+    assert config.waterfall.zoom == 0
+    assert config.waterfall.history_rows == 100
+    assert config.waterfall.terminal_rows == 0
+    assert config.waterfall.render_min_db == -100.0
+    assert config.waterfall.render_max_db == -40.0
+    assert config.waterfall.speed == 1
+    assert config.waterfall.refresh_hz == 5.0
+    assert config.waterfall.interp == 13
+    assert config.waterfall.label_columns_per_tick == 18
+    assert config.waterfall.show_tuned_marker is True
+    assert config.waterfall.show_passband is False
     assert config.startup.mode == "last"
     assert config.startup.preset == 1
     assert config.startup.playback is False
@@ -86,6 +98,22 @@ high_cut_hz = 2400
 [tuning.mode_steps.usb]
 pairs = [[1000, 100], [2500, 250]]
 
+[waterfall]
+center_khz = 855.0
+zoom = 7
+history_rows = 300
+terminal_rows = 30
+render_min_db = -105
+render_max_db = -35
+speed = 4
+refresh_hz = 12
+interp = 13
+label_columns_per_tick = 20
+show_tuned_marker = true
+show_passband = true
+low_cut_hz = -5000
+high_cut_hz = 5000
+
 [startup]
 mode = "preset"
 preset = 7
@@ -125,6 +153,20 @@ mode = "usb"
     assert config.tuning.mode_passbands["am"] == (-5000, 5000)
     assert config.tuning.mode_step_pairs["usb"] == ((1000, 100), (2500, 250))
     assert config.tuning.mode_step_pairs["am"] == ((5000, 1000),)
+    assert config.waterfall.center_khz == 855.0
+    assert config.waterfall.zoom == 7
+    assert config.waterfall.history_rows == 300
+    assert config.waterfall.terminal_rows == 30
+    assert config.waterfall.render_min_db == -105.0
+    assert config.waterfall.render_max_db == -35.0
+    assert config.waterfall.speed == 4
+    assert config.waterfall.refresh_hz == 12.0
+    assert config.waterfall.interp == 13
+    assert config.waterfall.label_columns_per_tick == 20
+    assert config.waterfall.show_tuned_marker is True
+    assert config.waterfall.show_passband is True
+    assert config.waterfall.low_cut_hz == -5000
+    assert config.waterfall.high_cut_hz == 5000
     assert resolve_presets_path(config) == tmp_path / "my-presets.toml"
     assert resolve_state_path(config) == tmp_path / "state.json"
     assert config.startup.mode == "preset"
@@ -181,6 +223,12 @@ def test_project_root_example_config_parses():
 
     assert config.keys[":"] == "command-mode"
     assert config.receivers.allowed
+    assert config.waterfall.center_khz == 5000.0
+    assert config.waterfall.zoom == 7
+    assert config.waterfall.history_rows == 300
+    assert config.waterfall.speed == 4
+    assert config.waterfall.refresh_hz == 12.0
+    assert config.waterfall.show_passband is True
     assert config.startup.playback is True
 
 

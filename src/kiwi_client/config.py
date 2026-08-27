@@ -69,6 +69,20 @@ pairs = [[1000, 100]]
 [tuning.mode_steps.cw]
 pairs = [[100, 10]]
 
+[waterfall]
+center_khz = 5000.0
+zoom = 0
+history_rows = 100
+terminal_rows = 0
+render_min_db = -100
+render_max_db = -40
+speed = 1
+refresh_hz = 5
+interp = 13
+label_columns_per_tick = 18
+show_tuned_marker = true
+show_passband = false
+
 [startup]
 state_file = "~/.local/state/kiwi-client/state.json"
 mode = "last"
@@ -189,6 +203,27 @@ class TuningConfig:
 
 
 @dataclass(frozen=True)
+class WaterfallConfig:
+    """Standalone raster waterfall display defaults."""
+
+    center_khz: float = 5000.0
+    zoom: int = 0
+    history_rows: int = 100
+    terminal_rows: int = 0
+    render_min_db: float = -100.0
+    render_max_db: float = -40.0
+    speed: int = 1
+    refresh_hz: float = 5.0
+    interp: int = 13
+    label_columns_per_tick: int = 18
+    show_tuned_marker: bool = True
+    show_passband: bool = False
+    tuned_khz: float | None = None
+    low_cut_hz: int | None = None
+    high_cut_hz: int | None = None
+
+
+@dataclass(frozen=True)
 class StartupConfig:
     """TUI startup/restore settings."""
 
@@ -211,6 +246,7 @@ class KiwiClientConfig:
     receivers: ReceiverConfig = field(default_factory=ReceiverConfig)
     presets: PresetsConfig = field(default_factory=PresetsConfig)
     tuning: TuningConfig = field(default_factory=TuningConfig)
+    waterfall: WaterfallConfig = field(default_factory=WaterfallConfig)
     startup: StartupConfig = field(default_factory=StartupConfig)
     default_state: dict[str, Any] = field(default_factory=dict)
     keys: dict[str, str] = field(default_factory=dict)
@@ -274,6 +310,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
     receivers = config.receivers
     presets = config.presets
     tuning = config.tuning
+    waterfall = config.waterfall
     startup = config.startup
     default_state = dict(config.default_state)
     keys = dict(config.keys)
@@ -346,6 +383,33 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
             mode_passbands=mode_passbands,
             mode_step_pairs=mode_step_pairs,
         )
+    if isinstance(data.get("waterfall"), dict):
+        waterfall_data = data["waterfall"]
+        tuned_khz = waterfall_data.get("tuned_khz", waterfall.tuned_khz)
+        low_cut_hz = waterfall_data.get("low_cut_hz", waterfall.low_cut_hz)
+        high_cut_hz = waterfall_data.get("high_cut_hz", waterfall.high_cut_hz)
+        waterfall = replace(
+            waterfall,
+            center_khz=float(waterfall_data.get("center_khz", waterfall.center_khz)),
+            zoom=int(waterfall_data.get("zoom", waterfall.zoom)),
+            history_rows=int(waterfall_data.get("history_rows", waterfall.history_rows)),
+            terminal_rows=int(waterfall_data.get("terminal_rows", waterfall.terminal_rows)),
+            render_min_db=float(waterfall_data.get("render_min_db", waterfall.render_min_db)),
+            render_max_db=float(waterfall_data.get("render_max_db", waterfall.render_max_db)),
+            speed=int(waterfall_data.get("speed", waterfall.speed)),
+            refresh_hz=float(waterfall_data.get("refresh_hz", waterfall.refresh_hz)),
+            interp=int(waterfall_data.get("interp", waterfall.interp)),
+            label_columns_per_tick=int(
+                waterfall_data.get("label_columns_per_tick", waterfall.label_columns_per_tick)
+            ),
+            show_tuned_marker=bool(
+                waterfall_data.get("show_tuned_marker", waterfall.show_tuned_marker)
+            ),
+            show_passband=bool(waterfall_data.get("show_passband", waterfall.show_passband)),
+            tuned_khz=None if tuned_khz is None else float(tuned_khz),
+            low_cut_hz=None if low_cut_hz is None else int(low_cut_hz),
+            high_cut_hz=None if high_cut_hz is None else int(high_cut_hz),
+        )
     if isinstance(data.get("startup"), dict):
         startup_data = data["startup"]
         startup = replace(
@@ -370,6 +434,7 @@ def _merge_config(config: KiwiClientConfig, data: dict[str, Any]) -> KiwiClientC
         receivers=receivers,
         presets=presets,
         tuning=tuning,
+        waterfall=waterfall,
         startup=startup,
         default_state=default_state,
         keys=keys,

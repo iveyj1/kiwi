@@ -54,7 +54,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
     parser.add_argument("--ramp", default=" .:-=+*#%@", help="ASCII intensity ramp from dim to bright")
     parser.add_argument("--speed", type=int, default=1)
-    parser.add_argument("--interp", type=int, default=13)
+    parser.add_argument(
+        "--interp",
+        type=int,
+        default=13,
+        help="FFT-bin reduction: 0..4=max/min/last/drop/CMA; 10..14=same with CIC compensation",
+    )
     parser.add_argument("--duration-seconds", type=float, default=60.0)
     parser.add_argument("--max-frames", type=int, default=50)
     parser.add_argument("--timestamp", type=int)

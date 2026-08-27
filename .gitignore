@@ -1,8 +1,11 @@
 __pycache__/
+.venv/
+.kiwi-venv/
 kiwiclient/
 recordings/
 artifacts/
 state.json
 *egg-info/
 build/
+nohup.out
 kiwisdr_pi_project_scaffold.zip

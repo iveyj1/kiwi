@@ -4,6 +4,13 @@ This file should describe user-visible behavior as the application develops.
 
 ## Basic client
 
+Prepare an isolated project Python environment and install all current extras with:
+
+```bash
+./setup-python
+source .kiwi-venv/bin/activate
+```
+
 The first basic client is a scriptable command shell. It manages client state and can produce dry-run plans for guarded live operations without connecting.
 
 Run interactively as a command shell:
@@ -69,6 +76,24 @@ step_percent = 10
 startup_mute_ms = 100
 startup_fade_in_ms = 50
 stop_fade_out_ms = 50
+
+[waterfall]
+# Standalone Kitty viewer defaults; explicit CLI arguments override these.
+center_khz = 5000.0
+zoom = 7
+history_rows = 300
+# Set to 0 to select half the detected terminal height.
+terminal_rows = 30
+render_min_db = -100
+render_max_db = -40
+speed = 4
+refresh_hz = 12
+interp = 13
+label_columns_per_tick = 18
+show_tuned_marker = true
+show_passband = true
+low_cut_hz = -5000
+high_cut_hz = 5000
 
 [live]
 # Default is false. Set true only for trusted local interactive use.
@@ -471,6 +496,41 @@ Installed script names:
 kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local-wf-capture.jsonl
 kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
+
+A detailed standalone raster viewer is available for terminals supporting the Kitty graphics protocol. Fixture mode is offline and retains all 1024 source bins in the raster image:
+
+```bash
+kiwi-wf-terminal \
+  --fixture tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl \
+  --rows 100
+```
+
+Guarded live mode uses the existing local receiver policy and can optionally save its fixture:
+
+```bash
+kiwi-wf-terminal \
+  --allow-live \
+  --host 10.0.0.40 \
+  --center-khz 5000 \
+  --rows 100 \
+  --render-min-db -100 \
+  --render-max-db -40 \
+  --save-fixture tests/fixtures/kiwi/local-wf-terminal.jsonl
+```
+
+The viewer recognizes Kitty, Ghostty, and WezTerm identifiers. By default it reserves a visible image area using the full terminal width and half the terminal height; `--terminal-columns` and `--terminal-rows` override that placement. Live updates remain anchored in this area, and the cursor is restored below it when the viewer exits. Use `--force` only when the current terminal is known to support Kitty graphics but does not advertise that capability. `--dry-run` prints the guarded live plan without connecting. Cursor readout and tuning interaction are not implemented yet.
+
+`--interp` is not a smoothing-strength scale. It selects how multiple FFT values are reduced into each W/F output bin: `0=max`, `1=min`, `2=last`, `3=drop`, and `4=CMA`; values `10..14` select the same methods with CIC compensation. The default `13` is drop+CIC, while `3` is drop without CIC. Values `5..9` are unsupported and rejected. Changing this setting will not disable Kitty's spatial image scaling.
+
+When the receiver supplies `bandwidth`, `wf_fft_size`, and `zoom_max` metadata, the raster viewer shows an adaptive terminal-text frequency ruler above the image. Mapping uses the server-reported frame start and zoom, so at zoom 0 a 30 MHz receiver correctly shows `0..30000 kHz` even if a different center was requested. Major labels use 1/2/5-based intervals, available terminal width controls label density, and overlapping interior labels are omitted. Edge-label precision increases automatically for narrower spans. `[waterfall].label_columns_per_tick` controls target density; larger values produce fewer labels.
+
+The live viewer defaults the tuned marker to `--center-khz`. A white vertical line marks tuned frequency. Orange vertical lines mark passband edges when `--show-passband` is enabled and low/high cuts are configured. Override them with `--tuned-khz`, `--low-cut-hz`, and `--high-cut-hz`; disable them with `--no-show-tuned-marker` or `--no-show-passband`. Fixture mode only draws overlays when a tuned frequency is explicitly supplied or configured, avoiding an unrelated live center marker.
+
+`kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
+
+Terminal image encoding/output runs in one background renderer. Incoming frames continue updating numeric history while a terminal is slow or unfocused, and redraw requests are coalesced rather than queued. When focus returns, the display may jump directly to current history; it should not replay an accumulated image-update backlog or starve the Kiwi connection. W/F sessions rely on Kiwi `SET keepalive`, not the Python WebSocket library's ping timeout. A real transport closure is reported as a concise error without automatic reconnect.
+
+If background rendering remains visibly expensive, first reduce `refresh_hz` or `history_rows`. Reducing refresh rate usually gives the largest terminal-output reduction; history rows reduce PNG generation and transfer size. `terminal_rows` changes placement scale but does not reduce the 1024-bin source raster transfer.
 
 Expected future operations:
 

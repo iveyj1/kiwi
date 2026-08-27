@@ -224,7 +224,7 @@ Shape notes:
 
 ## Milestone 7 — Waterfall
 
-Status: **In progress; spec, synthetic parser fixture, ASCII row renderer, fixture preview command, W/F sequence tracking, guarded W/F capture, and standalone live preview added**
+Status: **In progress; parser/harness, ASCII preview, guarded capture, backend-neutral raster history, and standalone Kitty fixture/live viewer added**
 
 Goal:
 
@@ -245,7 +245,14 @@ Suggested order:
 6. Done: capture a short local W/F fixture after parser/render tests pass.
 7. Partially done: update protocol notes with synthetic and local fixture-backed W/F facts; W/F sequence semantics still need investigation.
 8. Done: add a standalone live W/F preview.
-9. Decide whether to integrate a compact pane into the curses TUI or use a richer renderer.
+9. Done: add a fixed-height raster history, deterministic color mapping, dependency-free PNG encoder, and harness-covered Kitty protocol backend.
+10. Done: add fixture and guarded live `kiwi-wf-terminal` paths; live tests use a fake WebSocket and do not require a graphics terminal.
+11. Done: add metadata/frame-backed frequency mapping and a left/center/right terminal ruler; local zoom-0 and synthetic zoomed mappings are harness-covered.
+12. Done: capture a short zoom-7 local AM fixture; known 760/950 kHz peaks confirm mapping and low-to-high bin orientation.
+13. Done: add adaptive 1/2/5-based ruler labels with width-aware density, interval-derived precision, edge preservation, and overlap rejection.
+14. Done: add white tuned-frequency and orange passband-edge raster overlays, plus persistent `[waterfall]` defaults with explicit CLI precedence.
+15. Done: prevent terminal output backpressure from starving W/F networking by using a single coalescing worker renderer and Kiwi application keepalives instead of WebSocket ping timeouts.
+16. Next: evaluate overlay/ruler/default choices in normal use, add cursor/tune interaction, then decide whether to integrate a compact raster pane into the curses TUI, add a native desktop backend, or retain a standalone companion viewer.
 
 Notes:
 

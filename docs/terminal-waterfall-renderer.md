@@ -4,7 +4,7 @@
 
 Provide an optional raster-image terminal waterfall viewer for KiwiSDR W/F data. This should make live waterfall output easier to interpret than the current ASCII row preview while preserving the fixture-first parser/model/render separation.
 
-This is bookmarked future work, not the current implementation target.
+The implementation in `src/kiwi_client/waterfall_raster.py` and `src/kiwi_client/waterfall_terminal.py` provides fixture and guarded live Kitty rendering plus an adaptive frequency ruler. Interactive pan/zoom, tuning overlays, and TUI integration remain future work.
 
 ## Goals
 
@@ -30,7 +30,8 @@ kiwi-wf-terminal --allow-live \
   --host 10.0.0.40 \
   --backend kitty \
   --rows 100 \
-  --width 1024 \
+  --terminal-columns 128 \
+  --terminal-rows 30 \
   --render-min-db -100 \
   --render-max-db -40
 ```
@@ -46,6 +47,14 @@ Fixture preview mode:
 ```bash
 kiwi-wf-terminal --fixture tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --backend kitty
 ```
+
+Installed entry point:
+
+```bash
+kiwi-wf-terminal --fixture tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl --backend kitty
+```
+
+Use `--force` only when the terminal supports Kitty graphics but does not advertise itself as Kitty, Ghostty, or WezTerm.
 
 ## Renderer backends
 
@@ -65,7 +74,14 @@ Requirements:
 
 - Detect or require capable terminal via `TERM`, `KITTY_WINDOW_ID`, or explicit `--force`.
 - Encode image data as PNG bytes, then base64 chunks for Kitty protocol.
-- Reuse one image id and update/replace it in place when new rows arrive.
+- Reuse one image id and placement id and update/replace them in place when new rows arrive.
+- Use Kitty quiet mode (`q=2`) so acknowledgements are not echoed as input text.
+- Disable placement cursor movement (`C=1`) so repeated updates do not add blank lines or scroll.
+- Auto-fit to the terminal width and half-height unless explicit placement dimensions are supplied.
+- Before the first placement, reserve the configured row rectangle and move back to its top-left anchor; otherwise a `C=1` image started from the shell's bottom line is clipped below the viewport until exit.
+- Reserve space only once, update at the stable anchor, and restore the cursor below the image when viewing finishes.
+- Render an adaptive terminal-text frequency ruler above the image when frame metadata is sufficient; use 1/2/5 major spacing, configurable width-aware density, precision derived from interval, and overlap rejection while keeping labels outside the 1024-bin raster.
+- Draw tuned frequency and optional passband edges as deterministic white/orange raster columns after history color rendering, without modifying stored dBm rows.
 - Avoid flooding terminal output; throttle updates if needed.
 - Provide clear error if Kitty support is unavailable.
 
@@ -75,15 +91,15 @@ Future optional backend. Similar model, different encoder/protocol.
 
 ## Data model
 
-Add a reusable in-memory waterfall image buffer:
+The reusable `WaterfallHistory` model provides the in-memory waterfall buffer:
 
 ```text
-WaterfallImageBuffer
-  rows: fixed-height ring buffer of calibrated dBm rows
+WaterfallHistory
+  rows: fixed-height ring buffer of dBm rows
   width: number of bins per row
   max_rows: display height
   append(frame)
-  matrix() -> rectangular row matrix, oldest-to-newest or newest-to-oldest by option
+  rows(newest_at_top=..., pad_dbm=...) -> rectangular numeric row matrix
 ```
 
 Behavior:
@@ -101,14 +117,9 @@ Use the same local display scaling concepts already added for ASCII preview:
 
 - `--render-min-db`
 - `--render-max-db`
-- optional colormap name
+- a fixed deterministic initial colormap; named colormaps are future work
 
-Initial implementation options:
-
-1. Use Pillow directly to map dBm rows to RGB pixels.
-2. Use matplotlib colormaps only for quick implementation.
-
-Preference: use a small Pillow/numpy-based mapper if this becomes production code, to avoid matplotlib overhead in live preview.
+The initial implementation uses a small deterministic built-in palette and a dependency-free PNG encoder. This avoids matplotlib overhead and keeps exact RGB/PNG behavior harness-testable. A future named-colormap API can be added without changing the history model.
 
 Scaling rules:
 
@@ -122,7 +133,7 @@ Scaling rules:
 Live W/F capture loop
   -> parse W/F payload
   -> WaterfallFrame
-  -> WaterfallImageBuffer.append(frame)
+  -> WaterfallHistory.append(frame)
   -> render buffer to PNG bytes
   -> terminal backend update image
 ```
@@ -168,13 +179,17 @@ Do not require a Kitty terminal in automated tests.
 - Best default row count for readability and terminal size.
 - Whether to depend on Pillow/numpy or continue using matplotlib for first prototype.
 - Whether terminal image viewer should later integrate into curses TUI or remain a separate companion command.
-- How to map frequency/bin labels into terminal graphics without clutter.
+- Whether future detailed ticks belong in terminal text, raster pixels, or a native GUI backend.
 
 ## Suggested implementation order
 
-1. Add `WaterfallImageBuffer` with fixture tests.
-2. Add deterministic dBm-to-RGB image renderer returning PNG bytes.
-3. Add Kitty escape encoder with pure string/bytes tests.
-4. Add fixture-backed `kiwi-wf-terminal --fixture ... --backend kitty` prototype.
-5. Add guarded live mode using fake websocket tests first.
-6. Try short local live preview only after all harness tests pass.
+1. Done: add `WaterfallHistory` with fixture tests.
+2. Done: add deterministic dBm-to-RGB rendering and PNG encoding.
+3. Done: add Kitty escape encoder with pure byte tests.
+4. Done: add fixture-backed `kiwi-wf-terminal --fixture ... --backend kitty`.
+5. Done: add guarded live mode using fake WebSocket tests first.
+6. Pending: run a short local visual test only after the full harness passes in an environment with pytest and a Kitty-capable terminal.
+7. Done: add fixture-backed frequency mapping, adaptive labels, and a zoom-7 local AM regression capture.
+8. Done: add tuned-frequency/passband overlays and persistent `[waterfall]` defaults with CLI precedence.
+9. Done: isolate live terminal rendering from the network event loop, coalesce redraw requests, disable redundant WebSocket protocol pings, and report connection closure without a traceback.
+10. Pending: add interactive cursor/tuning controls and evaluate whether full-height marker lines should gain alternate patterns.

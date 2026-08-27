@@ -61,8 +61,15 @@ SET agc=<0|1> hang=<0|1> thresh=<value> slope=<value> decay=<ms> manGain=<value>
 - `maxdb` — W/F display/capture max dB scale.
 - `mindb` — W/F display/capture min dB scale.
 - `speed` — W/F update speed, currently `1..4`.
-- `interp` — W/F interpolation/compensation setting.
+- `interp` — categorical FFT-to-waterfall-bin reduction: `0=max`, `1=min`, `2=last`, `3=drop`, `4=CMA`; add 10 for CIC compensation (`10..14`). It is not a smoothing-strength scale. Default `13` is drop+CIC.
 - `compression` / `wf_comp` — W/F compression flag; first parser path uses `0` only.
+- `history_rows` — number of received W/F frames retained in the raster.
+- `terminal_rows` — Kitty placement height in terminal cells; config value `0` means automatic half-height.
+- `render_min_db` / `render_max_db` — local color scale, separate from receiver min/max commands.
+- `refresh_hz` — maximum terminal image redraw rate, separate from receiver W/F speed.
+- `label_columns_per_tick` — target terminal width per adaptive frequency label; larger values reduce label density.
+- `tuned_khz` — optional white tuned-frequency overlay; live viewer defaults it to center frequency.
+- `low_cut_hz` / `high_cut_hz` — optional orange passband-edge overlays relative to tuned frequency.
 
 Kiwi command shapes:
 

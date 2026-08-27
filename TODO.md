@@ -2,6 +2,133 @@
 
 ## Current slice
 
+Goal: Prevent terminal output backpressure from stalling the Kiwi W/F network session.
+
+Observed failure: while the Kitty graphics terminal was unfocused, image updates later jumped through accumulated history and `websockets` closed with `1011 keepalive ping timeout`. The synchronous PNG/terminal write currently runs inside the receive callback, so a blocked terminal can starve WebSocket receive, pong, and application keepalive work.
+
+Done criteria:
+
+- Keep frame parsing/history updates cheap in the network coroutine.
+- Move PNG encoding and terminal output off the asyncio event-loop thread.
+- Coalesce redraw requests so slow/background terminal rendering cannot create an unbounded image-update queue.
+- Disable library-level WebSocket pings for W/F sessions because Kiwi application `SET keepalive` is already used and terminal rendering must not cause a false ping timeout.
+- Convert WebSocket connection closure into a concise `LiveCaptureError` instead of an uncaught traceback.
+- Add fake-transport regression coverage for connector options, redraw coalescing, full frame ingestion, and clean closure reporting.
+- Update operational/failure documentation and development log.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_live_waterfall.py tests/harness/test_waterfall_terminal.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: only after harness success, and only as a short attended focus/background check on a local receiver if the user requests it.
+
+Goal: Add tuned/passband overlays and persistent standalone waterfall defaults.
+
+Done criteria:
+
+- Add renderer-independent mapping from tuned frequency and passband edges to raster columns.
+- Draw deterministic, distinguishable marker patterns without mutating protocol frames or history data.
+- Omit markers outside the visible mapped span and validate passband ordering.
+- Add optional `--tuned-khz`, `--low-cut-hz`, and `--high-cut-hz` viewer controls.
+- Add a `[waterfall]` configuration model for center/zoom, history and terminal rows, render range, speed, refresh rate, interpolation, label density, and overlay defaults.
+- Preserve explicit CLI arguments over discovered/configured defaults.
+- Add synthetic raster and config/CLI harness coverage before live use.
+- Update configuration examples, user/rendering docs, roadmap, and development log.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_raster.py tests/harness/test_waterfall_terminal.py tests/harness/test_config.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no initially; overlays and config precedence are deterministic from synthetic/contextualized frames. User can evaluate overlays in the existing live viewer after harness success.
+
+Goal: Add adaptive frequency labels and verify nonzero-zoom mapping on the local receiver.
+
+Done criteria:
+
+- Select major ruler intervals using 1/2/5 × powers-of-ten spacing.
+- Adapt label count to terminal width and avoid overlapping labels.
+- Derive label decimal precision from the selected interval.
+- Preserve edge labels while adding useful interior major frequencies where space permits.
+- Keep tick positions deterministic and proportional to the mapped W/F span.
+- Add pure policy/render tests for narrow, medium, AM-band, and narrowband spans.
+- After the full harness passes, capture a short attended nonzero-zoom fixture from `10.0.0.40:8073` around known AM/WWV/WWVB signals.
+- Verify mapped span/bin width and plausible signal positions, then update protocol, rendering, user, roadmap, and development docs.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_terminal.py tests/protocol/test_waterfall.py tests/harness/test_local_wf_capture.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: yes, only after harness success. Planned test: one short guarded local W/F capture from `10.0.0.40:8073`, no reconnect loop or admin commands, centered to include known local AM or time-signal carriers, with fixture output retained for regression.
+
+Goal: Add fixture-backed waterfall frequency mapping and a terminal ruler.
+
+Done criteria:
+
+- Model W/F metadata from `bandwidth`, `wf_fft_size`, `zoom_max`, `zoom`, `start`, `wf_fps`, and `wf_cal` messages.
+- Decode frame zoom from the low bits of `flags_x_zoom_server` while masking W/F flags.
+- Map `x_bin_server` and zoom to start/end/center frequency and bin width using the Kiwi maximum-bin grid.
+- Contextualize parsed frames independently from network and UI code.
+- Add a deterministic terminal ruler showing left, center, and right frequencies without reducing the 1024-bin raster width.
+- Cover zoom-0 local fixture mapping and synthetic zoomed mapping before any new live capture.
+- Update protocol, rendering, user, roadmap, and development docs.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/protocol/test_waterfall.py tests/harness/test_local_wf_capture.py tests/harness/test_waterfall_terminal.py tests/harness/test_live_waterfall.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no initially; use the existing local zoom-0 fixture and synthetic zoomed frames. A later zoomed local fixture can verify nonzero-zoom receiver behavior.
+
+Goal: Clarify and validate Kiwi waterfall interpolation modes from reference source.
+
+Done criteria:
+
+- Record that `SET interp` is a categorical FFT-to-waterfall-bin reduction mode, not a monotonic smoothing amount.
+- Model modes 0..4 as max/min/last/drop/CMA and 10..14 as the same modes with CIC compensation.
+- Reject unsupported values 5..9 and values outside 0..14 before connecting.
+- Include the decoded method and CIC state in dry-run plans and improve CLI help.
+- Add harness/protocol coverage and update protocol, rendering, user, and development docs.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/protocol/test_waterfall.py tests/harness/test_live_waterfall.py tests/harness/test_live_waterfall_preview.py tests/harness/test_waterfall_terminal.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no; behavior is established by local `~/kiwiclient` and upstream Kiwi server source and command generation is harness-testable.
+
+Goal: Anchor the Kitty image in visible terminal space during live updates.
+
+Done criteria:
+
+- Reserve the configured terminal-row rectangle once before the first image placement.
+- Move back to a stable top-left anchor before drawing so `C=1` does not leave the image clipped below the command line.
+- Keep subsequent updates at the same anchor without adding more lines.
+- Restore the cursor below the image when the viewer finishes.
+- Add backend byte-stream tests for reservation, repeated updates, and finish behavior.
+- Update renderer docs and development log.
+
+Test command: `.kiwi-venv/bin/python -m pytest tests/harness/test_waterfall_terminal.py && .kiwi-venv/bin/python -m pytest`
+
+Live-radio needed: no initially; terminal layout bytes are deterministic. User can retry after harness validation.
+
+Goal: Stabilize Kitty live rendering after first user visual test.
+
+Done criteria:
+
+- Suppress Kitty protocol acknowledgements so terminal responses are not echoed as visible escape/ANSI text.
+- Keep cursor position fixed and reuse a stable image placement so repeated live updates do not introduce blank lines or scroll the terminal.
+- Auto-fit default image placement to the current terminal width and half its row height while preserving explicit placement overrides.
+- Add pure harness coverage for protocol controls and default placement sizing.
+- Update user/rendering docs and the development log.
+
+Test command: `.venv/bin/python -m pytest tests/harness/test_waterfall_terminal.py && .venv/bin/python -m pytest`
+
+Live-radio needed: no initially; protocol bytes and sizing are deterministic. User can retry the existing live command after harness validation.
+
+Goal: Standalone raster waterfall foundation and Kitty terminal viewer.
+
+Done criteria:
+
+- Add a fixed-height, renderer-neutral waterfall history buffer with deterministic orientation and width validation.
+- Add deterministic dBm-to-RGB mapping and dependency-free PNG encoding.
+- Add a pure, harness-covered Kitty graphics protocol encoder.
+- Add fixture-backed `kiwi-wf-terminal` rendering without requiring a graphics-capable terminal in tests.
+- Refactor live W/F delivery so raster consumers receive parsed `WaterfallFrame` objects rather than extracting pre-rendered ASCII from status metrics.
+- Add guarded live terminal viewing while preserving fixture capture, ASCII preview, and local-radio guardrails.
+- Update the roadmap, waterfall docs, user guide, and development log.
+
+Test command: `python3 -m pytest tests/protocol/test_waterfall.py tests/harness/test_waterfall_raster.py tests/harness/test_waterfall_terminal.py tests/harness/test_live_waterfall.py tests/harness/test_live_waterfall_preview.py && python3 -m pytest`
+
+Live-radio needed: no initially; use synthetic and captured fixtures plus fake WebSockets. A short local-only visual test may follow after the full harness passes.
+
 Goal: Waterfall fixture inspection and sequence semantics.
 
 Done criteria:
@@ -38,9 +165,11 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 ## Next
 
-- Add frequency/bin mapping from local W/F metadata (`center_freq`, `bandwidth`, `wf_fft_size`, zoom/start).
-- When ready for richer terminal display, implement the bookmarked `docs/terminal-waterfall-renderer.md` spec.
-- Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
+- If temporal jumps become problematic, instrument receive cadence, coalesced redraw count, and draw duration before changing buffering; current behavior resembles the Kiwi browser client.
+- Evaluate adaptive ruler density, marker prominence, and persisted operating defaults during normal use.
+- Add cursor frequency readout and keyboard tune-to-cursor interaction.
+- Decide how the standalone W/F viewer should exchange tuning state with the audio controller.
+- Decide whether to add a native desktop raster backend, integrate a compact image pane into the curses TUI, or retain `kiwi-wf-terminal` as a companion view.
 
 ## Later
 
