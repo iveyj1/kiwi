@@ -344,21 +344,51 @@ def test_draw_waterfall_pane_survives_a_curses_write_error():
     assert drawn == 1
 
 
-def test_auto_scale_puts_the_noise_floor_at_the_bottom_of_the_palette():
-    """A fixed window cannot serve every zoom; the floor moves with bin width."""
+def test_auto_scale_leaves_half_the_cells_at_the_lowest_level():
+    """Half the cells reading as background is what makes signals legible."""
     from kiwi_client.waterfall_display import auto_scale_dbm
 
-    floor, carrier = -70.0, -35.0
-    rows = [[floor + (i * 7 + j) % 4 for j in range(100)] for i in range(8)]
-    for row in rows:
-        row[50] = carrier
+    rows = [[-90.0 + (index * 7 + column) % 20 for column in range(200)] for index in range(8)]
 
     low, high = auto_scale_dbm(rows)
+    levels = [dbm_to_level(v, min_dbm=low, max_dbm=high, levels=DEFAULT_LEVELS) for row in rows for v in row]
+    black = sum(1 for level in levels if level == 0) / len(levels)
 
-    assert low < floor, "the floor must sit above the low end, not clip"
-    assert high >= carrier, "the carrier must not clip at the top"
-    floor_level = dbm_to_level(floor, min_dbm=low, max_dbm=high, levels=32)
-    assert floor_level <= 6, f"noise floor should stay dark, got level {floor_level}"
+    assert 0.45 <= black <= 0.60, f"expected about half black, got {black:.1%}"
+
+
+def test_auto_scale_honours_a_requested_black_fraction():
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    rows = [[float(-100 + value) for value in range(100)]]
+
+    low, high = auto_scale_dbm(rows, black_fraction=0.25)
+    levels = [dbm_to_level(v, min_dbm=low, max_dbm=high, levels=DEFAULT_LEVELS) for row in rows for v in row]
+    black = sum(1 for level in levels if level == 0) / len(levels)
+
+    assert 0.20 <= black <= 0.32
+
+
+def test_auto_scale_leaves_headroom_above_the_peak():
+    """A signal that grows, or a new one appearing, must not clip immediately."""
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    rows = [[-80.0] * 999 + [-40.0]]
+
+    _low, high = auto_scale_dbm(rows, headroom_db=20.0)
+
+    assert high >= -40.0 + 19.0
+
+
+def test_auto_scale_ignores_low_outliers():
+    """Real spectra carry stray very low samples; anchoring to them wastes the palette."""
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    clean = [[-80.0 + (i % 5) for i in range(500)]]
+    noisy = [list(clean[0])]
+    noisy[0][:5] = [-130.0] * 5
+
+    assert auto_scale_dbm(clean)[0] == pytest.approx(auto_scale_dbm(noisy)[0], abs=1.5)
 
 
 def test_auto_scale_enforces_a_minimum_range_on_flat_input():
@@ -373,6 +403,14 @@ def test_auto_scale_returns_none_with_no_data():
     from kiwi_client.waterfall_display import auto_scale_dbm
 
     assert auto_scale_dbm([]) is None
+
+
+def test_auto_scale_rejects_an_impossible_black_fraction():
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    for bad in (0.0, 1.0, -0.5):
+        with pytest.raises(ValueError, match="black_fraction"):
+            auto_scale_dbm([[-90.0]], black_fraction=bad)
 
 
 def test_wedge_pattern_is_identical_in_every_row():

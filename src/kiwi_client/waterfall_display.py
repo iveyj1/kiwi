@@ -169,27 +169,48 @@ def buffer_from_frames(
 def auto_scale_dbm(
     rows,
     *,
-    floor_percentile: float = 0.20,
+    black_fraction: float = 0.5,
     peak_percentile: float = 0.999,
-    headroom_db: float = 4.0,
+    headroom_db: float = 20.0,
+    levels: int = DEFAULT_LEVELS,
     min_range_db: float = 25.0,
 ) -> tuple[float, float] | None:
     """Return a (min_dbm, max_dbm) display window fitted to recent rows.
 
     A fixed window cannot serve every zoom: the noise floor moves by roughly
-    3 dB per zoom step as the bins narrow. Anchoring the low end just under the
-    measured floor keeps it at the dark end of the palette, which is what makes
-    signals stand out instead of the whole image sitting mid-ramp.
+    3 dB per zoom step as the bins narrow.
+
+    The low end is chosen so that `black_fraction` of cells land in level 0,
+    rather than by anchoring below the lowest sample. Real spectra always carry
+    some very low outliers, and anchoring to those drags the window down far
+    past anything meaningful, wasting most of the palette on empty space. Half
+    the cells reading as background is what makes signals legible.
+
+    The top gets `headroom_db` above the measured peak so a signal that grows,
+    or a new one that appears, does not immediately clip. It also lowers overall
+    contrast, which keeps the noise floor from shimmering between levels.
 
     Returns None when there is nothing to measure.
     """
+    if not 0.0 < black_fraction < 1.0:
+        raise ValueError("black_fraction must be between 0 and 1")
+    if levels < 2:
+        raise ValueError("levels must be at least 2")
     values = sorted(value for row in rows for value in row)
     if not values:
         return None
-    floor = values[min(len(values) - 1, int(len(values) * floor_percentile))]
+
+    reference = values[min(len(values) - 1, int(len(values) * black_fraction))]
     peak = values[min(len(values) - 1, int(len(values) * peak_percentile))]
-    low = floor - headroom_db
-    high = max(peak + headroom_db, low + min_range_db)
+    high = peak + headroom_db
+
+    # Level 0 spans [low, low + (high - low) / levels). Put the top of that band
+    # exactly at `reference` so the requested fraction quantises to black:
+    #   low + (high - low) / levels == reference
+    low = (levels * reference - high) / (levels - 1)
+
+    if high - low < min_range_db:
+        low = high - min_range_db
     return (low, high)
 
 
