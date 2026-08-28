@@ -198,5 +198,5 @@ Do not require a Kitty terminal in automated tests.
 10. Done: add a local cursor, precise status readout, local keyboard movement/reset, and clean keyboard quit without transmitting receiver commands.
 11. Done: change cursor movement to configured per-mode round main/small frequency steps, preserve exact selected frequency, cycle step pairs, and map selection to the nearest raster column; bin width remains display resolution.
 12. Done: add queued, fixture-tested W/F recenter and zoom commands around exact cursor selection with zoom bounds.
-13. Done: coordinate exact selected tuning with a separately owned SND task, `a` audio toggle, Enter tune, CW offset/passband handling, null-sink diagnostics, status/error reporting, and shared viewer shutdown.
+13. Done: coordinate exact selected tuning with a separately owned primary SND task opened before paired W/F, lazy `a` output mute/enable, Enter tune, CW offset/passband handling, null-sink diagnostics, status/error reporting, and shared viewer shutdown.
 14. Pending: user-evaluate combined W/F+SND operation and refine compact status/key presentation.

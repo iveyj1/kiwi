@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_play import LiveSndPlaybackConfig
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.waterfall import WaterfallFrame
@@ -19,6 +20,7 @@ from kiwi_client.waterfall_terminal import (
     CursorAction,
     CursorKeyDecoder,
     KittyTerminalBackend,
+    SwitchableAudioSink,
     WaterfallAudioController,
     WaterfallTerminalViewer,
     _assign_session_timestamp,
@@ -499,6 +501,87 @@ def test_live_viewer_uses_guarded_capture_and_parsed_frame_callback(tmp_path: Pa
     assert backend.images[-1].height == 3
 
 
+def test_audio_startup_is_ready_before_paired_waterfall_opens(tmp_path: Path):
+    order = []
+    fake_connect = FakeConnect([WF_PAYLOAD])
+
+    def ordered_connect(uri, **kwargs):
+        order.append("wf-open")
+        return fake_connect(uri, **kwargs)
+
+    async def ready_audio(
+        config,
+        sink,
+        *,
+        allow_live,
+        stop_event,
+        command_queue,
+        session_ready_callback,
+    ):
+        order.append("snd-open")
+        session_ready_callback()
+        order.append("snd-ready")
+        while not stop_event.is_set():
+            await asyncio.sleep(0)
+
+    viewer = WaterfallTerminalViewer(backend=FakeBackend(), max_rows=1)
+    wf_config = LiveWaterfallCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=tmp_path / "paired.jsonl",
+        timestamp=123456,
+        max_frames=1,
+    )
+    snd_config = LiveSndPlaybackConfig(
+        host="10.0.0.40",
+        port=8073,
+        timestamp=123456,
+    )
+
+    asyncio.run(
+        view_live_waterfall(
+            wf_config,
+            viewer,
+            allow_live=True,
+            websocket_connect=ordered_connect,
+            audio_config=snd_config,
+            audio_start=False,
+            audio_sink_factory=NullAudioSink,
+            audio_runner=ready_audio,
+        )
+    )
+
+    assert order[:3] == ["snd-open", "snd-ready", "wf-open"]
+
+
+def test_audio_failure_before_ready_does_not_open_waterfall(tmp_path: Path):
+    fake_connect = FakeConnect([WF_PAYLOAD])
+
+    async def fail_audio(*args, **kwargs):
+        raise RuntimeError("SND refused")
+
+    with pytest.raises(LiveCaptureError, match="audio session failed before W/F startup: SND refused"):
+        asyncio.run(
+            view_live_waterfall(
+                LiveWaterfallCaptureConfig(
+                    host="10.0.0.40",
+                    port=8073,
+                    output=tmp_path / "never-open.jsonl",
+                    max_frames=1,
+                ),
+                WaterfallTerminalViewer(backend=FakeBackend(), max_rows=1),
+                allow_live=True,
+                websocket_connect=fake_connect,
+                audio_config=LiveSndPlaybackConfig(),
+                audio_start=True,
+                audio_sink_factory=NullAudioSink,
+                audio_runner=fail_audio,
+            )
+        )
+
+    assert fake_connect.calls == []
+
+
 def test_live_viewer_coalesces_immediate_frames_and_draws_off_event_loop(tmp_path: Path):
     backend = FakeBackend()
     viewer = WaterfallTerminalViewer(
@@ -565,6 +648,24 @@ def test_viewer_cursor_uses_exact_steps_independent_from_bin_resolution():
     assert viewer.tuned_khz == 150.0
 
 
+def test_switchable_audio_sink_keeps_session_format_while_muted():
+    sink = SwitchableAudioSink(NullAudioSink, enabled=False)
+
+    sink.start(sample_rate_hz=12000, channels=1, sample_width_bytes=2)
+    sink.write(b"\x00\x00")
+    assert sink.delegate is None
+
+    sink.set_enabled(True)
+    assert isinstance(sink.delegate, NullAudioSink)
+    delegate = sink.delegate
+    sink.write(b"\x00\x00")
+    assert delegate.chunks == 1
+
+    sink.set_enabled(False)
+    assert delegate.stopped is True
+    assert sink.delegate is None
+
+
 def test_audio_tune_command_applies_cw_radio_offset():
     viewer = WaterfallTerminalViewer(
         backend=FakeBackend(),
@@ -598,8 +699,17 @@ def test_audio_tune_command_applies_cw_radio_offset():
 def test_audio_controller_toggles_and_tunes_to_exact_cursor():
     calls = []
 
-    async def fake_audio_runner(config, sink, *, allow_live, stop_event, command_queue):
+    async def fake_audio_runner(
+        config,
+        sink,
+        *,
+        allow_live,
+        stop_event,
+        command_queue,
+        session_ready_callback,
+    ):
         calls.append((config, sink, allow_live, command_queue))
+        session_ready_callback()
         while not stop_event.is_set():
             await asyncio.sleep(0)
 
@@ -643,6 +753,9 @@ def test_audio_controller_toggles_and_tunes_to_exact_cursor():
         assert controller.tune_to_cursor() is True
         assert controller.command_queue.get_nowait() == "SET mod=am low_cut=-5000 high_cut=5000 freq=5001.0000"
         await controller.toggle()
+        assert controller.enabled is True
+        assert viewer.audio_status == "MUTED"
+        await controller.finish()
         assert controller.enabled is False
         assert viewer.audio_status == "OFF"
         return redraw
