@@ -1472,3 +1472,23 @@ def test_manual_scale_turns_auto_off():
 
     assert state.auto_scale is False
     assert (state.min_dbm, state.max_dbm) == (-95.0, -35.0)
+
+
+def test_wf_test_loads_a_wedge_and_pins_the_scale():
+    state = tui.WaterfallPaneState()
+
+    response, message = tui.handle_waterfall_command("wf test wedge", state)
+
+    assert response["test_pattern"] == "wedge"
+    assert state.visible is True
+    assert state.auto_scale is False, "auto scale would refit and hide the banding"
+    assert (state.min_dbm, state.max_dbm) == (-100.0, -40.0)
+    assert "rendering, not data" in message
+
+
+def test_wf_test_defaults_to_wedge_and_rejects_unknown_patterns():
+    state = tui.WaterfallPaneState()
+    tui.handle_waterfall_command("wf test", state)
+    assert state.source == "test:wedge"
+    response, _ = tui.handle_waterfall_command("wf test spiral", state)
+    assert response["type"] == "error"

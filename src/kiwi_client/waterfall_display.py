@@ -191,3 +191,38 @@ def auto_scale_dbm(
     low = floor - headroom_db
     high = max(peak + headroom_db, low + min_range_db)
     return (low, high)
+
+
+def test_pattern_rows(
+    pattern: str = "wedge",
+    *,
+    rows: int = 64,
+    width: int = 1024,
+    min_dbm: float = -100.0,
+    max_dbm: float = -40.0,
+) -> list[list[float]]:
+    """Generate synthetic W/F rows for separating render bugs from data bugs.
+
+    - `wedge`: horizontal ramp, identical in every row. Any horizontal banding
+      or row-to-row variation on screen is then a rendering or terminal fault,
+      because the data has none.
+    - `vwedge`: vertical ramp, uniform across each row. Isolates the half-block
+      upper/lower split, since adjacent rows differ by one step.
+    - `bars`: alternating full-scale and floor rows, the worst case for the
+      upper/lower split within a character cell.
+    - `flat`: one constant value everywhere.
+    """
+    span = max_dbm - min_dbm
+    if pattern == "wedge":
+        row = [min_dbm + span * column / max(1, width - 1) for column in range(width)]
+        return [list(row) for _ in range(rows)]
+    if pattern == "vwedge":
+        return [[min_dbm + span * index / max(1, rows - 1)] * width for index in range(rows)]
+    if pattern == "bars":
+        return [[max_dbm if index % 2 else min_dbm] * width for index in range(rows)]
+    if pattern == "flat":
+        return [[(min_dbm + max_dbm) / 2] * width for _ in range(rows)]
+    raise ValueError(f"unknown test pattern {pattern!r}; use wedge, vwedge, bars or flat")
+
+
+TEST_PATTERNS = ("wedge", "vwedge", "bars", "flat")

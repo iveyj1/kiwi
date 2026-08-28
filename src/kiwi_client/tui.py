@@ -29,7 +29,13 @@ from kiwi_client.client_app import (
 )
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.waterfall import parse_waterfall_uncompressed
-from kiwi_client.waterfall_display import DEFAULT_LEVELS, WaterfallImageBuffer, auto_scale_dbm
+from kiwi_client.waterfall_display import (
+    DEFAULT_LEVELS,
+    TEST_PATTERNS,
+    WaterfallImageBuffer,
+    auto_scale_dbm,
+    test_pattern_rows,
+)
 from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
 from kiwi_client.waterfall_palette import COLORMAPS, DEFAULT_COLORMAP
 from kiwi_client.config import (
@@ -257,6 +263,26 @@ def handle_waterfall_command(
         return (
             {"type": "waterfall", "colormap": waterfall.colormap, "restart_required": True},
             f"waterfall colormap {waterfall.colormap}; restart the TUI to apply",
+        )
+    if action == "test":
+        pattern = parts[2] if len(parts) > 2 else "wedge"
+        if pattern not in TEST_PATTERNS:
+            usage = f"usage: wf test <{'|'.join(TEST_PATTERNS)}>"
+            return {"type": "error", "error": usage}, usage
+        rows = test_pattern_rows(pattern, rows=waterfall.buffer.max_rows)
+        buffer = WaterfallImageBuffer(max_rows=waterfall.buffer.max_rows)
+        for row in rows:
+            buffer.append(row)
+        waterfall.buffer = buffer
+        waterfall.source = f"test:{pattern}"
+        waterfall.visible = True
+        # A test pattern is meaningless under auto scale, which would refit the
+        # window to the pattern and hide exactly the banding being looked for.
+        waterfall.auto_scale = False
+        waterfall.min_dbm, waterfall.max_dbm = -100.0, -40.0
+        return (
+            {"type": "waterfall", "test_pattern": pattern, "rows": len(rows)},
+            f"test pattern {pattern}; any banding here is rendering, not data",
         )
     if action == "auto":
         waterfall.auto_scale = not (len(parts) > 2 and parts[2] == "off")

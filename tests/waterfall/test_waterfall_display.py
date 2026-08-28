@@ -372,3 +372,37 @@ def test_auto_scale_returns_none_with_no_data():
     from kiwi_client.waterfall_display import auto_scale_dbm
 
     assert auto_scale_dbm([]) is None
+
+
+def test_wedge_pattern_is_identical_in_every_row():
+    """The whole point: any row-to-row difference on screen must be rendering."""
+    from kiwi_client.waterfall_display import test_pattern_rows
+
+    rows = test_pattern_rows("wedge", rows=8, width=64)
+
+    assert all(row == rows[0] for row in rows)
+    assert rows[0] == sorted(rows[0]), "wedge must ramp monotonically"
+
+
+def test_vwedge_pattern_is_uniform_across_each_row():
+    from kiwi_client.waterfall_display import test_pattern_rows
+
+    rows = test_pattern_rows("vwedge", rows=8, width=16)
+
+    assert all(len(set(row)) == 1 for row in rows)
+    assert [row[0] for row in rows] == sorted(row[0] for row in rows)
+
+
+def test_bars_pattern_alternates_between_the_extremes():
+    from kiwi_client.waterfall_display import test_pattern_rows
+
+    rows = test_pattern_rows("bars", rows=4, width=4, min_dbm=-100, max_dbm=-40)
+
+    assert [row[0] for row in rows] == [-100, -40, -100, -40]
+
+
+def test_unknown_test_pattern_is_rejected():
+    from kiwi_client.waterfall_display import test_pattern_rows
+
+    with pytest.raises(ValueError, match="unknown test pattern"):
+        test_pattern_rows("spiral")
