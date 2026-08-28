@@ -323,6 +323,18 @@ Tests use a fake operations layer that emits synthetic rows through the status c
 
 Not yet confirmed against a live receiver.
 
+Fixed a segfault reported after repeating `wf live 9 910` in the TUI. Diagnosed from the core dump rather than guessed: the crashing thread was `Thread-1 (_run)`, the playback worker, inside `libasound` `snd_pcm_poll_descriptors_revents` via `libportaudio` and cffi, while the main thread was in `_Py_Dealloc`. Signal 11, `SEGV_MAPERR`. Not memory pressure; 9.5 GB was available.
+
+The chain had two independent faults.
+
+First, the trigger. Reissuing `wf live` while a feed was running raised `RuntimeError("background operation already running")` from `BackgroundOperation.start`. The TUI's controller path already caught `RuntimeError` for exactly this reason, added earlier when repeating `:pb` unwound curses, but the new `wf` interception sat before that guard and caught only `ClientCommandError`. So the new command path reintroduced a bug the project had already fixed once.
+
+Second, and worse, the reason it was fatal rather than merely ugly. `run_tui` called `curses.wrapper` with no `try/finally`, so any exception left daemon worker threads running into interpreter shutdown. The playback worker sits in PortAudio/ALSA through cffi; tearing down the interpreter underneath it frees state it is still using. This was a pre-existing latent bug, not something the waterfall work introduced: any unhandled TUI exception with playback active would have done it. Only the orderly `q` path stopped workers.
+
+Fixes: `ClientController.shutdown()` stops and joins every worker, called from a `finally` around `curses.wrapper` so it runs on exception paths too; the `wf` interception now catches `RuntimeError` like the controller path; and `_start_waterfall_background` replaces a running feed instead of refusing, because reissuing `wf live` with a different zoom is how a user changes span, which is precisely what prompted the crash. Stopping or replacing a feed also drains the row queue so stale rows from the previous span cannot appear under the new one.
+
+Regression tests cover the reissue, the RuntimeError reaching the user as a message rather than propagating, shutdown stopping both workers, and `run_tui` shutting workers down when the UI raises. Full suite: 374 passed.
+
 ## YYYY-MM-DD
 
 ### Finding

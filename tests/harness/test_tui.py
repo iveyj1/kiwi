@@ -1324,3 +1324,111 @@ def test_wf_live_without_a_controller_reports_instead_of_crashing():
 
     assert response["type"] == "error"
     assert "no controller" in message
+
+
+# --- crash regressions ---
+# A segfault was traced to the playback worker still inside PortAudio/ALSA while
+# the interpreter tore down, after a RuntimeError escaped the TUI. Both halves
+# are covered here: the escape, and the shutdown that made it fatal.
+
+
+class SlowStoppableOperations(FakeWaterfallOperations):
+    """Waterfall stub that keeps running until asked to stop."""
+
+    def waterfall(self, config, *, stop_event=None, status_callback=None):
+        self.calls.append(config)
+        while stop_event is not None and not stop_event.is_set():
+            if status_callback is not None:
+                status_callback({"dbm_row": (-90.0,) * 8, "x_bin_server": 0})
+            time.sleep(0.01)
+        return {"path": None, "receiver": config.receiver, "zoom": config.zoom}
+
+
+def test_reissuing_wf_live_restarts_instead_of_raising():
+    """Changing zoom means reissuing wf-live; it must replace the running feed."""
+    operations = SlowStoppableOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+
+    controller.execute("wf-live 8 910 --allow-live")
+    response = controller.execute("wf-live 11 910 --allow-live")
+    controller.shutdown(timeout=2.0)
+
+    assert response["type"] == "waterfall-status"
+    assert [c.zoom for c in operations.calls] == [8, 11]
+
+
+def test_wf_runtime_error_is_reported_not_propagated():
+    """A RuntimeError from the wf path must not unwind curses."""
+
+    class Exploding(FakeWaterfallOperations):
+        pass
+
+    controller = ClientController(operations=Exploding(), allow_live_default=True)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("background operation already running")
+
+    controller._start_waterfall_background = boom
+    input_state = tui.TuiInputState(mode=tui.InputMode.COMMAND, command="wf live 9 910")
+
+    response, message = tui.handle_tui_key(10, input_state, controller, waterfall=tui.WaterfallPaneState())
+
+    assert response is None
+    assert "already running" in message
+
+
+def test_controller_shutdown_stops_and_joins_every_worker():
+    operations = SlowStoppableOperations()
+    controller = ClientController(operations=operations, allow_live_default=True)
+    controller.execute("wf-live 8 910 --allow-live")
+
+    controller.shutdown(timeout=2.0)
+
+    assert not controller.waterfall_background.status().running
+    assert not controller.background.status().running
+    assert controller.running is False
+
+
+def test_controller_shutdown_is_safe_with_no_workers_running():
+    controller = ClientController()
+
+    controller.shutdown(timeout=0.1)
+
+    assert controller.running is False
+
+
+def test_run_tui_shuts_workers_down_even_when_the_ui_raises(monkeypatch):
+    """The segfault needed an exception path that skipped worker shutdown."""
+    controller = ClientController(operations=SlowStoppableOperations(), allow_live_default=True)
+    controller.execute("wf-live 8 910 --allow-live")
+    calls = []
+    real_shutdown = controller.shutdown
+
+    def tracked(**kwargs):
+        calls.append(True)
+        real_shutdown(**kwargs)
+
+    controller.shutdown = tracked
+
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("boom from inside curses")
+
+    monkeypatch.setattr(tui.curses, "wrapper", explode)
+    monkeypatch.setattr(tui, "start_startup_playback", lambda *a, **k: None)
+
+    with pytest.raises(RuntimeError, match="boom from inside curses"):
+        tui.run_tui(controller)
+
+    assert calls, "shutdown must run on the exception path"
+    assert not controller.waterfall_background.status().running
+
+
+def test_stopping_the_feed_clears_queued_rows():
+    """Stale rows from a stopped feed must not appear under a later one."""
+    controller = ClientController(operations=FakeWaterfallOperations(), allow_live_default=True)
+    for _ in range(10):
+        controller._publish_waterfall_row({"dbm_row": (-90.0,) * 8, "x_bin_server": 0})
+
+    controller.execute("wf-stop")
+
+    assert controller.waterfall_rows.empty()

@@ -29,7 +29,7 @@ Also done:
 Follow-on, not in this slice:
 
 - Frequency axis under the pane, now that bin/frequency mapping exists.
-- Live-radio confirmation of the feed against a local receiver, to judge what zoom and span read well.
+- Live-radio confirmation of the feed against a local receiver, to judge what zoom and span read well. A first attempt crashed; see the dev log. Fixed and retestable.
 - Terminal graphics backend for a standalone high-resolution view. Kitty and ghostty support the Kitty graphics protocol, foot supports Sixel, so it needs runtime detection with the half-block pane as fallback.
 
 ## Done in previous slices

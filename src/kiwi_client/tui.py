@@ -804,7 +804,7 @@ def handle_tui_key(
         if waterfall is not None:
             try:
                 handled = handle_waterfall_command(command, waterfall, controller)
-            except ClientCommandError as exc:
+            except (ClientCommandError, RuntimeError) as exc:
                 return None, f"error: {exc}"
             if handled is not None:
                 return handled
@@ -935,7 +935,13 @@ def run_tui(controller: ClientController | None = None, *, config: KiwiClientCon
         if not controller.receiver_presets:
             controller.receiver_presets.update(receiver_presets)
     start_startup_playback(controller, config)
-    curses.wrapper(_run_curses, controller, config)
+    try:
+        curses.wrapper(_run_curses, controller, config)
+    finally:
+        # Workers must not outlive the interpreter. A playback thread still
+        # inside PortAudio when teardown begins segfaults the process, so this
+        # runs on exceptions too, not only on an orderly quit.
+        controller.shutdown()
 
 
 def start_startup_playback(controller: ClientController, config: KiwiClientConfig) -> dict[str, Any] | None:

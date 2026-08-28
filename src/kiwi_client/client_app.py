@@ -284,6 +284,8 @@ class LiveClientOperations:
 
 
 WATERFALL_ROW_QUEUE_SIZE = 256
+WATERFALL_RESTART_TIMEOUT_SECONDS = 3.0
+SHUTDOWN_JOIN_TIMEOUT_SECONDS = 5.0
 
 
 class ClientController:
@@ -703,6 +705,12 @@ class ClientController:
     def _start_waterfall_background(self, zoom: int, center_khz: float) -> dict[str, Any]:
         config = self._waterfall_config(zoom, center_khz)
         config.validate()
+        # Reissuing wf-live is how a user changes zoom or centre, so replace any
+        # running feed instead of refusing. The worker slot allows only one.
+        if self.waterfall_background.status().running:
+            self.waterfall_background.stop()
+            self.waterfall_background.join(timeout=WATERFALL_RESTART_TIMEOUT_SECONDS)
+        self.drain_waterfall_rows()
 
         def target(stop_event, command_queue, status_callback):
             def on_status(metrics: dict) -> None:
@@ -719,8 +727,39 @@ class ClientController:
             "center_khz": center_khz,
         }
 
+    def drain_waterfall_rows(self) -> int:
+        """Discard any queued W/F rows; used when the feed is replaced or stopped."""
+        dropped = 0
+        while True:
+            try:
+                self.waterfall_rows.get_nowait()
+            except queue.Empty:
+                return dropped
+            dropped += 1
+
+    def shutdown(self, *, timeout: float = SHUTDOWN_JOIN_TIMEOUT_SECONDS) -> None:
+        """Stop and join every background worker before the process exits.
+
+        Daemon worker threads that are still inside a C extension when the
+        interpreter starts tearing down can crash the process. The playback
+        worker sits in PortAudio/ALSA, so this must run on every exit path,
+        including exceptions, not just on an orderly quit.
+        """
+        for worker in (self.background, self.waterfall_background):
+            try:
+                worker.stop()
+            except Exception:
+                pass
+        for worker in (self.background, self.waterfall_background):
+            try:
+                worker.join(timeout=timeout)
+            except Exception:
+                pass
+        self.running = False
+
     def _stop_waterfall_background(self) -> dict[str, Any]:
         status = self.waterfall_background.stop()
+        self.drain_waterfall_rows()
         return {"type": "waterfall-status", "operation": status.as_dict()}
 
     def _stop_background(self) -> dict[str, Any]:
