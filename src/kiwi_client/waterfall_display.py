@@ -18,7 +18,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-DEFAULT_LEVELS = 32  # must match waterfall_palette.PALETTE_LEVELS
+DEFAULT_LEVELS = 15  # must match waterfall_palette.PALETTE_LEVELS; see the pair-count note there
 DEFAULT_MIN_DBM = -110.0
 DEFAULT_MAX_DBM = -20.0
 

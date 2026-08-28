@@ -23,9 +23,19 @@ from __future__ import annotations
 DEFAULT_COLORMAP = "kiwi"
 COLORMAPS = ("kiwi", "cutesdr", "greyscale")
 # Must match waterfall_display.DEFAULT_LEVELS; a test asserts they agree.
-# The xterm-256 cube only resolves about 30 distinct colours along these ramps,
-# so levels beyond roughly 48 buy nothing while costing N*N colour pairs.
-PALETTE_LEVELS = 32
+#
+# Capped by the curses attribute layout, not by the terminal. ncurses packs the
+# colour pair number into A_COLOR, which is 0xFF00 here: 8 bits, so only pairs
+# 1..255 are addressable through curses.color_pair(). `tput pairs` advertising
+# 32767 or 65536 is irrelevant, because reaching those needs init_extended_pair,
+# which this Python curses build does not provide.
+#
+# A half-block cell needs one pair per (upper, lower) combination, so N levels
+# need 1 + N*N pairs. N=15 gives 226, inside the limit. N=16 would need 257 and
+# every pair above 255 silently wraps to `number & 0xFF`, painting cells with a
+# completely unrelated pair.
+PALETTE_LEVELS = 15
+MAX_ADDRESSABLE_PAIRS = 255
 
 # xterm-256: indices 16..231 are a 6x6x6 cube on these component values,
 # and 232..255 are a 24-step grey ramp at 8 + 10*n.

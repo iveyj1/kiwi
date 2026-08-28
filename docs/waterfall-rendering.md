@@ -20,7 +20,7 @@ See [Waterfall display specification](waterfall-spec.md) for the current fixture
 
 - A colour half-block pane is integrated into the curses TUI via `waterfall_display.py` (model), `waterfall_palette.py` (xterm-256 ramp), and `waterfall_pane.py` (cells and drawing). Two frames per character row, 24 levels, fed from fixtures.
 - Curses colour is limited to the terminal's 256-colour palette. `init_extended_pair` is unavailable in the local Python curses build, so 24-bit colour is not reachable from a curses pane even on a truecolor terminal. A future standalone renderer writing raw escapes could do better.
-- A half-block cell needs one colour pair per (upper, lower) level combination, so 24 levels need 576 pairs. Local terminals report 32767 or more.
+- A half-block cell needs one colour pair per (upper, lower) level combination, so N levels need `1 + N*N` pairs. The ceiling is 255, not what the terminal advertises: `curses.color_pair()` packs the pair number into the 8-bit `A_COLOR` field and anything above 255 wraps to `number & 0xFF`. Reaching the terminal's advertised 32767 would need `init_extended_pair`, absent from the local Python curses build. Hence 15 levels, 226 pairs.
 
 ## Questions to resolve
 

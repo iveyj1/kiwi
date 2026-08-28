@@ -249,8 +249,9 @@ def test_pair_numbers_are_unique_and_skip_reserved_pair_zero():
 
 
 def test_required_pairs_fits_the_terminals_in_use():
-    # Local terminals report 32767 pairs or more.
-    assert required_pairs(DEFAULT_LEVELS) < 32767
+    # curses.color_pair() packs the pair into 8 bits, so 255 is the real ceiling
+    # no matter what the terminal advertises.
+    assert required_pairs(DEFAULT_LEVELS) <= 255
 
 
 # --- pane ---
@@ -406,3 +407,33 @@ def test_unknown_test_pattern_is_rejected():
 
     with pytest.raises(ValueError, match="unknown test pattern"):
         test_pattern_rows("spiral")
+
+
+def test_pair_numbers_stay_inside_the_addressable_range():
+    """Regression: pairs above 255 wrap to number & 0xFF and paint wrong colours.
+
+    curses.color_pair() packs the pair into the 8-bit A_COLOR field. With 32
+    levels this silently produced black stripes over every level above 7, since
+    pair 265 masked to 9 = (upper 0, lower 8).
+    """
+    from kiwi_client.waterfall_palette import MAX_ADDRESSABLE_PAIRS
+
+    highest = pair_number(PALETTE_LEVELS - 1, PALETTE_LEVELS - 1)
+
+    assert highest <= MAX_ADDRESSABLE_PAIRS
+    assert highest == highest & 0xFF or highest <= 255
+
+
+def test_init_waterfall_pairs_refuses_levels_that_would_wrap():
+    """The ceiling holds even when the terminal claims tens of thousands of pairs."""
+    with pytest.raises(RuntimeError, match="addressable"):
+        init_waterfall_pairs(lambda n, f, b: None, levels=32, max_pairs=65536)
+
+
+def test_every_registered_pair_is_uniquely_addressable():
+    registered = {}
+    init_waterfall_pairs(lambda n, f, b: registered.__setitem__(n, (f, b)), levels=PALETTE_LEVELS)
+
+    assert len(registered) == PALETTE_LEVELS**2
+    masked = {n & 0xFF for n in registered}
+    assert len(masked) == len(registered), "two pairs collide after 8-bit masking"

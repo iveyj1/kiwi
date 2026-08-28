@@ -22,7 +22,13 @@ from kiwi_client.waterfall_display import (
     dbm_to_level,
     half_block_cells,
 )
-from kiwi_client.waterfall_palette import DEFAULT_COLORMAP, pair_number, palette_color, required_pairs
+from kiwi_client.waterfall_palette import (
+    DEFAULT_COLORMAP,
+    MAX_ADDRESSABLE_PAIRS,
+    pair_number,
+    palette_color,
+    required_pairs,
+)
 from kiwi_client.waterfall_render import DEFAULT_REDUCTION, reduce_bins
 
 
@@ -67,14 +73,21 @@ def init_waterfall_pairs(
 ) -> int:
     """Register one curses colour pair per (upper, lower) level combination.
 
-    Returns the number of pairs registered. Raises if the terminal cannot
-    provide enough, rather than silently drawing a wrong-coloured waterfall.
+    Returns the number of pairs registered. Raises rather than silently drawing
+    a wrong-coloured waterfall.
+
+    The binding limit is `curses.color_pair()`, which packs the pair number into
+    the 8-bit A_COLOR field, so pairs above 255 wrap to `number & 0xFF` and paint
+    unrelated colours. A terminal advertising tens of thousands of pairs does not
+    change that, so the ceiling is checked here regardless of `max_pairs`.
     """
     needed = required_pairs(levels)
-    if max_pairs is not None and needed > max_pairs:
+    limit = MAX_ADDRESSABLE_PAIRS if max_pairs is None else min(max_pairs, MAX_ADDRESSABLE_PAIRS)
+    if needed > limit:
         raise RuntimeError(
-            f"waterfall pane needs {needed} colour pairs for {levels} levels but the "
-            f"terminal offers {max_pairs}; reduce levels"
+            f"waterfall pane needs {needed} colour pairs for {levels} levels but only {limit} "
+            f"are addressable through curses.color_pair(); use at most "
+            f"{int(limit ** 0.5) if limit < MAX_ADDRESSABLE_PAIRS else 15} levels"
         )
     colors = [palette_color(level, levels=levels, colormap=colormap) for level in range(levels)]
     for upper in range(levels):

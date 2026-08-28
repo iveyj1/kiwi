@@ -341,6 +341,16 @@ Also confirmed from the same file that the byte to dBm mapping is right: the sen
 
 Added display auto-ranging, on by default. A fixed dB window cannot serve every zoom, because the noise floor moves by roughly 3 dB per zoom step as bins narrow. The previous fixed -110..-20 default spread 32 levels over 90 dB, 2.8 dB per level, which put a -70 dB floor at level 14, mid palette, so the floor itself rendered as green and yellow and per-frame noise flickered a level either way. `auto_scale_dbm()` anchors the low end just below the measured floor percentile so the floor stays dark. `wf auto [off]` toggles it, and an explicit `wf scale` turns it off so a manual choice is not overwritten on the next redraw. Full suite: 390 passed.
 
+Found the waterfall banding. It was neither the data nor the cell computation: `curses.color_pair()` packs the pair number into the 8-bit `A_COLOR` field, `0xFF00` here, so only pairs 1..255 are addressable. With 32 levels a half-block cell needs `1 + 32*32 = 1025` pairs, and every pair above 255 silently wrapped to `number & 0xFF`, selecting an unrelated pair.
+
+The wedge test pattern made it obvious. For a wedge `upper == lower == L`, so the pair is `1 + 33L`: levels 0..7 give 1..232 and rendered correctly, which is why the left third of the wedge was clean. Level 8 gives 265, which masks to 9, and pair 9 is `(upper=0, lower=8)`, so those cells drew a black top half over a coloured bottom half. That is exactly the black horizontal striping, beginning exactly where the arithmetic says it should.
+
+The guard in `init_waterfall_pairs` had been checking `curses.COLOR_PAIRS`, which the local terminals report as 32767 or 65536. That is the terminfo capability, not what `color_pair()` can address; reaching it needs `init_extended_pair`, which this Python curses build does not provide. That absence had been noted earlier in the session but never connected to the pair budget, so the guard validated against a number three orders of magnitude too large and passed.
+
+Levels are now 15, needing 226 pairs, and the guard checks the addressable ceiling regardless of what the terminal advertises. The cost is 13 distinct colours instead of 18. Tests now assert that no two registered pairs collide after 8-bit masking, which is the property that actually broke.
+
+Ruled out first, and worth keeping on record: the cell computation is correct, since constant input yields identical cells, a vertical ramp yields a monotonic sequence, and a horizontal wedge is byte-identical across character rows; and the captured fixtures show no frame-to-frame alternation, with mean lag-1 and lag-2 median differences within 10 percent.
+
 ## YYYY-MM-DD
 
 ### Finding
