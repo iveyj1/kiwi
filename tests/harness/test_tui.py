@@ -1432,3 +1432,23 @@ def test_stopping_the_feed_clears_queued_rows():
     controller.execute("wf-stop")
 
     assert controller.waterfall_rows.empty()
+
+
+def test_wf_cmap_selects_a_kiwisdr_colormap():
+    state = tui.WaterfallPaneState()
+    assert state.colormap == "kiwi", "the KiwiSDR default should be the default here too"
+
+    response, message = tui.handle_waterfall_command("wf cmap cutesdr", state)
+
+    assert state.colormap == "cutesdr"
+    assert response["restart_required"] is True, "pairs are allocated once at startup"
+    assert "restart" in message
+
+
+def test_wf_cmap_rejects_an_unknown_map_without_changing_state():
+    state = tui.WaterfallPaneState()
+
+    response, _ = tui.handle_waterfall_command("wf cmap viridis", state)
+
+    assert response["type"] == "error"
+    assert state.colormap == "kiwi"

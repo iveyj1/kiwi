@@ -12,11 +12,16 @@ from kiwi_client.waterfall_display import (
     half_block_cells,
 )
 from kiwi_client.waterfall_palette import (
+    COLORMAPS,
+    DEFAULT_COLORMAP,
     PALETTE_LEVELS,
-    cube_index,
+    colormap_rgb,
+    level_to_colormap_index,
+    nearest_xterm256,
     pair_number,
     palette_color,
     palette_indices,
+    palette_rgb,
     required_pairs,
 )
 from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
@@ -134,34 +139,105 @@ def test_half_block_character_is_the_upper_block():
 
 
 # --- palette ---
+# Ramps are transcribed from mkcolormap() in web/openwebrx/openwebrx.js of the
+# Beagle_SDR_GPS firmware. These pin the segment boundaries so a transcription
+# error would show up rather than merely looking plausible.
 
 
-def test_cube_index_matches_the_xterm_256_formula():
-    assert cube_index(0, 0, 0) == 16
-    assert cube_index(5, 5, 5) == 231
+def test_kiwi_colormap_matches_the_firmware_segment_boundaries():
+    """Black, blue, cyan, green, yellow, red, then red with blue rising to 128."""
+    assert colormap_rgb(0) == (0, 0, 0)
+    assert colormap_rgb(31) == (0, 0, 255)
+    assert colormap_rgb(71) == (0, 255, 255)
+    assert colormap_rgb(95) == (0, 255, 0)
+    assert colormap_rgb(115) == (255, 255, 0)
+    assert colormap_rgb(183) == (255, 0, 0)
+    assert colormap_rgb(255) == (255, 0, 130)  # (255-184)*128/70 = 129.83, rounds up
+
+
+def test_kiwi_colormap_is_continuous_across_segment_joins():
+    """A transcription slip would show up as a jump at a segment boundary."""
+    for boundary in (32, 72, 96, 116, 184):
+        before = colormap_rgb(boundary - 1)
+        after = colormap_rgb(boundary)
+        assert max(abs(a - b) for a, b in zip(before, after)) <= 8, f"jump at {boundary}"
+
+
+def test_cutesdr_colormap_matches_its_firmware_boundaries():
+    assert colormap_rgb(0, colormap="cutesdr") == (0, 0, 0)
+    assert colormap_rgb(42, colormap="cutesdr") == (0, 0, 249)
+    assert colormap_rgb(86, colormap="cutesdr") == (0, 255, 255)
+    assert colormap_rgb(119, colormap="cutesdr") == (0, 255, 0)
+    assert colormap_rgb(153, colormap="cutesdr") == (255, 255, 0)
+    assert colormap_rgb(216, colormap="cutesdr") == (255, 0, 0)
+
+
+def test_colormaps_round_and_clamp_like_the_browser():
+    """mkcolormap ends with Math.round then w3_clamp(v, 0, 255)."""
+    # Greyscale runs to 303 before clamping.
+    assert colormap_rgb(255, colormap="greyscale") == (255, 255, 255)
+    for colormap in COLORMAPS:
+        for index in (0, 1, 127, 254, 255):
+            assert all(0 <= c <= 255 for c in colormap_rgb(index, colormap=colormap))
+
+
+def test_every_colormap_starts_dark_and_ends_bright():
+    for colormap in COLORMAPS:
+        assert sum(colormap_rgb(0, colormap=colormap)) < sum(colormap_rgb(255, colormap=colormap))
+
+
+def test_colormap_rejects_unknown_names_and_out_of_range_indices():
+    with pytest.raises(ValueError, match="unknown colormap"):
+        colormap_rgb(0, colormap="viridis")
+    with pytest.raises(ValueError, match="outside 0..255"):
+        colormap_rgb(256)
+
+
+def test_nearest_xterm256_finds_exact_cube_and_grey_entries():
+    assert nearest_xterm256(0, 0, 0) == 16
+    assert nearest_xterm256(255, 255, 255) == 231
+    assert nearest_xterm256(255, 0, 0) == 196
+    assert nearest_xterm256(0, 0, 255) == 21
+    # Mid grey is better served by the grey ramp than by the cube.
+    assert 232 <= nearest_xterm256(128, 128, 128) <= 255
+
+
+def test_nearest_xterm256_rejects_out_of_range_components():
     with pytest.raises(ValueError, match="red must be in range"):
-        cube_index(6, 0, 0)
+        nearest_xterm256(256, 0, 0)
 
 
-def test_palette_runs_dark_to_hot_within_the_colour_cube():
+def test_level_to_colormap_index_spans_the_whole_ramp():
+    assert level_to_colormap_index(0) == 0
+    assert level_to_colormap_index(PALETTE_LEVELS - 1) == 255
+    with pytest.raises(ValueError, match="outside 0"):
+        level_to_colormap_index(PALETTE_LEVELS)
+
+
+def test_palette_levels_match_the_display_model():
+    """The two modules must agree or pair numbering and colours diverge."""
+    assert PALETTE_LEVELS == DEFAULT_LEVELS
+
+
+def test_palette_indices_run_dark_to_hot_within_xterm256():
     indices = palette_indices()
 
     assert len(indices) == PALETTE_LEVELS
     assert indices[0] == 16, "lowest level should be black"
-    assert indices[-1] == 231, "highest level should be white"
-    assert all(16 <= index <= 231 for index in indices)
+    assert all(16 <= index <= 255 for index in indices)
 
 
-def test_palette_resamples_for_a_different_level_count():
-    small = palette_indices(8)
+def test_palette_rgb_exposes_exact_colours_for_non_palette_renderers():
+    """A graphics backend should get true RGB, not the 256-colour approximation."""
+    rgb = palette_rgb()
 
-    assert len(small) == 8
-    assert small[0] == 16 and small[-1] == 231
+    assert len(rgb) == PALETTE_LEVELS
+    assert rgb[0] == (0, 0, 0)
+    assert rgb[-1] == colormap_rgb(255)
 
 
-def test_palette_rejects_out_of_range_levels():
-    with pytest.raises(ValueError, match="outside 0"):
-        palette_color(PALETTE_LEVELS)
+def test_default_colormap_is_the_kiwi_one():
+    assert DEFAULT_COLORMAP == "kiwi"
 
 
 def test_pair_numbers_are_unique_and_skip_reserved_pair_zero():

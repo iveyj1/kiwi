@@ -22,7 +22,7 @@ from kiwi_client.waterfall_display import (
     dbm_to_level,
     half_block_cells,
 )
-from kiwi_client.waterfall_palette import pair_number, palette_color, required_pairs
+from kiwi_client.waterfall_palette import DEFAULT_COLORMAP, pair_number, palette_color, required_pairs
 from kiwi_client.waterfall_render import DEFAULT_REDUCTION, reduce_bins
 
 
@@ -63,6 +63,7 @@ def init_waterfall_pairs(
     *,
     levels: int = DEFAULT_LEVELS,
     max_pairs: int | None = None,
+    colormap: str = DEFAULT_COLORMAP,
 ) -> int:
     """Register one curses colour pair per (upper, lower) level combination.
 
@@ -75,10 +76,10 @@ def init_waterfall_pairs(
             f"waterfall pane needs {needed} colour pairs for {levels} levels but the "
             f"terminal offers {max_pairs}; reduce levels"
         )
+    colors = [palette_color(level, levels=levels, colormap=colormap) for level in range(levels)]
     for upper in range(levels):
-        foreground = palette_color(upper, levels=levels)
         for lower in range(levels):
-            init_pair(pair_number(upper, lower, levels=levels), foreground, palette_color(lower, levels=levels))
+            init_pair(pair_number(upper, lower, levels=levels), colors[upper], colors[lower])
     return levels * levels
 
 

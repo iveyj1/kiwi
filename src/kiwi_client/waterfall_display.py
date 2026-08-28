@@ -8,7 +8,8 @@ to palette levels. It knows nothing about curses, terminals, or files.
 Colour depth note: the curses pane is limited to the terminal's 256-colour
 palette, because ncurses here has no extended-pair support. Raw terminal output
 could do 24-bit, but a curses pane cannot, so the model quantises to a modest
-number of levels and lets each backend map levels to its own colours.
+number of levels and lets each backend map levels to its own colours. See
+`waterfall_palette` for the KiwiSDR colour ramps themselves.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-DEFAULT_LEVELS = 24
+DEFAULT_LEVELS = 32  # must match waterfall_palette.PALETTE_LEVELS
 DEFAULT_MIN_DBM = -110.0
 DEFAULT_MAX_DBM = -20.0
 

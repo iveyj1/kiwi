@@ -31,6 +31,7 @@ from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.waterfall import parse_waterfall_uncompressed
 from kiwi_client.waterfall_display import DEFAULT_LEVELS, WaterfallImageBuffer
 from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
+from kiwi_client.waterfall_palette import COLORMAPS, DEFAULT_COLORMAP
 from kiwi_client.config import (
     KiwiClientConfig,
     add_allowed_receiver_to_config,
@@ -96,7 +97,7 @@ COMMAND_HINTS = [
     CommandHint(
         "wf",
         "waterfall pane",
-        "wf [on|off|toggle] | wf live [zoom] [center_khz] | wf stop | wf load <f> | wf scale <min> <max> | wf height <n>",
+        "wf [on|off|toggle] | wf live [zoom] [center_khz] | wf stop | wf load <f> | wf scale <min> <max> | wf height <n> | wf cmap <name>",
         "Waterfall",
     ),
     CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
@@ -142,6 +143,7 @@ class WaterfallPaneState:
     height: int = 8
     min_dbm: float = -110.0
     max_dbm: float = -20.0
+    colormap: str = DEFAULT_COLORMAP
     source: str = ""
 
     def load_fixture(self, path: Path, *, calibration_db: float = 0.0) -> int:
@@ -245,6 +247,15 @@ def handle_waterfall_command(
             return {"type": "error", "error": "wf scale max must exceed min"}, "wf scale max must exceed min"
         waterfall.min_dbm, waterfall.max_dbm = low, high
         return {"type": "waterfall", "min_dbm": low, "max_dbm": high}, f"waterfall scale {low:g}..{high:g} dB"
+    if action == "cmap":
+        if len(parts) < 3 or parts[2] not in COLORMAPS:
+            usage = f"usage: wf cmap <{'|'.join(COLORMAPS)}>"
+            return {"type": "error", "error": usage}, usage
+        waterfall.colormap = parts[2]
+        return (
+            {"type": "waterfall", "colormap": waterfall.colormap, "restart_required": True},
+            f"waterfall colormap {waterfall.colormap}; restart the TUI to apply",
+        )
     if action == "height":
         if len(parts) < 3 or not parts[2].isdigit() or int(parts[2]) < 1:
             return {"type": "error", "error": "usage: wf height <rows>"}, "usage: wf height <rows>"
@@ -979,7 +990,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def setup_waterfall_colors(levels: int = DEFAULT_LEVELS) -> bool:
+def setup_waterfall_colors(levels: int = DEFAULT_LEVELS, colormap: str = DEFAULT_COLORMAP) -> bool:
     """Initialise curses colour pairs for the waterfall pane.
 
     Returns False when the terminal cannot support the pane, so the TUI keeps
@@ -992,7 +1003,7 @@ def setup_waterfall_colors(levels: int = DEFAULT_LEVELS) -> bool:
         curses.use_default_colors()
         if curses.COLORS < 256:
             return False
-        init_waterfall_pairs(curses.init_pair, levels=levels, max_pairs=curses.COLOR_PAIRS)
+        init_waterfall_pairs(curses.init_pair, levels=levels, max_pairs=curses.COLOR_PAIRS, colormap=colormap)
         return True
     except (curses.error, RuntimeError):
         return False
@@ -1058,7 +1069,8 @@ def _draw_waterfall(stdscr, waterfall: WaterfallPaneState, *, top: int, width: i
     if rows < 1:
         return top
     span = waterfall.buffer.width
-    label = f"Waterfall: {rows * 2} frames x {span} bins -> {width - 1} cols  [{waterfall.min_dbm:g}..{waterfall.max_dbm:g} dB]"
+    label = (f"Waterfall: {rows * 2} frames x {span} bins -> {width - 1} cols  "
+             f"[{waterfall.min_dbm:g}..{waterfall.max_dbm:g} dB, {waterfall.colormap}]")
     stdscr.addnstr(top, 0, label, max(0, width - 1))
     cells = pane_cells(
         waterfall.buffer,
