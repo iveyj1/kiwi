@@ -341,3 +341,34 @@ def test_draw_waterfall_pane_survives_a_curses_write_error():
     drawn = draw_waterfall_pane(Failing(), [(HalfBlockCell(0, 0),)], top=0, color_pair=lambda p: p)
 
     assert drawn == 1
+
+
+def test_auto_scale_puts_the_noise_floor_at_the_bottom_of_the_palette():
+    """A fixed window cannot serve every zoom; the floor moves with bin width."""
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    floor, carrier = -70.0, -35.0
+    rows = [[floor + (i * 7 + j) % 4 for j in range(100)] for i in range(8)]
+    for row in rows:
+        row[50] = carrier
+
+    low, high = auto_scale_dbm(rows)
+
+    assert low < floor, "the floor must sit above the low end, not clip"
+    assert high >= carrier, "the carrier must not clip at the top"
+    floor_level = dbm_to_level(floor, min_dbm=low, max_dbm=high, levels=32)
+    assert floor_level <= 6, f"noise floor should stay dark, got level {floor_level}"
+
+
+def test_auto_scale_enforces_a_minimum_range_on_flat_input():
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    low, high = auto_scale_dbm([[-90.0] * 20])
+
+    assert high - low >= 25.0, "a flat frame must not collapse to a zero-width window"
+
+
+def test_auto_scale_returns_none_with_no_data():
+    from kiwi_client.waterfall_display import auto_scale_dbm
+
+    assert auto_scale_dbm([]) is None

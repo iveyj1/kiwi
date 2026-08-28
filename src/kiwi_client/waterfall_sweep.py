@@ -305,7 +305,7 @@ class WaterfallSweepConfig:
     maxdb: int = 0
     mindb: int = -110
     speed: int = 4
-    interp: int = 13
+    interp: int = 10
     min_snr_db: float = DEFAULT_MIN_SNR_DB
     duration_seconds: float = DEFAULT_DURATION_SECONDS
     timestamp: int | None = None
@@ -623,7 +623,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-db", type=int, default=0)
     parser.add_argument("--min-db", type=int, default=-110)
     parser.add_argument("--speed", type=int, default=4)
-    parser.add_argument("--interp", type=int, default=13)
+    parser.add_argument("--interp", type=int, default=10)
     parser.add_argument("--min-snr-db", type=float, default=DEFAULT_MIN_SNR_DB)
     parser.add_argument("--duration-seconds", type=float, default=DEFAULT_DURATION_SECONDS)
     parser.add_argument("--timestamp", type=int)

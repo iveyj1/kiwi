@@ -335,6 +335,12 @@ Fixes: `ClientController.shutdown()` stops and joins every worker, called from a
 
 Regression tests cover the reissue, the RuntimeError reaching the user as a message rather than propagating, shutdown stopping both workers, and `run_tui` shutting workers down when the UI raises. Full suite: 374 passed.
 
+Fixed the live waterfall looking like random speckle with false horizontal banding. The cause was `SET interp=13`, carried since the first spec draft. Reading `rx/rx_waterfall.cpp` in the firmware shows `interp` values of 10 or more enable CIC compensation and have 10 subtracted, with the remainder selecting `wf_interp_t { WF_MAX=0, WF_MIN, WF_LAST, WF_DROP, WF_CMA }`. So 13 was `WF_DROP`, which discards FFT bins instead of combining them; every displayed bin then carried one un-averaged FFT bin's full noise variance. Changed the default to `10`, which is `WF_MAX` plus CIC compensation, matching the receiver's own fallback.
+
+Also confirmed from the same file that the byte to dBm mapping is right: the sender clamps dB to 0..-200 and the client recovers `dBm = byte - 255`, with `wf_cal` already applied at the sender.
+
+Added display auto-ranging, on by default. A fixed dB window cannot serve every zoom, because the noise floor moves by roughly 3 dB per zoom step as bins narrow. The previous fixed -110..-20 default spread 32 levels over 90 dB, 2.8 dB per level, which put a -70 dB floor at level 14, mid palette, so the floor itself rendered as green and yellow and per-frame noise flickered a level either way. `auto_scale_dbm()` anchors the low end just below the measured floor percentile so the floor stays dark. `wf auto [off]` toggles it, and an explicit `wf scale` turns it off so a manual choice is not overwritten on the next redraw. Full suite: 390 passed.
+
 ## YYYY-MM-DD
 
 ### Finding

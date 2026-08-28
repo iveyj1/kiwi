@@ -120,6 +120,8 @@ Reference-backed planning facts, not yet locally fixture-verified:
 - Reference default bin count is `WF_BINS = 1024`.
 - Uncompressed W/F setup uses `SET wf_comp=0`.
 - Reference setup commands include `SET zoom=<zoom> cf=<center_khz>`, `SET maxdb=<maxdb> mindb=<mindb>`, `SET wf_speed=<1..4>`, `SET wf_comp=<0|1>`, and `SET interp=<value>`.
+- **`SET interp` encoding**, from `rx/rx_waterfall.cpp` in the Beagle_SDR_GPS firmware: a value of 10 or more sets CIC compensation and has 10 subtracted; the remainder selects `wf_interp_t { WF_MAX=0, WF_MIN, WF_LAST, WF_DROP, WF_CMA }`, with anything out of range falling back to `WF_MAX`. So `interp=10` is max plus CIC compensation, and `interp=13` is `WF_DROP`. `WF_DROP` discards FFT bins rather than combining them, so each displayed bin carries one un-averaged FFT bin's full noise variance; it makes a live waterfall look like random speckle. Use `10`.
+- Byte to dBm mapping is confirmed in firmware: the sender clamps `dB` to `0..-200` and maps it so the client recovers `dBm = byte - 255`. The transmitted value already includes the `wf_cal` offset.
 
 Evidence:
 

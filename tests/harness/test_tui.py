@@ -1452,3 +1452,23 @@ def test_wf_cmap_rejects_an_unknown_map_without_changing_state():
 
     assert response["type"] == "error"
     assert state.colormap == "kiwi"
+
+
+def test_waterfall_auto_scale_is_on_by_default_and_toggles():
+    state = tui.WaterfallPaneState()
+    assert state.auto_scale is True
+
+    _, message = tui.handle_waterfall_command("wf auto off", state)
+    assert state.auto_scale is False and "off" in message
+    tui.handle_waterfall_command("wf auto", state)
+    assert state.auto_scale is True
+
+
+def test_manual_scale_turns_auto_off():
+    """An explicit scale would otherwise be overwritten on the next redraw."""
+    state = tui.WaterfallPaneState()
+
+    tui.handle_waterfall_command("wf scale -95 -35", state)
+
+    assert state.auto_scale is False
+    assert (state.min_dbm, state.max_dbm) == (-95.0, -35.0)

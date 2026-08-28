@@ -164,3 +164,30 @@ def buffer_from_frames(
     for row in dbm_rows:
         buffer.append(row, calibration_db=calibration_db)
     return buffer
+
+
+def auto_scale_dbm(
+    rows,
+    *,
+    floor_percentile: float = 0.20,
+    peak_percentile: float = 0.999,
+    headroom_db: float = 4.0,
+    min_range_db: float = 25.0,
+) -> tuple[float, float] | None:
+    """Return a (min_dbm, max_dbm) display window fitted to recent rows.
+
+    A fixed window cannot serve every zoom: the noise floor moves by roughly
+    3 dB per zoom step as the bins narrow. Anchoring the low end just under the
+    measured floor keeps it at the dark end of the palette, which is what makes
+    signals stand out instead of the whole image sitting mid-ramp.
+
+    Returns None when there is nothing to measure.
+    """
+    values = sorted(value for row in rows for value in row)
+    if not values:
+        return None
+    floor = values[min(len(values) - 1, int(len(values) * floor_percentile))]
+    peak = values[min(len(values) - 1, int(len(values) * peak_percentile))]
+    low = floor - headroom_db
+    high = max(peak + headroom_db, low + min_range_db)
+    return (low, high)

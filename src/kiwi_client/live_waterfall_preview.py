@@ -66,7 +66,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="how bins are aggregated into a column; max keeps narrow carriers visible",
     )
     parser.add_argument("--speed", type=int, default=1)
-    parser.add_argument("--interp", type=int, default=13)
+    parser.add_argument("--interp", type=int, default=10)
     parser.add_argument("--duration-seconds", type=float, default=60.0)
     parser.add_argument("--max-frames", type=int, default=50)
     parser.add_argument("--timestamp", type=int)

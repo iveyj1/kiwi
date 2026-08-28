@@ -108,7 +108,7 @@ def test_live_waterfall_config_dry_run_plan(tmp_path: Path):
         "SET maxdb=0 mindb=-110",
         "SET wf_speed=1",
         "SET wf_comp=0",
-        "SET interp=13",
+        "SET interp=10",
         "SET keepalive",
     ]
 

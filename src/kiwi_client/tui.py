@@ -29,7 +29,7 @@ from kiwi_client.client_app import (
 )
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.waterfall import parse_waterfall_uncompressed
-from kiwi_client.waterfall_display import DEFAULT_LEVELS, WaterfallImageBuffer
+from kiwi_client.waterfall_display import DEFAULT_LEVELS, WaterfallImageBuffer, auto_scale_dbm
 from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
 from kiwi_client.waterfall_palette import COLORMAPS, DEFAULT_COLORMAP
 from kiwi_client.config import (
@@ -143,6 +143,7 @@ class WaterfallPaneState:
     height: int = 8
     min_dbm: float = -110.0
     max_dbm: float = -20.0
+    auto_scale: bool = True
     colormap: str = DEFAULT_COLORMAP
     source: str = ""
 
@@ -246,6 +247,7 @@ def handle_waterfall_command(
         if high <= low:
             return {"type": "error", "error": "wf scale max must exceed min"}, "wf scale max must exceed min"
         waterfall.min_dbm, waterfall.max_dbm = low, high
+        waterfall.auto_scale = False
         return {"type": "waterfall", "min_dbm": low, "max_dbm": high}, f"waterfall scale {low:g}..{high:g} dB"
     if action == "cmap":
         if len(parts) < 3 or parts[2] not in COLORMAPS:
@@ -255,6 +257,12 @@ def handle_waterfall_command(
         return (
             {"type": "waterfall", "colormap": waterfall.colormap, "restart_required": True},
             f"waterfall colormap {waterfall.colormap}; restart the TUI to apply",
+        )
+    if action == "auto":
+        waterfall.auto_scale = not (len(parts) > 2 and parts[2] == "off")
+        return (
+            {"type": "waterfall", "auto_scale": waterfall.auto_scale},
+            f"waterfall auto scale {'on' if waterfall.auto_scale else 'off'}",
         )
     if action == "height":
         if len(parts) < 3 or not parts[2].isdigit() or int(parts[2]) < 1:
@@ -1068,9 +1076,13 @@ def _draw_waterfall(stdscr, waterfall: WaterfallPaneState, *, top: int, width: i
     rows = min(waterfall.height, available)
     if rows < 1:
         return top
+    if waterfall.auto_scale:
+        fitted = auto_scale_dbm(waterfall.buffer.rows(rows * 2))
+        if fitted is not None:
+            waterfall.min_dbm, waterfall.max_dbm = fitted
     span = waterfall.buffer.width
     label = (f"Waterfall: {rows * 2} frames x {span} bins -> {width - 1} cols  "
-             f"[{waterfall.min_dbm:g}..{waterfall.max_dbm:g} dB, {waterfall.colormap}]")
+             f"[{waterfall.min_dbm:.0f}..{waterfall.max_dbm:.0f} dB{' auto' if waterfall.auto_scale else ''}]")
     stdscr.addnstr(top, 0, label, max(0, width - 1))
     cells = pane_cells(
         waterfall.buffer,

@@ -53,7 +53,11 @@ class LiveWaterfallCaptureConfig:
     ascii_columns: int | None = None
     ascii_reduction: str = DEFAULT_REDUCTION
     speed: int = 1
-    interp: int = 13
+    # Kiwi interp encoding: values >= 10 set CIC compensation and the remainder
+    # selects wf_interp_t { MAX=0, MIN, LAST, DROP, CMA }. 10 = MAX + CIC comp.
+    # 13 would be DROP, which discards FFT bins instead of combining them and
+    # leaves every displayed bin carrying full un-averaged noise variance.
+    interp: int = 10
     duration_seconds: float = 3.0
     max_frames: int = 5
     compression: bool = False
@@ -287,7 +291,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="how bins are aggregated into a column; max keeps narrow carriers visible",
     )
     parser.add_argument("--speed", type=int, default=1)
-    parser.add_argument("--interp", type=int, default=13)
+    parser.add_argument("--interp", type=int, default=10, help="10 = max + CIC compensation; see wf_interp_t")
     parser.add_argument("--duration-seconds", type=float, default=3.0)
     parser.add_argument("--max-frames", type=int, default=5)
     parser.add_argument("--timestamp", type=int)
