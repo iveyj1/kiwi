@@ -1,5 +1,14 @@
 # Radio Lab Notes
 
+## 2026-08-28 — User-reported proxy combined W/F + SND validation
+
+- Receiver: `misdr.proxy.kiwisdr.com:8073` (explicitly selected by user; not contacted by the agent).
+- Report time: approximately 2026-08-28 03:07 UTC / 2026-08-27 23:07 local.
+- Working configuration defaults: 5000 kHz, AM, passband -5000..5000 Hz, W/F zoom 7, speed 4, interp 13, `--audio` enabled.
+- Observation: combined waterfall and audible audio work after opening/authenticating SND before paired W/F with one shared session timestamp.
+- Previous failure: W/F-first ordering caused proxy close code 1005 as soon as audio was added, even with a shared timestamp.
+- Fixture: none; this is user-reported external proxy validation. Deterministic fake-runner ordering coverage remains in the harness.
+
 ## Receivers
 
 | Name | Address | Notes |
