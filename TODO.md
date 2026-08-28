@@ -12,7 +12,7 @@ Done criteria:
 - For `--audio` startup, create SND first and await readiness before constructing/opening W/F.
 - Abort cleanly if SND fails before readiness instead of opening an orphan paired W/F.
 - Add deterministic fake-runner ordering/failure tests and retain separate session task ownership.
-- Document that adding audio to an already-open W/F session may require a controlled W/F restart in a subsequent slice.
+- Keep primary SND connected in muted mode so later `a` output toggles do not require W/F restart.
 - Run full harness and merge `fix/wf-audio-primary-order` into `wf1`; do not automatically connect externally.
 
 Goal: Pair combined W/F and SND connections with one Kiwi session timestamp.
@@ -271,6 +271,7 @@ Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-pro
 
 ## Next
 
+- User validation confirms combined proxy W/F+SND works with shared timestamp and SND-first pairing; next evaluate mute/tune/recenter/zoom behavior during longer normal use.
 - If temporal jumps become problematic, instrument receive cadence, coalesced redraw count, and draw duration before changing buffering; current behavior resembles the Kiwi browser client.
 - Evaluate adaptive ruler density, marker prominence, and persisted operating defaults during normal use.
 - Replace bin-sized cursor movement with configured round frequency steps before cursor-driven tuning; map the exact selected frequency to the nearest raster column while reporting bin width only as display resolution.
