@@ -36,7 +36,12 @@ from kiwi_client.waterfall_display import (
     auto_scale_dbm,
     test_pattern_rows,
 )
-from kiwi_client.waterfall_pane import draw_waterfall_pane, init_waterfall_pairs, pane_cells
+from kiwi_client.waterfall_pane import (
+    cells_from_dbm_rows,
+    draw_waterfall_pane,
+    init_waterfall_pairs,
+    pane_dbm_rows,
+)
 from kiwi_client.waterfall_palette import COLORMAPS, DEFAULT_COLORMAP
 from kiwi_client.config import (
     KiwiClientConfig,
@@ -1102,17 +1107,20 @@ def _draw_waterfall(stdscr, waterfall: WaterfallPaneState, *, top: int, width: i
     rows = min(waterfall.height, available)
     if rows < 1:
         return top
+    # Reduce first, then fit the scale to the reduced values, because those are
+    # what the pane actually draws. Fitting to raw bins leaves the display far
+    # brighter than intended, since max-hold shifts the distribution upwards.
+    reduced = pane_dbm_rows(waterfall.buffer, width=max(1, width - 1), height=rows)
     if waterfall.auto_scale:
-        fitted = auto_scale_dbm(waterfall.buffer.rows(rows * 2))
+        fitted = auto_scale_dbm(reduced)
         if fitted is not None:
             waterfall.min_dbm, waterfall.max_dbm = fitted
     span = waterfall.buffer.width
     label = (f"Waterfall: {rows * 2} frames x {span} bins -> {width - 1} cols  "
              f"[{waterfall.min_dbm:.0f}..{waterfall.max_dbm:.0f} dB{' auto' if waterfall.auto_scale else ''}]")
     stdscr.addnstr(top, 0, label, max(0, width - 1))
-    cells = pane_cells(
-        waterfall.buffer,
-        width=max(1, width - 1),
+    cells = cells_from_dbm_rows(
+        reduced,
         height=rows,
         min_dbm=waterfall.min_dbm,
         max_dbm=waterfall.max_dbm,

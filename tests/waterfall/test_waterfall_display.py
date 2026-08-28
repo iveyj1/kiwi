@@ -475,3 +475,47 @@ def test_every_registered_pair_is_uniquely_addressable():
     assert len(registered) == PALETTE_LEVELS**2
     masked = {n & 0xFF for n in registered}
     assert len(masked) == len(registered), "two pairs collide after 8-bit masking"
+
+
+def test_auto_scale_must_be_fitted_to_reduced_rows_not_raw_bins():
+    """Regression: max-hold shifts the distribution, so fitting raw bins is wrong.
+
+    Over n bins the median of the maxima is the 0.5**(1/n) quantile of the
+    input; for 1024 bins across 100 columns that is the 93rd percentile. Fitting
+    to raw rows left the pane almost entirely lit.
+    """
+    import random
+
+    from kiwi_client.waterfall_display import auto_scale_dbm, buffer_from_frames
+    from kiwi_client.waterfall_pane import pane_dbm_rows
+
+    random.seed(11)
+    raw = [[random.gauss(-80, 5) for _ in range(1024)] for _ in range(8)]
+    buffer = buffer_from_frames(raw)
+    reduced = pane_dbm_rows(buffer, width=100, height=4)
+
+    def black_fraction(window):
+        low, high = window
+        levels = [
+            dbm_to_level(v, min_dbm=low, max_dbm=high, levels=DEFAULT_LEVELS)
+            for row in reduced
+            for v in row
+        ]
+        return sum(1 for level in levels if level == 0) / len(levels)
+
+    assert black_fraction(auto_scale_dbm(reduced)) == pytest.approx(0.5, abs=0.12)
+    assert black_fraction(auto_scale_dbm(raw)) < 0.15, "fitting raw bins should be visibly wrong"
+
+
+def test_pane_dbm_rows_returns_what_gets_drawn():
+    from kiwi_client.waterfall_display import buffer_from_frames
+    from kiwi_client.waterfall_pane import cells_from_dbm_rows, pane_cells, pane_dbm_rows
+
+    buffer = buffer_from_frames([[-90.0 + (i + j) % 30 for j in range(256)] for i in range(6)])
+
+    rows = pane_dbm_rows(buffer, width=32, height=3)
+    split = cells_from_dbm_rows(rows, height=3, min_dbm=-95, max_dbm=-50)
+    combined = pane_cells(buffer, width=32, height=3, min_dbm=-95, max_dbm=-50)
+
+    assert len(rows) == 6 and len(rows[0]) == 32
+    assert split == combined, "the two-step and one-step paths must agree"

@@ -32,6 +32,49 @@ from kiwi_client.waterfall_palette import (
 from kiwi_client.waterfall_render import DEFAULT_REDUCTION, reduce_bins
 
 
+def pane_dbm_rows(
+    buffer: WaterfallImageBuffer,
+    *,
+    width: int,
+    height: int,
+    reduction: str = DEFAULT_REDUCTION,
+) -> tuple[tuple[float, ...], ...]:
+    """Return rows reduced to pane width, newest first: exactly what gets drawn.
+
+    Auto-scaling must be fitted to these values rather than to the raw bins.
+    Max-hold reduction shifts the distribution upwards by a lot: over n bins the
+    median of the maxima is the `0.5 ** (1/n)` quantile of the input, which for
+    1024 bins across 100 columns is the 93rd percentile. Fitting a window to the
+    raw rows therefore leaves far less of the display dark than intended.
+    """
+    if width < 1 or height < 0:
+        raise ValueError("pane width must be >= 1 and height >= 0")
+    if height == 0:
+        return ()
+    return tuple(
+        tuple(reduce_bins(row, width, reduction=reduction))
+        for row in buffer.rows(2 * height)
+    )
+
+
+def cells_from_dbm_rows(
+    rows: Sequence[Sequence[float]],
+    *,
+    height: int,
+    min_dbm: float = DEFAULT_MIN_DBM,
+    max_dbm: float = DEFAULT_MAX_DBM,
+    levels: int = DEFAULT_LEVELS,
+) -> tuple[tuple[HalfBlockCell, ...], ...]:
+    """Quantise already-reduced rows and pack them into half-block cells."""
+    if not rows:
+        return ()
+    level_rows = [
+        tuple(dbm_to_level(value, min_dbm=min_dbm, max_dbm=max_dbm, levels=levels) for value in row)
+        for row in rows
+    ]
+    return half_block_cells(level_rows, height=height)
+
+
 def pane_cells(
     buffer: WaterfallImageBuffer,
     *,
@@ -47,21 +90,8 @@ def pane_cells(
     Each character row shows two waterfall rows, so a pane `height` characters
     tall displays `2 * height` frames.
     """
-    if width < 1 or height < 0:
-        raise ValueError("pane width must be >= 1 and height >= 0")
-    if height == 0:
-        return ()
-    rows = buffer.rows(2 * height)
-    if not rows:
-        return ()
-    level_rows = [
-        tuple(
-            dbm_to_level(value, min_dbm=min_dbm, max_dbm=max_dbm, levels=levels)
-            for value in reduce_bins(row, width, reduction=reduction)
-        )
-        for row in rows
-    ]
-    return half_block_cells(level_rows, height=height)
+    rows = pane_dbm_rows(buffer, width=width, height=height, reduction=reduction)
+    return cells_from_dbm_rows(rows, height=height, min_dbm=min_dbm, max_dbm=max_dbm, levels=levels)
 
 
 def init_waterfall_pairs(
