@@ -750,6 +750,60 @@ def preview_terminal_fixture(path: Path, viewer: WaterfallTerminalViewer) -> int
     return frames
 
 
+class SwitchableAudioSink:
+    """Keep SND connected while lazily enabling or muting local audio output."""
+
+    def __init__(self, sink_factory: Callable[[], AudioSink], *, enabled: bool = False) -> None:
+        self.sink_factory = sink_factory
+        self.enabled = enabled
+        self.delegate: AudioSink | None = None
+        self.format: tuple[int, int, int] | None = None
+
+    def start(self, *, sample_rate_hz: int, channels: int, sample_width_bytes: int) -> None:
+        self.format = (sample_rate_hz, channels, sample_width_bytes)
+        if self.enabled:
+            self._start_delegate()
+
+    def _start_delegate(self) -> None:
+        if self.delegate is not None or self.format is None:
+            return
+        sink = self.sink_factory()
+        sample_rate_hz, channels, sample_width_bytes = self.format
+        sink.start(
+            sample_rate_hz=sample_rate_hz,
+            channels=channels,
+            sample_width_bytes=sample_width_bytes,
+        )
+        self.delegate = sink
+
+    def set_enabled(self, enabled: bool) -> None:
+        if enabled == self.enabled:
+            return
+        if enabled:
+            self.enabled = True
+            try:
+                self._start_delegate()
+            except Exception:
+                self.enabled = False
+                raise
+        else:
+            self.enabled = False
+            if self.delegate is not None:
+                self.delegate.stop()
+                self.delegate = None
+
+    def write(self, pcm: bytes) -> None:
+        if self.enabled:
+            self._start_delegate()
+            if self.delegate is not None:
+                self.delegate.write(pcm)
+
+    def stop(self) -> None:
+        if self.delegate is not None:
+            self.delegate.stop()
+            self.delegate = None
+
+
 class WaterfallAudioController:
     """Own one optional SND task without coupling it to W/F transport."""
 
@@ -761,15 +815,19 @@ class WaterfallAudioController:
         redraw_requested: asyncio.Event,
         sink_factory: Callable[[], AudioSink] = SoundDeviceSink,
         runner: Callable[..., Any] = play_live_snd,
+        output_enabled: bool = True,
     ) -> None:
         self.viewer = viewer
         self.config = config
         self.redraw_requested = redraw_requested
         self.sink_factory = sink_factory
         self.runner = runner
+        self.sink = SwitchableAudioSink(sink_factory, enabled=output_enabled)
         self.command_queue: queue.Queue[str] = queue.Queue()
         self.stop_event: Event | None = None
         self.task: asyncio.Task | None = None
+        self.ready = asyncio.Event()
+        self.error: str | None = None
 
     @property
     def enabled(self) -> bool:
@@ -787,28 +845,46 @@ class WaterfallAudioController:
                 radio_frequency_khz=radio_frequency_khz,
             )
         self.stop_event = Event()
+        self.ready.clear()
+        self.error = None
         self.viewer.set_audio_status("STARTING")
         self.redraw_requested.set()
         self.task = asyncio.create_task(self._run(self.stop_event))
         return True
 
     async def _run(self, stop_event: Event) -> None:
-        self.viewer.set_audio_status("ON")
-        self.redraw_requested.set()
+        def session_ready() -> None:
+            self.ready.set()
+            self.viewer.set_audio_status("ON" if self.sink.enabled else "MUTED")
+            self.redraw_requested.set()
+
         try:
             await self.runner(
                 self.config,
-                self.sink_factory(),
+                self.sink,
                 allow_live=True,
                 stop_event=stop_event,
                 command_queue=self.command_queue,
+                session_ready_callback=session_ready,
             )
         except Exception as exc:
+            self.error = str(exc)
             self.viewer.set_audio_status(f"ERROR {exc}")
             self.redraw_requested.set()
             return
         self.viewer.set_audio_status("OFF" if stop_event.is_set() else "ENDED")
         self.redraw_requested.set()
+
+    async def wait_ready(self) -> bool:
+        if self.task is None:
+            return False
+        ready_task = asyncio.create_task(self.ready.wait())
+        done, _pending = await asyncio.wait((ready_task, self.task), return_when=asyncio.FIRST_COMPLETED)
+        if ready_task in done and ready_task.result():
+            return True
+        ready_task.cancel()
+        await asyncio.gather(ready_task, return_exceptions=True)
+        return False
 
     async def stop(self) -> bool:
         if not self.enabled or self.stop_event is None or self.task is None:
@@ -821,10 +897,16 @@ class WaterfallAudioController:
         return True
 
     async def toggle(self) -> None:
-        if self.enabled:
-            await self.stop()
+        if not self.enabled:
+            return
+        try:
+            self.sink.set_enabled(not self.sink.enabled)
+        except Exception as exc:
+            self.error = str(exc)
+            self.viewer.set_audio_status(f"ERROR {exc}")
         else:
-            self.start()
+            self.viewer.set_audio_status("ON" if self.sink.enabled else "MUTED")
+        self.redraw_requested.set()
 
     def tune_to_cursor(self) -> bool:
         if not self.enabled:
@@ -927,6 +1009,7 @@ async def view_live_waterfall(
             redraw_requested=redraw_requested,
             sink_factory=audio_sink_factory,
             runner=audio_runner,
+            output_enabled=audio_start,
         )
         if audio_config is not None
         else None
@@ -956,6 +1039,13 @@ async def view_live_waterfall(
             elif stopping:
                 return
 
+    if audio_controller is not None:
+        audio_controller.start()
+        if not await audio_controller.wait_ready():
+            error = audio_controller.error or "SND session ended before becoming ready"
+            await audio_controller.finish()
+            raise LiveCaptureError(f"audio session failed before W/F startup: {error}")
+
     capture_task = asyncio.create_task(
         capture_live_waterfall(
             config,
@@ -981,8 +1071,6 @@ async def view_live_waterfall(
         if keyboard_fd is not None
         else None
     )
-    if audio_start and audio_controller is not None:
-        audio_controller.start()
     try:
         done, _pending = await asyncio.wait(
             (capture_task, render_task),

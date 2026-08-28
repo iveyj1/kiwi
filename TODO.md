@@ -2,6 +2,19 @@
 
 ## Current slice
 
+Goal: Establish SND as the primary Kiwi session before opening paired W/F.
+
+Observed failure: even with a shared timestamp, `--audio` immediately caused proxy W/F closure code 1005. Kiwi browser startup calls `open_websocket('SND', ...)` before `open_websocket('W/F', ...)`; the project created the W/F capture task first and only then scheduled SND, so the proxy saw the pairing in reverse order.
+
+Done criteria:
+
+- Add an optional SND-ready callback at the point the SND socket is open and auth has been sent.
+- For `--audio` startup, create SND first and await readiness before constructing/opening W/F.
+- Abort cleanly if SND fails before readiness instead of opening an orphan paired W/F.
+- Add deterministic fake-runner ordering/failure tests and retain separate session task ownership.
+- Document that adding audio to an already-open W/F session may require a controlled W/F restart in a subsequent slice.
+- Run full harness and merge `fix/wf-audio-primary-order` into `wf1`; do not automatically connect externally.
+
 Goal: Pair combined W/F and SND connections with one Kiwi session timestamp.
 
 Observed failure: pressing `a` on `misdr.proxy.kiwisdr.com:8073` caused the existing W/F socket to close with code 1005. Kiwi browser source uses one `kiwi.conn_tstamp` for both `SND` and `W/F`; the combined client left both timestamps as `None`, so each delayed `websocket_uri()` call generated a different timestamp.

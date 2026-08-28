@@ -542,7 +542,7 @@ Live keyboard controls are local-only and do not send tuning or zoom commands:
 - `c`: recenter the current W/F zoom on the exact cursor frequency.
 - `+` / `=`: zoom in one level around the cursor.
 - `-`: zoom out one level around the cursor.
-- `a`: toggle the separately owned SND audio session.
+- `a`: toggle local audio output while keeping the paired SND session alive.
 - Enter: tune active audio to the exact cursor frequency using current mode/passband.
 - `q`: stop W/F and audio cleanly.
 
@@ -550,7 +550,7 @@ The status row reports cursor frequency, offset from tuned frequency, and source
 
 Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands.
 
-Audio uses a separate SND WebSocket owned by the same viewer lifecycle. Start it with `--audio`, `[waterfall].audio = true`, or toggle it with `a`; use `--null-audio` to test the SND session while discarding samples. Enter sends `SET mod=...` for the exact cursor frequency, mode, and passband. CW preserves the project convention that cursor/user frequency is passband center and applies configured `cw_offset_hz` to radio frequency. Audio errors appear in the status row without terminating W/F. SND and W/F reuse one Kiwi session timestamp even when audio starts later, matching browser pairing behavior.
+The combined live viewer always establishes its separately owned SND WebSocket first, then opens paired W/F with the same session timestamp, matching Kiwi browser order. Without `--audio` / `[waterfall].audio = true`, the SND stream remains connected but the lazy local sink is `MUTED`; `a` toggles local output without tearing down the primary SND session. `--null-audio` keeps output device-free even when toggled ON. Enter sends `SET mod=...` for the exact cursor frequency, mode, and passband. CW preserves the project convention that cursor/user frequency is passband center and applies configured `cw_offset_hz` to radio frequency. A primary SND startup failure prevents opening orphan W/F; later audio-device errors are shown in status.
 
 `kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
 

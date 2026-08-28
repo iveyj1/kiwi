@@ -300,6 +300,7 @@ async def play_live_snd(
     stop_event: Event | None = None,
     command_queue: queue.Queue[str] | None = None,
     status_callback: Callable[[dict], None] | None = None,
+    session_ready_callback: Callable[[], None] | None = None,
 ) -> PlaybackResult:
     """Run one guarded live SND playback session."""
     config.validate()
@@ -334,6 +335,8 @@ async def play_live_snd(
     ) as websocket:
         try:
             await websocket.send(encode_auth())
+            if session_ready_callback is not None:
+                session_ready_callback()
             while snd_loop_allowed(start, snd_frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
                 if stop_event is not None and stop_event.is_set() and not fading_out:
                     fade_out_total = samples_for_ms(state.sample_rate, config.stop_fade_out_ms)
