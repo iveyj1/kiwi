@@ -27,7 +27,7 @@ max_frames = 0
 # Keep restricted=true for normal local-radio work.
 # Set restricted=false only when you explicitly want unrestricted receiver addresses.
 restricted = false
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073", "misdr.proxy.kiwisdr.com:8073"]
 
 [presets]
 # Durable radio and receiver-register presets live here.
