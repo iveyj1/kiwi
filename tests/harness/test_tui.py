@@ -186,6 +186,25 @@ def test_render_dashboard_shows_connected_for_running_operation():
     assert "Connected: yes" in text
 
 
+def test_render_dashboard_includes_shared_paired_session_status():
+    text = render_dashboard(
+        ClientState(),
+        paired_session={
+            "desired_receiver": "10.0.0.40:8073",
+            "active_receiver": "10.0.0.40:8073",
+            "snd_status": "running",
+            "wf_status": "inactive",
+            "audio_enabled": True,
+            "waterfall_zoom": 7,
+        },
+    )
+
+    assert "Session receiver: 10.0.0.40:8073" in text
+    assert "Active receiver: 10.0.0.40:8073" in text
+    assert "Streams: SND running / W/F inactive" in text
+    assert "Session audio: ON | W/F zoom: 7" in text
+
+
 def test_render_dashboard_includes_persistent_live_state():
     state = ClientState(
         host="10.0.0.41",

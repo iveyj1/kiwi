@@ -405,6 +405,22 @@ New controller tests cover initialization from CW `ClientState`, radio command s
 
 Map legacy playback lifecycle and generation-aware errors into the shared state, then display paired status in the TUI before starting W/F from it.
 
+## 2026-09-03 — TUI paired lifecycle status adapter
+
+### Decision
+
+Mapped current legacy audio-only `BackgroundOperation` playback into the generation-aware shared session snapshot without changing live startup. Playback start records a new shared generation and desired receiver; status maps SND to running/stopping/failed/stopped and explicitly marks W/F inactive. Intentional stop advances generation so late worker state cannot overwrite the newer stop state. Local audio enabled state reflects null versus real sink selection.
+
+Extended the pure TUI dashboard with optional shared-session lines for desired/active receiver, SND/W/F states, audio state, and W/F zoom. Legacy operation metrics and `RadioSessionState` remain during migration.
+
+### Test result
+
+New controller and dashboard tests cover audio-only lifecycle mapping and paired status rendering. Targeted client/session/TUI harness: 99 tests passed. Full harness: 306 tests passed in 3.91 seconds; `compileall` and `git diff --check` passed. Existing receiver-switch recovery tests remain green. No live connection was made.
+
+### Follow-up
+
+Define and harness a paired TUI operation using `PairedSessionCoordinator`, initially publishing W/F state/metrics without embedding terminal graphics.
+
 ## YYYY-MM-DD
 
 ### Finding

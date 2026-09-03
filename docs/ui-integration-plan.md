@@ -78,6 +78,10 @@ Migrate standalone viewer and TUI actions to the same command API. Preserve exis
 
 ## Phase 3 — TUI integration
 
+Status: **Lifecycle/status adapter started; paired W/F startup not yet enabled.**
+
+Current audio-only `BackgroundOperation` playback is represented as generation-aware SND running/stopping/failed state with W/F explicitly inactive. The pure dashboard can display desired/active receiver, SND/W/F states, audio state, and zoom while legacy operation details remain available.
+
 Add paired-session lifecycle and status to `kiwi-tui` without embedding graphics first.
 
 - Start/stop the shared interactive session.

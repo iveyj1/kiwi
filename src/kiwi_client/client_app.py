@@ -25,7 +25,12 @@ from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
-from kiwi_client.session_manager import RadioSessionManager, RadioSessionSnapshot
+from kiwi_client.session_manager import (
+    RadioSessionManager,
+    RadioSessionSnapshot,
+    SetSessionIntent,
+    TransportUpdate,
+)
 from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
@@ -302,6 +307,7 @@ class ClientController:
         self.last_play_bg_null_sink = False
         self.session = RadioSessionState(desired_receiver=self.state.receiver)
         self.paired_session = RadioSessionManager(paired_snapshot_from_client_state(self.state))
+        self._background_session_generation: int | None = None
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -392,7 +398,7 @@ class ClientController:
                 "type": "status",
                 "state": self._state_dict_with_connection(),
                 "session": self.session_status().as_dict(),
-                "paired_session": self.paired_session.state.as_dict(),
+                "paired_session": self.paired_session_status().as_dict(),
             }
         if command == "connect":
             self.state = replace(self.state, connected=True)
@@ -537,6 +543,34 @@ class ClientController:
         state["connected"] = bool(self.state.connected or self.background.status().running)
         return state
 
+    def paired_session_status(self) -> RadioSessionSnapshot:
+        """Return shared session state adapted from the current legacy worker."""
+        self._sync_paired_session(selection_follows_tune=False)
+        status = self.background.status()
+        generation = self._background_session_generation
+        if status.name != "play" or generation is None or generation != self.paired_session.state.generation:
+            return self.paired_session.state
+        if status.running:
+            snd_status = "stopping" if status.stop_requested else "running"
+            self.paired_session.dispatch(
+                TransportUpdate(
+                    "snd",
+                    snd_status,
+                    generation=generation,
+                    active_receiver=self.state.receiver,
+                )
+            )
+            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+        elif status.error:
+            self.paired_session.dispatch(
+                TransportUpdate("snd", "failed", generation=generation, error=status.error)
+            )
+            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+        else:
+            self.paired_session.dispatch(TransportUpdate("snd", "stopped", generation=generation))
+            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+        return self.paired_session.state
+
     def session_status(self) -> RadioSessionState:
         """Return a session snapshot derived from controller intent and worker status."""
         status = self.background.status()
@@ -633,6 +667,14 @@ class ClientController:
     def _start_playback_background(self, null_sink: bool) -> dict[str, Any]:
         config = self._playback_config()
         self.last_play_bg_null_sink = null_sink
+        paired = self.paired_session.dispatch(
+            SetSessionIntent(running=True, receiver=self.state.receiver)
+        )
+        self._background_session_generation = paired.state.generation
+        self.paired_session.state = replace(
+            self.paired_session.state,
+            audio_enabled=not null_sink,
+        )
         self.session = replace(
             self.session,
             mode="starting",
@@ -659,6 +701,7 @@ class ClientController:
         status = self.background.stop()
         if status.name == "play":
             self.session = replace(self.session, mode="stopping", desired_playback=False, error=None)
+            self.paired_session.dispatch(SetSessionIntent(running=False))
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
     def _wait_background(self, timeout: float | None) -> dict[str, Any]:
@@ -668,6 +711,14 @@ class ClientController:
                 self.session = replace(self.session, mode="failed", active_receiver=None, error=status.error)
             else:
                 self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
+            if not self.paired_session.state.desired_running:
+                self.paired_session.state = replace(
+                    self.paired_session.state,
+                    active_receiver=None,
+                    snd_status="stopped",
+                    wf_status="stopped",
+                    error=None,
+                )
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
     def _sync_paired_session(self, *, selection_follows_tune: bool = True) -> None:

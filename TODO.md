@@ -1,25 +1,27 @@
 # TODO
 
-## Current slice — Paired lifecycle adapter
+## Current slice — Paired TUI operation design
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
 Completed in this branch:
 
 - Added UI-neutral paired transport coordinator and typed interactive session model.
-- `ClientController` now initializes/synchronizes shared receiver, tuned/selected frequency, mode, passband, CW offset, and command precision.
-- Controller `status` exposes the shared snapshot while retaining legacy `RadioSessionState` compatibility.
-- Full harness: 304 tests passed.
+- Added `ClientController` state and generation-aware audio-only lifecycle adapters.
+- TUI dashboard can display desired/active receiver, SND/W/F status, audio state, and W/F zoom while retaining legacy operation details.
+- Existing receiver-switch rollback behavior remains harnessed.
+- Full harness: 306 tests passed.
 
-Next goal: map legacy playback start/stop/failure/switch transitions into generation-aware paired lifecycle state, then expose those fields in the TUI dashboard without starting W/F yet.
+Next goal: design the smallest paired TUI operation that replaces startup `play-bg` when W/F is requested, without embedding graphics yet.
 
 Done criteria:
 
-- Map current audio-only `BackgroundOperation` states accurately as SND state with W/F marked inactive/waiting as appropriate.
-- Preserve receiver-switch recovery and rollback behavior.
-- Prevent stale worker errors from replacing a newer generation.
-- Render paired desired/active receiver and SND/W/F status in pure TUI dashboard tests.
-- Do not change live startup defaults or connect to a receiver.
+- Define explicit start/stop command/API semantics for audio-only versus paired interactive sessions.
+- Reuse `PairedSessionCoordinator`; do not duplicate SND/W/F ordering logic.
+- Publish W/F metadata/frame cadence metrics to the controller without terminal-renderer dependencies.
+- Route typed controller SND/W/F commands to the correct queues.
+- Add fake-runner lifecycle tests before exposing any live command.
+- Do not connect to a receiver.
 
 ## Plan
 

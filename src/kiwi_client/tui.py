@@ -368,6 +368,7 @@ def render_dashboard(
     *,
     message: str = "",
     operation: dict[str, Any] | None = None,
+    paired_session: dict[str, Any] | None = None,
     frequency_decimals: int = 3,
 ) -> str:
     """Render a text dashboard for tests and curses display."""
@@ -392,6 +393,14 @@ def render_dashboard(
         "",
         "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, record-bg, capture-bg, stop, help, quit",
     ])
+    if paired_session is not None:
+        lines.extend([
+            "",
+            f"Session receiver: {paired_session.get('desired_receiver') or 'none'}",
+            f"Active receiver: {paired_session.get('active_receiver') or 'none'}",
+            f"Streams: SND {paired_session.get('snd_status', 'unknown')} / W/F {paired_session.get('wf_status', 'unknown')}",
+            f"Session audio: {'ON' if paired_session.get('audio_enabled') else 'OFF'} | W/F zoom: {paired_session.get('waterfall_zoom', 0)}",
+        ])
     if operation is not None:
         lines.extend([
             "",
@@ -825,6 +834,7 @@ def _run_curses(stdscr, controller: ClientController, config: KiwiClientConfig) 
             last_response,
             message=message,
             operation=controller.background.status().as_dict(),
+            paired_session=controller.paired_session_status().as_dict(),
             frequency_decimals=config.display.frequency_decimals,
         )
         hints = render_tui_hints(input_state, config, controller)

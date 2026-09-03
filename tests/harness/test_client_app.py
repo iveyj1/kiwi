@@ -307,6 +307,26 @@ def test_controller_radio_commands_sync_shared_snapshot_and_status_output():
     assert "session" in response  # legacy compatibility during migration
 
 
+def test_background_playback_maps_to_generation_aware_shared_lifecycle():
+    controller = ClientController(operations=FakeOperations())
+
+    started = controller.execute("play-bg --allow-live --null-sink")
+    active = controller.paired_session_status()
+    controller.execute("stop")
+    controller.execute("wait 1")
+    stopped = controller.paired_session_status()
+
+    assert started["session"]["desired_playback"] is True
+    assert active.desired_running is True
+    assert active.snd_status == "running"
+    assert active.wf_status == "inactive"
+    assert active.active_receiver == controller.state.receiver
+    assert stopped.desired_running is False
+    assert stopped.snd_status == "stopped"
+    assert stopped.wf_status == "stopped"
+    assert stopped.active_receiver is None
+
+
 def test_client_switch_receiver_idle_updates_session_without_playback():
     controller = ClientController()
 
