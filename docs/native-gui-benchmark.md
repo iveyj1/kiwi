@@ -83,6 +83,32 @@ A toolkit must keep producer memory bounded and consume only the latest newer sn
 - Clean window close and worker wakeup.
 - Keep toolkit-specific code outside transport, protocol, and session modules.
 
+## Adapter comparison — 2026-09-03
+
+Headless/dummy direct-RGB test, 400 alternating frames per size. This measures toolkit conversion/event processing without compositor pacing and therefore demonstrates margin rather than visible FPS.
+
+```text
+Toolkit   | Size     | mean ms | p95 ms | startup ms* | Installed MB | Notes
+PySide6   | 1024x200 | 0.199   | 0.431  | 82.6        | 226.2        | Essentials + shiboken only
+PySide6   | 1024x400 | 0.412   | 0.609  | 1.2         | 226.2        | QApplication reused
+PySide6   | 1024x800 | 0.827   | 1.122  | 1.8         | 226.2        | QApplication reused
+pygame-ce | 1024x200 | 0.419   | 0.540  | 52.7        | 32.2         | SDL dummy driver
+pygame-ce | 1024x400 | 0.844   | 1.115  | 31.9        | 32.2         | display recreated
+pygame-ce | 1024x800 | 1.510   | 2.412  | 34.3         | 32.2         | display recreated
+```
+
+`*` First-start and repeated-start behavior differ, so startup values are descriptive rather than directly averaged.
+
+Both candidates have ample direct-RGB margin over the 20 FPS requirement. PySide6 is selected for the first GUI prototype despite its larger optional footprint because it is faster here and supplies mature controls, layouts, keyboard/mouse handling, accessibility, and packaging primitives that pygame would require the project to build. Keep pygame-ce as a smaller fallback candidate until an attended PySide6 window test confirms Linux display behavior.
+
+Install candidates only when benchmarking:
+
+```bash
+.kiwi-venv/bin/python -m pip install -e '.[gui-benchmark]'
+```
+
+Run either adapter with `--no-headless` for an attended compositor/window test.
+
 ## Result format
 
 Add one table to this document after running prototypes:

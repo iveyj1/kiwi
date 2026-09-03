@@ -1,24 +1,25 @@
 # TODO
 
-## Current slice — Native GUI candidate selection
+## Current slice — PySide6 fixture GUI prototype
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Completed in this branch:
+Completed comparison:
 
-- Added shared paired coordinator, typed session/controller/TUI lifecycle, headless `radio-bg`, and renderer-neutral snapshots.
-- Added toolkit-independent `tools/waterfall_gui_benchmark.py` with deterministic 1024-bin workloads, latest-generation coalescing, and JSON metrics.
-- Added 200/400/800-row no-window baseline results to `docs/native-gui-benchmark.md`.
-- Current environment has no Tkinter, PySide6, or pygame installed; no GUI dependency was added automatically.
+- Both PySide6 and pygame-ce exceed the 20 FPS direct-RGB target in headless benchmarks.
+- PySide6 Essentials measured roughly 0.41 ms mean / 0.61 ms p95 at 1024×400 versus pygame-ce 0.84/1.11 ms.
+- PySide6 Essentials is much larger (about 226 MB versus 32 MB), but is selected for the first prototype because mature widgets/layout/input avoid building a desktop UI framework inside the project.
+- Both remain optional extras; default installation is unchanged.
 
-Next goal: select the first isolated GUI benchmark candidate and dependency strategy before implementation.
+Next goal: add a fixture-only PySide6 window using `WaterfallSnapshotPublisher` and existing raster/overlay code.
 
-Decision criteria:
+Done criteria:
 
-- Prefer direct RGB/texture upload and reliable 1024×400 at 20 FPS.
-- Keep the candidate optional and outside default dependencies.
-- Account for installation/package size, Linux integration, input/widgets, and future zoom-history remapping.
-- Compare at least two viable candidates with the common workload before committing to the production frontend.
+- Keep PySide6 imports optional and report a clear installation command.
+- Render captured fixture history via direct `QImage`/`QPixmap`, not PNG/base64.
+- Add basic frequency/status text and clean window close.
+- Harness the model/controller boundary without requiring a display server.
+- Provide an attended fixture demo command; no receiver connection in this slice.
 
 ## Plan
 

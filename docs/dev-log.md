@@ -473,6 +473,22 @@ Four harness tests cover deterministic frame generation, exact slower-consumer c
 
 Choose an isolated optional toolkit benchmark strategy. Compare at least two viable adapters before selecting the production native frontend.
 
+## 2026-09-03 — Native GUI adapter comparison
+
+### Decision
+
+Added a common direct-RGB adapter benchmark with deferred imports and fake-adapter lifecycle tests. Added separate optional `gui-pyside`, `gui-pygame`, and `gui-benchmark` extras; default/setup dependencies remain unchanged. Compared PySide6/Qt offscreen with pygame-ce/SDL dummy at 1024×200/400/800 over 400 alternating frames.
+
+Both have ample margin over 20 FPS. At 1024×400, PySide6 measured about 0.412 ms mean / 0.609 ms p95 presentation cost; pygame-ce measured 0.844/1.115 ms. PySide6 Essentials plus shiboken occupies about 226 MB versus pygame-ce about 32 MB. Select PySide6 for the first fixture GUI prototype because its widget/layout/input facilities remove substantial application code; retain pygame-ce as a fallback pending an attended real-window test.
+
+### Test result
+
+Four fake-adapter tests cover deterministic RGB, common lifecycle/timing results, cleanup after failure, and multi-height JSON CLI output. Optional PySide6 6.11.2 and pygame-ce 2.5.8 were installed in `.kiwi-venv` for benchmarking only. Full harness pending after the next fixture-prototype slice. No receiver connection was made.
+
+### Follow-up
+
+Build a fixture-only PySide6 window against the shared snapshot/raster boundary, then perform an attended local window test before any live-session integration.
+
 ## YYYY-MM-DD
 
 ### Finding

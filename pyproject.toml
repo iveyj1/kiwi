@@ -18,6 +18,16 @@ playback = [
 image = [
     "matplotlib>=3.8",
 ]
+gui-pyside = [
+    "PySide6-Essentials>=6.8",
+]
+gui-pygame = [
+    "pygame-ce>=2.5",
+]
+gui-benchmark = [
+    "PySide6-Essentials>=6.8",
+    "pygame-ce>=2.5",
+]
 
 [project.scripts]
 kiwi-client = "kiwi_client.client_app:main"
