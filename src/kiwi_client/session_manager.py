@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import TypeAlias
 
 from kiwi_client.commands import encode_modulation, encode_waterfall_view
@@ -38,6 +38,9 @@ class RadioSessionSnapshot:
     waterfall_zoom: int = 0
     waterfall_zoom_max: int = 14
     audio_enabled: bool = False
+
+    def as_dict(self) -> dict:
+        return asdict(self)
 
     def __post_init__(self) -> None:
         for name, value in (

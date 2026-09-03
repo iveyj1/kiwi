@@ -391,6 +391,20 @@ Six pure tests cover exact dual-stream direct tuning, CW offset, recenter/zoom b
 
 Add a compatibility adapter from `ClientState`/`ClientController` into the shared snapshot and migrate controller command routing incrementally.
 
+## 2026-09-03 — ClientController shared-state adapter
+
+### Decision
+
+Added `paired_snapshot_from_client_state()` and initialized a `RadioSessionManager` inside `ClientController`. Tune, tune-step, mode, filter, atomic batches, receiver changes, and status synchronize the shared receiver/frequency/mode/passband/CW/precision snapshot. `status` now includes `paired_session` while retaining the legacy `session` response during migration. No live operation behavior changed.
+
+### Test result
+
+New controller tests cover initialization from CW `ClientState`, radio command synchronization, exact frequency state, passband changes, and compatible status output. Targeted client/session/TUI tests: 97 passed. Full harness: 304 tests passed in 3.78 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+Map legacy playback lifecycle and generation-aware errors into the shared state, then display paired status in the TUI before starting W/F from it.
+
 ## YYYY-MM-DD
 
 ### Finding

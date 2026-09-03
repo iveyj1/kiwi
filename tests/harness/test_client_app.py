@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from kiwi_client.client_app import ClientCommandError, ClientController, run_script, main
+from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, run_script, main
 
 
 class FakeVolumeControl:
@@ -266,6 +266,45 @@ def test_client_receiver_invalid_port_reports_command_error():
 
     with pytest.raises(ClientCommandError, match="invalid receiver port"):
         controller.execute("receiver http://example.com:bad/")
+
+
+def test_controller_initializes_shared_session_snapshot_from_client_state():
+    controller = ClientController(
+        state=ClientState(
+            host="10.0.0.40",
+            port=8073,
+            frequency_khz=335.1255,
+            mode="cw",
+            low_cut_hz=650,
+            high_cut_hz=1050,
+            cw_offset_hz=-800,
+            frequency_command_decimals=4,
+        )
+    )
+
+    shared = controller.paired_session.state
+
+    assert shared.desired_receiver == "10.0.0.40:8073"
+    assert shared.frequency_khz == shared.selected_khz == pytest.approx(335.1255)
+    assert shared.mode == "cw"
+    assert (shared.low_cut_hz, shared.high_cut_hz) == (650, 1050)
+    assert shared.cw_offset_hz == -800
+    assert shared.frequency_decimals == 4
+
+
+def test_controller_radio_commands_sync_shared_snapshot_and_status_output():
+    controller = ClientController(state=ClientState())
+
+    controller.execute("tune 6000.125")
+    controller.execute("mode usb 100 2800")
+    response = controller.execute("status")
+
+    shared = controller.paired_session.state
+    assert shared.frequency_khz == shared.selected_khz == pytest.approx(6000.125)
+    assert shared.mode == "usb"
+    assert (shared.low_cut_hz, shared.high_cut_hz) == (100, 2800)
+    assert response["paired_session"] == shared.as_dict()
+    assert "session" in response  # legacy compatibility during migration
 
 
 def test_client_switch_receiver_idle_updates_session_without_playback():

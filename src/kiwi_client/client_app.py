@@ -25,6 +25,7 @@ from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
+from kiwi_client.session_manager import RadioSessionManager, RadioSessionSnapshot
 from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
@@ -130,6 +131,27 @@ class ClientState:
 
 class ClientCommandError(ValueError):
     """Raised for invalid client shell commands."""
+
+
+def paired_snapshot_from_client_state(
+    state: ClientState,
+    previous: RadioSessionSnapshot | None = None,
+    *,
+    selection_follows_tune: bool = True,
+) -> RadioSessionSnapshot:
+    """Adapt legacy client state into the shared interactive-session model."""
+    snapshot = previous or RadioSessionSnapshot()
+    return replace(
+        snapshot,
+        desired_receiver=state.receiver,
+        frequency_khz=state.frequency_khz,
+        selected_khz=state.frequency_khz if selection_follows_tune else snapshot.selected_khz,
+        mode=state.mode,
+        low_cut_hz=state.low_cut_hz,
+        high_cut_hz=state.high_cut_hz,
+        cw_offset_hz=state.cw_offset_hz,
+        frequency_decimals=state.frequency_command_decimals,
+    )
 
 
 def normalized_mode(mode: str) -> str:
@@ -279,6 +301,7 @@ class ClientController:
         self.receiver_presets: dict[Any, dict[str, str]] = dict(receiver_presets or {})
         self.last_play_bg_null_sink = False
         self.session = RadioSessionState(desired_receiver=self.state.receiver)
+        self.paired_session = RadioSessionManager(paired_snapshot_from_client_state(self.state))
         self.running = True
 
     def execute(self, line: str) -> dict[str, Any] | None:
@@ -324,6 +347,7 @@ class ClientController:
             if command == "agc" and len(shlex.split(command_line)) > 1:
                 touched_agc = True
         self.state = trial.state
+        self._sync_paired_session()
         self.presets = dict(trial.presets)
         self.receiver_presets = dict(trial.receiver_presets)
         active_commands: list[str] = []
@@ -363,7 +387,13 @@ class ClientController:
         if command == "help":
             return {"type": "help", "commands": available_commands()}
         if command == "status":
-            return {"type": "status", "state": self._state_dict_with_connection(), "session": self.session_status().as_dict()}
+            self._sync_paired_session()
+            return {
+                "type": "status",
+                "state": self._state_dict_with_connection(),
+                "session": self.session_status().as_dict(),
+                "paired_session": self.paired_session.state.as_dict(),
+            }
         if command == "connect":
             self.state = replace(self.state, connected=True)
             return {"type": "state", "state": self.state.as_dict()}
@@ -596,6 +626,7 @@ class ClientController:
 
     def _set_receiver_response(self, value: str) -> dict[str, Any]:
         self.state = self._with_receiver(value)
+        self._sync_paired_session(selection_follows_tune=False)
         self.session = replace(self.session, desired_receiver=self.state.receiver)
         return {"type": "state", "state": self.state.as_dict(), "session": self.session_status().as_dict()}
 
@@ -639,6 +670,13 @@ class ClientController:
                 self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
+    def _sync_paired_session(self, *, selection_follows_tune: bool = True) -> None:
+        self.paired_session.state = paired_snapshot_from_client_state(
+            self.state,
+            self.paired_session.state,
+            selection_follows_tune=selection_follows_tune,
+        )
+
     def _modulation_command(self) -> str:
         return encode_modulation(
             self.state.mode,
@@ -649,6 +687,7 @@ class ClientController:
         )
 
     def _state_response(self) -> dict[str, Any]:
+        self._sync_paired_session()
         command = self._modulation_command()
         return self._state_response_with_active_command(command)
 
