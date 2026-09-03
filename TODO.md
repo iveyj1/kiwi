@@ -1,22 +1,25 @@
 # TODO
 
-## Current slice — Shared paired-session coordinator
+## Current slice — Controller session manager foundation
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Goal: extract Kiwi paired SND/W/F lifecycle ownership from the terminal UI into a reusable, UI-neutral coordinator.
+Completed in this branch:
+
+- Added UI-neutral `PairedSessionCoordinator` with shared timestamp resolution.
+- Migrated `kiwi-wf-terminal` to SND-first/W/F-second coordinated startup and cleanup.
+- Covered readiness failure, cancellation, W/F failure, post-ready SND error policy, and separate command queues with fake runners.
+- Full harness: 296 tests passed.
+
+Next goal: introduce the controller-owned session/action model without changing existing TUI behavior.
 
 Done criteria:
 
-- Keep one shared session timestamp in the supplied SND/W/F configs.
-- Start primary SND and await authenticated readiness before starting paired W/F.
-- Abort without opening W/F when SND fails before readiness.
-- Keep separate bounded-lifecycle SND and W/F tasks and command queues.
-- Stop SND cleanly when W/F completes, fails, or is cancelled.
-- Report SND failure after readiness independently while allowing W/F policy to remain explicit.
-- Add deterministic fake-runner tests before moving terminal behavior.
-- Migrate `kiwi-wf-terminal` to the coordinator without changing controls, rendering, or live guardrails.
-- Run targeted and full harnesses; no automatic live receiver connection.
+- Define immutable desired/active paired-session state and generation-aware errors.
+- Define typed tune, recenter, zoom, audio, and direct-frequency actions independent of curses and Kitty.
+- Add pure state-transition/command-routing tests.
+- Keep existing `RadioSessionState` compatibility while preparing migration from raw `BackgroundOperation` inference.
+- Do not connect to a receiver.
 
 ## Plan
 

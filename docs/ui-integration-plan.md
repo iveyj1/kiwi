@@ -41,6 +41,10 @@ Frontends
 
 ## Phase 1 — Shared paired-session coordinator
 
+Status: **Done for the existing combined terminal session.**
+
+`src/kiwi_client/paired_session.py` now owns shared timestamp resolution plus SND-first/W/F-second startup, shared stop ownership, independent command queues, readiness, and cleanup. `kiwi-wf-terminal` uses it while retaining terminal-specific rendering, input, and audio status presentation.
+
 Extract SND-first/W/F-second startup, shared stop ownership, independent command queues, readiness, status, and error isolation from `waterfall_terminal.py` into a UI-neutral module.
 
 Done criteria:
@@ -53,6 +57,8 @@ Done criteria:
 - `kiwi-wf-terminal` uses the shared coordinator with no user-visible regression.
 
 ## Phase 2 — Controller session manager
+
+Status: **Next.**
 
 Introduce a controller-owned `RadioSessionManager` around the paired coordinator.
 

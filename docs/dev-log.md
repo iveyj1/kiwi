@@ -359,6 +359,22 @@ Pure decoder/parser/model tests and pseudo-terminal routing tests cover editing,
 
 User-attended validation of `f` entry after merge.
 
+## 2026-09-03 — Shared paired-session coordinator
+
+### Decision
+
+After merging the completed `wf1` history into `main`, added `docs/ui-integration-plan.md` on `feature/shared-radio-session`. Curses remains a control/diagnostic fallback rather than the primary graphical architecture. Shared receiver lifecycle comes first, followed by controller/TUI integration and a native raster frontend evaluation.
+
+Extracted shared timestamp assignment and SND-first/W/F-second lifecycle into UI-neutral `src/kiwi_client/paired_session.py`. `PairedSessionCoordinator` owns the shared stop boundary and distinct SND/W/F command queues. The terminal viewer retains rendering/input policy but now runs capture through the coordinator. Pre-readiness SND failure prevents W/F startup; W/F completion, failure, and cancellation stop primary SND. Post-readiness SND errors remain independently visible under the existing terminal audio controller policy.
+
+### Test result
+
+New fake-runner tests cover timestamp assignment/mismatch, startup ordering, readiness failure, independent queues, cancellation, W/F failure, and post-ready primary error policy. Targeted paired/terminal harness: 54 tests passed. Full harness: 296 tests passed in 3.99 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+Add the controller-owned paired-session state and typed action foundation before changing TUI behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -26,6 +26,7 @@ from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
+from kiwi_client.paired_session import PairedSessionCoordinator, pair_session_configs
 from kiwi_client.playback import AudioSink, NullAudioSink, SoundDeviceSink
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
@@ -820,7 +821,7 @@ class WaterfallTerminalViewer:
             self._drawn_generation = max(self._drawn_generation, generation)
 
     def finish(self) -> None:
-        if self.needs_draw:
+        if self.needs_draw and self.has_history:
             self.draw()
         finish_backend = getattr(self.backend, "finish", None)
         if finish_backend is not None:
@@ -1127,6 +1128,8 @@ async def view_live_waterfall(
     redraw_requested = asyncio.Event()
     stop_event = Event()
     command_queue: queue.Queue[str] = queue.Queue()
+    if audio_config is not None:
+        config, audio_config = pair_session_configs(config, audio_config)
     audio_controller = (
         WaterfallAudioController(
             viewer=viewer,
@@ -1168,23 +1171,26 @@ async def view_live_waterfall(
             elif stopping:
                 return
 
-    if audio_controller is not None:
-        audio_controller.start()
-        if not await audio_controller.wait_ready():
-            error = audio_controller.error or "SND session ended before becoming ready"
-            await audio_controller.finish()
-            raise LiveCaptureError(f"audio session failed before W/F startup: {error}")
+    coordinator = PairedSessionCoordinator(
+        primary=audio_controller,
+        stop_event=stop_event,
+        waterfall_command_queue=command_queue,
+    )
 
-    capture_task = asyncio.create_task(
-        capture_live_waterfall(
+    async def run_waterfall(
+        paired_stop_event: Event,
+        paired_command_queue: queue.Queue[str],
+    ) -> Path:
+        return await capture_live_waterfall(
             config,
             allow_live=allow_live,
-            stop_event=stop_event,
+            stop_event=paired_stop_event,
             frame_callback=receive_frame,
-            command_queue=command_queue,
+            command_queue=paired_command_queue,
             websocket_connect=websocket_connect,
         )
-    )
+
+    capture_task = asyncio.create_task(coordinator.run(run_waterfall))
     render_task = asyncio.create_task(render_latest())
     keyboard_task = (
         asyncio.create_task(
@@ -1219,8 +1225,6 @@ async def view_live_waterfall(
         if keyboard_task is not None:
             keyboard_task.cancel()
             await asyncio.gather(keyboard_task, return_exceptions=True)
-        if audio_controller is not None:
-            await audio_controller.finish()
         try:
             await render_task
         finally:
