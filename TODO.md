@@ -1,24 +1,24 @@
 # TODO
 
-## Current slice — Controller session manager foundation
+## Current slice — ClientController session adapter
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
 Completed in this branch:
 
-- Added UI-neutral `PairedSessionCoordinator` with shared timestamp resolution.
-- Migrated `kiwi-wf-terminal` to SND-first/W/F-second coordinated startup and cleanup.
-- Covered readiness failure, cancellation, W/F failure, post-ready SND error policy, and separate command queues with fake runners.
-- Full harness: 296 tests passed.
+- Added UI-neutral `PairedSessionCoordinator` and migrated `kiwi-wf-terminal` lifecycle ownership.
+- Added immutable `RadioSessionSnapshot`, generation-aware errors, typed lifecycle/control actions, and pure SND/W/F command routing.
+- Full harness: 302 tests passed.
 
-Next goal: introduce the controller-owned session/action model without changing existing TUI behavior.
+Next goal: adapt existing `ClientController` state/actions to the new session manager without changing current TUI operation.
 
 Done criteria:
 
-- Define immutable desired/active paired-session state and generation-aware errors.
-- Define typed tune, recenter, zoom, audio, and direct-frequency actions independent of curses and Kitty.
-- Add pure state-transition/command-routing tests.
-- Keep existing `RadioSessionState` compatibility while preparing migration from raw `BackgroundOperation` inference.
+- Initialize the shared session snapshot from `ClientState` and waterfall config inputs without reverse UI dependencies.
+- Keep legacy `RadioSessionState` responses compatible during migration.
+- Route controller tune/mode/filter state changes through one synchronization adapter while preserving existing live playback command tests.
+- Expose paired SND/W/F status fields in controller status output without requiring live transports.
+- Add pure controller harness coverage and keep existing receiver-switch rollback tests passing.
 - Do not connect to a receiver.
 
 ## Plan

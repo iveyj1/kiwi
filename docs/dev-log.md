@@ -375,6 +375,22 @@ New fake-runner tests cover timestamp assignment/mismatch, startup ordering, rea
 
 Add the controller-owned paired-session state and typed action foundation before changing TUI behavior.
 
+## 2026-09-03 — Interactive session action foundation
+
+### Decision
+
+Added UI-neutral `src/kiwi_client/session_manager.py`. `RadioSessionManager` reduces typed lifecycle, transport, selection, tune, direct-frequency, recenter, zoom, and audio actions into immutable `RadioSessionSnapshot` values plus separate SND/W/F command batches. Errors carry session generations so stale transport results cannot overwrite a restarted session. CW command routing preserves user frequency while applying the configured radio offset.
+
+This is a state/action foundation only. Existing `ClientController` compatibility state and live `BackgroundOperation` behavior remain unchanged until an adapter is harnessed.
+
+### Test result
+
+Six pure tests cover exact dual-stream direct tuning, CW offset, recenter/zoom bounds, local audio state, stale generation rejection, and error clearing on session restart. Full harness: 302 tests passed in 3.73 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+Add a compatibility adapter from `ClientState`/`ClientController` into the shared snapshot and migrate controller command routing incrementally.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -58,7 +58,9 @@ Done criteria:
 
 ## Phase 2 — Controller session manager
 
-Status: **Next.**
+Status: **Foundation implemented; controller migration remains.**
+
+`src/kiwi_client/session_manager.py` defines immutable paired-session snapshots, generation-tagged errors, typed lifecycle/control actions, and deterministic SND/W/F command routing. It is UI-neutral and harness-covered. Existing `ClientController` and terminal-viewer state still need adapters/migration before this layer owns live policy.
 
 Introduce a controller-owned `RadioSessionManager` around the paired coordinator.
 
