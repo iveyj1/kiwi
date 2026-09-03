@@ -109,6 +109,7 @@ For each work slice:
 5. Run the relevant test command.
 6. Update docs if behavior, architecture, or user operation changed.
 7. Record important notes in `docs/dev-log.md`.
+8. In response, describe changes made, a brief manual test/demo process for the user (if appropriate), and next steps.
 
 ## Done criteria
 
