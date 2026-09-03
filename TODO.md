@@ -1,74 +1,42 @@
 # TODO
 
-## Current slice
+## Current slice — Shared paired-session coordinator
 
-Goal: user-attended validation of direct frequency entry in `kiwi-wf-terminal`.
+Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Validation:
-
-- Press `f`, type a frequency in kHz, and use Backspace if needed.
-- Press Esc and confirm no tuning occurs.
-- Repeat entry and press Enter; confirm SND tunes, W/F recenters at the current zoom, and the magenta cursor moves to the exact frequency when the new span arrives.
-- Confirm existing Enter-to-cursor tuning and other navigation controls remain operational.
-
-## Current status
-
-Integration branch: `wf1`; `main` remains closed.
-
-Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio, optimized redraw cadence, and direct `f` frequency entry. The full harness passes 289 tests.
-
-Keep `config.toml` unchanged for now: it intentionally has `[live].allow_live = true`, unlimited live caps, `[receivers].restricted = false`, and the MISDR proxy allowlisted.
-
-## Next slice candidates
-
-### 1. Attended combined-viewer evaluation
-
-Goal: verify normal interactive behavior now that the combined W/F+SND startup crash is fixed.
+Goal: extract Kiwi paired SND/W/F lifecycle ownership from the terminal UI into a reusable, UI-neutral coordinator.
 
 Done criteria:
 
-- User or attended operator tests mute/audio toggle (`a`), Enter tune-to-cursor, `c` recenter, `+`/`-` zoom, and `q` shutdown.
-- Use local receivers first unless explicitly evaluating the configured proxy.
-- Record receiver, UTC/local time, frequency/mode/passband, W/F zoom/speed/interp, and observed behavior in `docs/dev-log.md` or `docs/radio-lab.md`.
-- Add or update deterministic harness coverage before changing behavior.
+- Keep one shared session timestamp in the supplied SND/W/F configs.
+- Start primary SND and await authenticated readiness before starting paired W/F.
+- Abort without opening W/F when SND fails before readiness.
+- Keep separate bounded-lifecycle SND and W/F tasks and command queues.
+- Stop SND cleanly when W/F completes, fails, or is cancelled.
+- Report SND failure after readiness independently while allowing W/F policy to remain explicit.
+- Add deterministic fake-runner tests before moving terminal behavior.
+- Migrate `kiwi-wf-terminal` to the coordinator without changing controls, rendering, or live guardrails.
+- Run targeted and full harnesses; no automatic live receiver connection.
 
-### 2. Compact status/key-help refinement
+## Plan
 
-Goal: improve `kiwi-wf-terminal` status readability if normal use shows truncation or clutter.
+See `docs/ui-integration-plan.md`.
 
-Done criteria:
+1. Shared paired-session coordinator.
+2. Controller-owned `RadioSessionManager` and typed actions.
+3. TUI lifecycle/status integration without embedded graphics first.
+4. Native graphical frontend benchmark/prototype.
+5. Optional curses-aware Kitty pane if still valuable.
+6. One-stream SND consumer fan-out for playback/recording/detection.
 
-- Add pure status-row/layout tests for narrow and medium terminal widths.
-- Preserve current controls and audio/error visibility.
-- Update `docs/user-guide.md` if displayed controls/status change.
+## Deferred waterfall questions
 
-### 3. Optional W/F timing diagnostics
+- Measure whether zoom-dependent vertical slowdown is receiver cadence or presentation cadence.
+- Evaluate a small optional bounded W/F jitter/playout buffer and its smoothness/latency tradeoff.
+- Remap retained history across zoom/recenter changes like the KiwiSDR web client, resampling overlap and filling uncovered frequencies with black.
 
-Goal: instrument apparent temporal jumps only if they remain operationally problematic.
+## Validation baseline
 
-Done criteria:
-
-- Add fixture/fake-runner diagnostics for receive cadence, coalesced redraw count, dropped redraw requests, render duration, and terminal-output duration.
-- Keep diagnostics optional and low overhead.
-- Do not change buffering policy until measurements justify it.
-
-### 4. Product direction decision
-
-Goal: decide whether waterfall remains a standalone companion or moves into another UI.
-
-Options:
-
-- Keep `kiwi-wf-terminal` as the primary W/F companion viewer.
-- Integrate a compact waterfall pane into the curses TUI.
-- Add a native desktop raster backend.
-
-## Later
-
-- Compressed SND ADPCM decode.
-- Stereo/IQ SND decode.
-- Longer controlled recording/playback with explicit gap/sample-rate policy.
-- Beacon detector: start with synthetic carrier-present/absent, offset, noise, fading, weak-threshold, and false-positive fixtures before live captures.
-- Investigate whether received W/F cadence decreases with zoom or only presented redraw cadence changes.
-- Evaluate an optional small bounded W/F jitter/playout buffer. Measure whether timed frame release smooths bursty arrival without excessive latency; explicitly test target depth, underflow/overflow, oldest-frame dropping, and clean shutdown while keeping network receive nonblocking.
-- Preserve old waterfall history across zoom/recenter changes by remapping each row onto the new frequency scale, stretching/resampling overlap and filling uncovered frequencies with black, similar to the KiwiSDR web client.
-- Advanced long-integration/correlation analysis after recording and detector harnesses mature.
+- `main` now contains the tested `wf1` integration history.
+- Latest full harness before this slice: 289 tests passed.
+- `config.toml` remains intentionally unchanged.
