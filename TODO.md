@@ -2,20 +2,17 @@
 
 ## Current slice
 
-Goal: validate the optimized waterfall redraw cadence in an attended session.
+Goal: choose the next waterfall/UI work slice after successful redraw-cadence validation.
 
-Implemented baseline:
+Validated baseline:
 
 - Each received W/F row is color-mapped once into bounded RGB history.
 - Transient PNGs use fast level-1 compression.
 - Refresh scheduling preserves draw-start cadence instead of adding idle time after every completed draw.
+- User evaluation found a broad optimum around `refresh_hz=20`, with more frequent, smaller jumps and noticeably smoother motion.
 - One-bit coalescing, off-event-loop output, overlays, and numeric history remain intact.
 
-Done criteria:
-
-- Repeat the prior visual test at `rows=200`, `terminal_rows=20`, `refresh_hz=20`, and `speed=4`.
-- Record CPU, approximate visible updates or bottom-to-top transition count, and whether motion is less jarring.
-- If presentation remains substantially below receiver cadence, add measured receive/draw/encode/write timing diagnostics before another rendering change.
+Do not add more cadence complexity unless normal use shows a concrete problem. If needed, measure receive/draw/encode/write timing before changing rendering again.
 
 ## Current status
 

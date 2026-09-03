@@ -339,7 +339,7 @@ New deterministic tests cover cached row conversion, padding/orientation, bounde
 
 ### Follow-up
 
-Have the user repeat the attended local viewer test at a refresh cap no higher than the receiver cadence, initially `refresh_hz=20`. If visible presentation remains much slower than generated updates, add achieved draw/terminal timing counters before changing transport or adopting Kitty file/shared-memory transfer.
+Post-merge user validation found a broad optimum around `refresh_hz=20`. Motion now has more frequent, smaller jumps, making individual transitions difficult to count and noticeably improving the previous jarring presentation. Treat cadence optimization as successful for now; add achieved draw/terminal timing counters only if remaining jumps become operationally problematic. CPU after optimization was not recorded.
 
 ## YYYY-MM-DD
 
