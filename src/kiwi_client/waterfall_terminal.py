@@ -48,10 +48,11 @@ from kiwi_client.waterfall_raster import (
 
 @dataclass(frozen=True)
 class CursorAction:
-    """One decoded local-only cursor control action."""
+    """One decoded interactive waterfall control action."""
 
     kind: str
     bins: int = 0
+    text: str = ""
 
 
 class CursorKeyDecoder:
@@ -76,6 +77,7 @@ class CursorKeyDecoder:
         ord("="): CursorAction("zoom", 1),
         ord("-"): CursorAction("zoom", -1),
         ord("a"): CursorAction("audio-toggle"),
+        ord("f"): CursorAction("frequency-start"),
         10: CursorAction("audio-tune"),
         13: CursorAction("audio-tune"),
         ord("q"): CursorAction("quit"),
@@ -83,11 +85,28 @@ class CursorKeyDecoder:
 
     def __init__(self) -> None:
         self._buffer = bytearray()
+        self._frequency_text: str | None = None
 
     def feed(self, data: bytes) -> tuple[CursorAction, ...]:
         self._buffer.extend(data)
         actions: list[CursorAction] = []
         while self._buffer:
+            if self._frequency_text is not None:
+                value = self._buffer[0]
+                del self._buffer[0]
+                if value in (10, 13):
+                    actions.append(CursorAction("frequency-submit", text=self._frequency_text))
+                    self._frequency_text = None
+                elif value == 27:
+                    actions.append(CursorAction("frequency-cancel"))
+                    self._frequency_text = None
+                elif value in (8, 127):
+                    self._frequency_text = self._frequency_text[:-1]
+                    actions.append(CursorAction("frequency-edit", text=self._frequency_text))
+                elif 48 <= value <= 57 or (value == ord(".") and "." not in self._frequency_text):
+                    self._frequency_text += chr(value)
+                    actions.append(CursorAction("frequency-edit", text=self._frequency_text))
+                continue
             raw = bytes(self._buffer)
             matched = next(
                 ((sequence, action) for sequence, action in self._sequences.items() if raw.startswith(sequence)),
@@ -104,7 +123,20 @@ class CursorKeyDecoder:
             del self._buffer[0]
             if action is not None:
                 actions.append(action)
+                if action.kind == "frequency-start":
+                    self._frequency_text = ""
         return tuple(actions)
+
+
+def parse_direct_frequency_khz(text: str) -> float:
+    """Parse one finite, non-negative direct-entry frequency in kHz."""
+    try:
+        frequency_khz = float(text)
+    except ValueError as exc:
+        raise ValueError("frequency must be a non-negative number in kHz") from exc
+    if not text or not math.isfinite(frequency_khz) or frequency_khz < 0:
+        raise ValueError("frequency must be a non-negative finite number in kHz")
+    return frequency_khz
 
 
 @dataclass(frozen=True)
@@ -488,6 +520,9 @@ class WaterfallTerminalViewer:
         self._last_draw: float | None = None
         self._frequency_range: tuple[float, float] | None = None
         self._cursor: WaterfallCursor | None = None
+        self._pending_cursor_khz: float | None = None
+        self._frequency_entry_text: str | None = None
+        self._frequency_entry_error: str | None = None
         self._lock = Lock()
         self._generation = 0
         self._drawn_generation = 0
@@ -530,7 +565,7 @@ class WaterfallTerminalViewer:
         if tuned_khz is not None:
             parts.insert(1, f"tuned {cursor.frequency_khz - tuned_khz:+.3f} kHz")
         if keyboard_enabled:
-            parts.append("h/l main H/L small t/T pair c center +/- zoom a audio Enter tune 0 reset q quit")
+            parts.append("h/l main H/L small t/T pair c center +/- zoom a audio Enter tune f frequency 0 reset q quit")
         return " | ".join(parts)
 
     def cursor_status(self) -> str:
@@ -545,6 +580,46 @@ class WaterfallTerminalViewer:
                 audio_status=self.audio_status,
                 keyboard_enabled=self.keyboard_enabled,
             ) or ""
+
+    def set_frequency_entry(self, text: str | None, *, error: str | None = None) -> None:
+        with self._lock:
+            self._frequency_entry_text = text
+            self._frequency_entry_error = error
+            self._generation += 1
+
+    def set_direct_frequency(self, frequency_khz: float) -> tuple[str, str | None]:
+        """Tune SND and recenter W/F while preserving the exact entered kHz."""
+        if not math.isfinite(frequency_khz) or frequency_khz < 0:
+            raise ValueError("frequency must be a non-negative finite number in kHz")
+        with self._lock:
+            self.tuned_khz = frequency_khz
+            self.initial_cursor_khz = frequency_khz
+            self._pending_cursor_khz = frequency_khz
+            if (
+                self._cursor is not None
+                and self._cursor.start_khz <= frequency_khz <= self._cursor.end_khz
+            ):
+                self._cursor = replace(self._cursor, frequency_khz=frequency_khz)
+                self._pending_cursor_khz = None
+            radio_frequency_khz = frequency_khz
+            if self.mode == "cw":
+                radio_frequency_khz += self.cw_offset_hz / 1000.0
+            snd_command = None
+            if self.low_cut_hz is not None and self.high_cut_hz is not None:
+                snd_command = encode_modulation(
+                    self.mode,
+                    self.low_cut_hz,
+                    self.high_cut_hz,
+                    radio_frequency_khz,
+                    frequency_decimals=self.frequency_decimals,
+                )
+            wf_command = encode_waterfall_view(
+                self.zoom,
+                frequency_khz,
+                frequency_decimals=self.frequency_decimals,
+            )
+            self._generation += 1
+            return wf_command, snd_command
 
     def move_cursor_steps(self, delta: int, *, small: bool = False) -> bool:
         with self._lock:
@@ -649,7 +724,18 @@ class WaterfallTerminalViewer:
                 end_khz = frame.start_khz + frame.span_khz
                 self._frequency_range = (start_khz, end_khz)
                 if self.show_cursor and frame.bin_width_hz is not None:
-                    if self._cursor is None:
+                    if (
+                        self._pending_cursor_khz is not None
+                        and start_khz <= self._pending_cursor_khz <= end_khz
+                    ):
+                        self._cursor = WaterfallCursor(
+                            start_khz=start_khz,
+                            end_khz=end_khz,
+                            bin_width_hz=frame.bin_width_hz,
+                            frequency_khz=self._pending_cursor_khz,
+                        )
+                        self._pending_cursor_khz = None
+                    elif self._cursor is None:
                         preferred_khz = self.initial_cursor_khz
                         if preferred_khz is None:
                             preferred_khz = self.tuned_khz
@@ -694,6 +780,10 @@ class WaterfallTerminalViewer:
                 audio_status=self.audio_status,
                 keyboard_enabled=self.keyboard_enabled,
             )
+            if self._frequency_entry_text is not None:
+                status = f"Frequency kHz: {self._frequency_entry_text}_ | Enter apply Esc cancel"
+            elif self._frequency_entry_error is not None:
+                status = f"Frequency entry error: {self._frequency_entry_error} | press f to retry"
             generation = self._generation
         if frequency_range is not None and (self.tuned_khz is not None or cursor_khz is not None):
             start_khz, end_khz = frequency_range
@@ -916,15 +1006,20 @@ class WaterfallAudioController:
             self.viewer.set_audio_status("ON" if self.sink.enabled else "MUTED")
         self.redraw_requested.set()
 
+    def queue_tune_command(self, command: str) -> bool:
+        if not self.enabled:
+            return False
+        self.command_queue.put(command)
+        self.redraw_requested.set()
+        return True
+
     def tune_to_cursor(self) -> bool:
         if not self.enabled:
             return False
         command = self.viewer.audio_tune_command()
         if command is None:
             return False
-        self.command_queue.put(command)
-        self.redraw_requested.set()
-        return True
+        return self.queue_tune_command(command)
 
     async def finish(self) -> None:
         if self.enabled:
@@ -986,6 +1081,28 @@ async def control_waterfall_cursor(
                     await audio_controller.toggle()
                 elif action.kind == "audio-tune" and audio_controller is not None:
                     audio_controller.tune_to_cursor()
+                elif action.kind == "frequency-start":
+                    viewer.set_frequency_entry("")
+                    redraw_requested.set()
+                elif action.kind == "frequency-edit":
+                    viewer.set_frequency_entry(action.text)
+                    redraw_requested.set()
+                elif action.kind == "frequency-cancel":
+                    viewer.set_frequency_entry(None)
+                    redraw_requested.set()
+                elif action.kind == "frequency-submit":
+                    try:
+                        frequency_khz = parse_direct_frequency_khz(action.text)
+                    except ValueError as exc:
+                        viewer.set_frequency_entry(None, error=str(exc))
+                    else:
+                        viewer.set_frequency_entry(None)
+                        wf_command, snd_command = viewer.set_direct_frequency(frequency_khz)
+                        if command_queue is not None:
+                            command_queue.put(wf_command)
+                        if snd_command is not None and audio_controller is not None:
+                            audio_controller.queue_tune_command(snd_command)
+                    redraw_requested.set()
                 elif action.kind == "quit":
                     stop_event.set()
                     return

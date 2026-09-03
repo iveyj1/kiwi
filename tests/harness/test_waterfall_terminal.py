@@ -4,6 +4,7 @@ import io
 import json
 import os
 import pty
+import queue
 import termios
 import threading
 from pathlib import Path
@@ -37,6 +38,7 @@ from kiwi_client.waterfall_terminal import (
     frequency_label_decimals,
     frequency_ticks,
     next_redraw_deadline,
+    parse_direct_frequency_khz,
     main as waterfall_terminal_main,
     preview_terminal_fixture,
     terminal_supports_kitty,
@@ -52,10 +54,14 @@ class FakeBackend:
     def __init__(self):
         self.images = []
         self.frequency_ranges = []
+        self.status_lines = []
         self.draw_threads = []
 
     def set_frequency_range(self, start_khz, end_khz):
         self.frequency_ranges.append((start_khz, end_khz))
+
+    def set_status_line(self, status):
+        self.status_lines.append(status)
 
     def draw(self, image):
         self.draw_threads.append(threading.get_ident())
@@ -272,6 +278,32 @@ def test_viewer_defaults_to_current_terminal_placement(monkeypatch):
     assert viewer.backend.rows == 24
 
 
+def test_cursor_key_decoder_handles_direct_frequency_entry_edit_submit_and_cancel():
+    decoder = CursorKeyDecoder()
+
+    assert decoder.feed(b"f5000.12\x7f3\r") == (
+        CursorAction("frequency-start"),
+        CursorAction("frequency-edit", text="5"),
+        CursorAction("frequency-edit", text="50"),
+        CursorAction("frequency-edit", text="500"),
+        CursorAction("frequency-edit", text="5000"),
+        CursorAction("frequency-edit", text="5000."),
+        CursorAction("frequency-edit", text="5000.1"),
+        CursorAction("frequency-edit", text="5000.12"),
+        CursorAction("frequency-edit", text="5000.1"),
+        CursorAction("frequency-edit", text="5000.13"),
+        CursorAction("frequency-submit", text="5000.13"),
+    )
+    assert decoder.feed(b"f12\x1b")[-1] == CursorAction("frequency-cancel")
+
+
+def test_direct_frequency_parser_rejects_empty_negative_and_nonfinite_values():
+    assert parse_direct_frequency_khz("5000.125") == pytest.approx(5000.125)
+    for text in ("", "-1", "nan", "inf"):
+        with pytest.raises(ValueError, match="frequency"):
+            parse_direct_frequency_khz(text)
+
+
 def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
     decoder = CursorKeyDecoder()
 
@@ -298,6 +330,123 @@ def test_cursor_key_decoder_handles_text_arrows_shift_arrows_and_chunking():
         CursorAction("move-small", -1),
         CursorAction("move-small", 1),
     )
+
+
+def test_frequency_entry_prompt_is_rendered_in_status_line():
+    backend = FakeBackend()
+    viewer = WaterfallTerminalViewer(backend=backend, max_rows=1)
+    viewer.append(WaterfallFrame(sequence=1, bins=(155,), dbm=(-100,)), draw=False)
+
+    viewer.set_frequency_entry("5000.1")
+    viewer.draw()
+
+    assert backend.status_lines[-1] == "Frequency kHz: 5000.1_ | Enter apply Esc cancel"
+
+
+def test_direct_frequency_entry_routes_exact_snd_tune_and_wf_recenter():
+    master_fd, input_fd = pty.openpty()
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=1,
+        tuned_khz=150.0,
+        low_cut_hz=-5000,
+        high_cut_hz=5000,
+        show_cursor=True,
+        mode="am",
+        zoom=7,
+        frequency_decimals=4,
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=100.0,
+            span_khz=100.0,
+            bin_width_hz=25_000.0,
+        ),
+        draw=False,
+    )
+    wf_commands = queue.Queue()
+
+    class FakeAudioController:
+        def __init__(self):
+            self.commands = []
+
+        def queue_tune_command(self, command):
+            self.commands.append(command)
+            return True
+
+    audio = FakeAudioController()
+
+    async def exercise():
+        task = asyncio.create_task(
+            control_waterfall_cursor(
+                viewer,
+                redraw_requested=asyncio.Event(),
+                stop_event=threading.Event(),
+                input_fd=input_fd,
+                command_queue=wf_commands,
+                audio_controller=audio,
+            )
+        )
+        await asyncio.sleep(0)
+        os.write(master_fd, b"f150.2505\r")
+        await asyncio.sleep(0.01)
+        os.write(master_fd, b"q")
+        await asyncio.wait_for(task, timeout=1.0)
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        os.close(master_fd)
+        os.close(input_fd)
+
+    assert viewer.tuned_khz == pytest.approx(150.2505)
+    assert viewer.cursor_frequency_khz == pytest.approx(150.2505)
+    assert wf_commands.get_nowait() == "SET zoom=7 cf=150.2505"
+    assert audio.commands == ["SET mod=am low_cut=-5000 high_cut=5000 freq=150.2505"]
+
+
+def test_empty_direct_frequency_entry_does_not_queue_commands():
+    master_fd, input_fd = pty.openpty()
+    viewer = WaterfallTerminalViewer(backend=FakeBackend(), max_rows=1)
+    viewer.append(WaterfallFrame(sequence=1, bins=(155,), dbm=(-100,)), draw=False)
+    wf_commands = queue.Queue()
+
+    class FakeAudioController:
+        def __init__(self):
+            self.commands = []
+
+        def queue_tune_command(self, command):
+            self.commands.append(command)
+            return True
+
+    audio = FakeAudioController()
+
+    async def exercise():
+        task = asyncio.create_task(
+            control_waterfall_cursor(
+                viewer,
+                redraw_requested=asyncio.Event(),
+                stop_event=threading.Event(),
+                input_fd=input_fd,
+                command_queue=wf_commands,
+                audio_controller=audio,
+            )
+        )
+        await asyncio.sleep(0)
+        os.write(master_fd, b"f\rq")
+        await asyncio.wait_for(task, timeout=1.0)
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        os.close(master_fd)
+        os.close(input_fd)
+
+    assert wf_commands.empty()
+    assert audio.commands == []
 
 
 def test_cursor_keyboard_control_moves_requests_redraw_quits_and_restores_terminal():
@@ -796,6 +945,52 @@ def test_audio_controller_keeps_display_alive_after_audio_error():
 
     assert status == "ERROR audio unavailable"
     assert enabled is False
+
+
+def test_viewer_direct_frequency_waits_for_recentered_span_before_moving_cursor():
+    viewer = WaterfallTerminalViewer(
+        backend=FakeBackend(),
+        max_rows=2,
+        tuned_khz=150.0,
+        low_cut_hz=650,
+        high_cut_hz=1050,
+        show_cursor=True,
+        mode="cw",
+        zoom=8,
+        cw_offset_hz=-800,
+        frequency_decimals=4,
+    )
+    viewer.append(
+        WaterfallFrame(
+            sequence=1,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=100.0,
+            span_khz=100.0,
+            bin_width_hz=25_000.0,
+        ),
+        draw=False,
+    )
+
+    wf_command, snd_command = viewer.set_direct_frequency(335.1234)
+
+    assert wf_command == "SET zoom=8 cf=335.1234"
+    assert snd_command == "SET mod=cw low_cut=650 high_cut=1050 freq=334.3234"
+    assert viewer.tuned_khz == pytest.approx(335.1234)
+    assert viewer.cursor_frequency_khz == pytest.approx(150.0)
+
+    viewer.append(
+        WaterfallFrame(
+            sequence=2,
+            bins=(155,) * 4,
+            dbm=(-100,) * 4,
+            start_khz=300.0,
+            span_khz=100.0,
+            bin_width_hz=25_000.0,
+        ),
+        draw=False,
+    )
+    assert viewer.cursor_frequency_khz == pytest.approx(335.1234)
 
 
 def test_viewer_builds_recenter_and_zoom_commands_around_exact_cursor():

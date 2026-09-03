@@ -544,11 +544,12 @@ Live keyboard controls are local-only and do not send tuning or zoom commands:
 - `-`: zoom out one level around the cursor.
 - `a`: toggle local audio output while keeping the paired SND session alive.
 - Enter: tune active audio to the exact cursor frequency using current mode/passband.
+- `f`: enter a frequency directly in kHz. Decimal digits and one decimal point are accepted; Backspace edits, Esc cancels, and Enter tunes SND plus recenters W/F at the current zoom.
 - `q`: stop W/F and audio cleanly.
 
 The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
 
-Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands.
+Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands. Direct `f` entry preserves the entered precision, updates the tuned frequency, sends the matching SND modulation command, recenters W/F, and moves the cursor when the new mapped span arrives.
 
 The combined live viewer always establishes its separately owned SND WebSocket first, then opens paired W/F with the same session timestamp, matching Kiwi browser order. Without `--audio` / `[waterfall].audio = true`, the SND stream remains connected but the lazy local sink is `MUTED`; `a` toggles local output without tearing down the primary SND session. `--null-audio` keeps output device-free even when toggled ON. Enter sends `SET mod=...` for the exact cursor frequency, mode, and passband. CW preserves the project convention that cursor/user frequency is passband center and applies configured `cw_offset_hz` to radio frequency. A primary SND startup failure prevents opening orphan W/F; later audio-device errors are shown in status.
 
