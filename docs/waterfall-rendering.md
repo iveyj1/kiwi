@@ -33,6 +33,7 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 ## Questions to resolve
 
 - Does received W/F cadence decrease as zoom increases, or is the observed slowdown in presented redraw cadence? Leave this unmodified until receive/draw/encode/write timing is measured.
+- Would a small optional bounded jitter/playout buffer improve vertical motion? Explore timed release using monotonic arrival timestamps, with an explicit smoothness/latency tradeoff, bounded depth, defined underflow/overflow behavior, and no blocking in the network receive path. This must remain distinct from the unbounded redraw backlog that coalescing intentionally prevents.
 - Color mapping beyond fixed diagnostic scales.
 - Preserve old history when zoom/span/center changes. Desired behavior follows the KiwiSDR web client: remap existing rows from their original frequency coordinates to the new scale, resample/stretch overlapping data as needed, and fill newly uncovered frequency regions with black instead of immediately discarding or mis-scaling history.
 

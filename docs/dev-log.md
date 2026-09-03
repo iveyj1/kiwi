@@ -343,6 +343,8 @@ Post-merge user validation found a broad optimum around `refresh_hz=20`. Motion 
 
 Future zoom rendering should preserve old W/F history like the KiwiSDR web client: remap prior rows onto the new frequency scale, stretch/resample overlapping data where necessary, and fill frequencies not covered by old rows with black.
 
+Also consider an optional small bounded W/F jitter/playout buffer. The goal would be steady timed row release despite bursty network arrival, trading a controlled amount of latency for smoothness. Any experiment must measure receive cadence first, keep network ingestion nonblocking, cap queued frames, define underflow/overflow behavior, and remain separate from terminal redraw coalescing.
+
 ## YYYY-MM-DD
 
 ### Finding
