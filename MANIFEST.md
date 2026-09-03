@@ -3,8 +3,11 @@
 ## Root
 
 - `AGENTS.md` — project instructions for Pi Coding Agent.
-- `README.md` — scaffold overview and first commands.
-- `TODO.md` — lightweight current-slice tracker.
+- `TODO.md` — current status and next-slice tracker.
+- `MANIFEST.md` — repository file map.
+- `pyproject.toml` — Python package metadata, optional dependencies, and CLI entry points.
+- `config.toml` — local working configuration.
+- `presets.toml` — durable local radio and receiver presets.
 
 ## Docs
 
@@ -29,6 +32,11 @@
 - `.pi/prompts/live-radio-test.md` — controlled local live-test prompt.
 - `.pi/prompts/review-slice.md` — review prompt.
 - `.pi/prompts/fixture-capture.md` — fixture capture prompt.
+
+## Source
+
+- `src/kiwi_client/` — package code for protocol, transport, SND audio, recording, TUI, live workers, and waterfall rendering.
+- `tools/waterfall_image.py` — optional static PNG inspection helper for W/F fixtures.
 
 ## Tests
 

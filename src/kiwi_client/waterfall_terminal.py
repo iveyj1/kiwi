@@ -40,9 +40,9 @@ from kiwi_client.waterfall_raster import (
     RasterImage,
     WaterfallHistory,
     WaterfallOverlay,
+    WaterfallRasterHistory,
     apply_frequency_overlay,
     encode_png,
-    render_dbm_rows,
 )
 
 
@@ -255,6 +255,11 @@ def default_terminal_placement(*, columns: int, lines: int) -> tuple[int, int]:
     return (max(1, columns), max(1, lines // 2))
 
 
+def next_redraw_deadline(previous: float, *, now: float, interval: float) -> float:
+    """Advance a draw-start deadline without adding idle time after rendering."""
+    return max(previous + interval, now)
+
+
 def encode_kitty_image(
     png: bytes,
     *,
@@ -454,6 +459,11 @@ class WaterfallTerminalViewer:
             raise ValueError("waterfall zoom must satisfy 0 <= zoom <= zoom_max")
         self.backend = backend
         self.history = WaterfallHistory(max_rows=max_rows)
+        self.raster_history = WaterfallRasterHistory(
+            max_rows=max_rows,
+            min_dbm=min_dbm,
+            max_dbm=max_dbm,
+        )
         self.min_dbm = min_dbm
         self.max_dbm = max_dbm
         self.newest_at_top = newest_at_top
@@ -658,6 +668,7 @@ class WaterfallTerminalViewer:
                             bin_width_hz=frame.bin_width_hz,
                         )
             self.history.append(frame)
+            self.raster_history.append(frame)
             self._generation += 1
             if draw and (self._last_draw is None or now - self._last_draw >= self.refresh_interval):
                 self._last_draw = now
@@ -669,7 +680,7 @@ class WaterfallTerminalViewer:
         self,
     ) -> tuple[RasterImage, tuple[float, float] | None, str | None, int]:
         with self._lock:
-            rows = self.history.rows(newest_at_top=self.newest_at_top, pad_dbm=-255)
+            image = self.raster_history.image(newest_at_top=self.newest_at_top, pad_dbm=-255)
             frequency_range = self._frequency_range
             cursor = self._cursor
             cursor_khz = None if cursor is None else cursor.frequency_khz
@@ -684,9 +695,6 @@ class WaterfallTerminalViewer:
                 keyboard_enabled=self.keyboard_enabled,
             )
             generation = self._generation
-        if not rows:
-            raise ValueError("cannot render an empty waterfall history")
-        image = render_dbm_rows(rows, min_dbm=self.min_dbm, max_dbm=self.max_dbm)
         if frequency_range is not None and (self.tuned_khz is not None or cursor_khz is not None):
             start_khz, end_khz = frequency_range
             image = apply_frequency_overlay(
@@ -1033,7 +1041,11 @@ async def view_live_waterfall(
             if delay > 0:
                 await asyncio.sleep(delay)
             await asyncio.to_thread(viewer.draw)
-            next_draw = asyncio.get_running_loop().time() + viewer.refresh_interval
+            next_draw = next_redraw_deadline(
+                next_draw,
+                now=asyncio.get_running_loop().time(),
+                interval=viewer.refresh_interval,
+            )
             if viewer.needs_draw:
                 redraw_requested.set()
             elif stopping:
