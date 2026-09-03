@@ -78,9 +78,9 @@ Migrate standalone viewer and TUI actions to the same command API. Preserve exis
 
 ## Phase 3 — TUI integration
 
-Status: **Lifecycle/status adapter started; paired W/F startup not yet enabled.**
+Status: **Headless paired operation implemented; embedded graphics not enabled.**
 
-Current audio-only `BackgroundOperation` playback is represented as generation-aware SND running/stopping/failed state with W/F explicitly inactive. The pure dashboard can display desired/active receiver, SND/W/F states, audio state, and zoom while legacy operation details remain available.
+Current audio-only `BackgroundOperation` playback is represented as generation-aware SND running/stopping/failed state with W/F explicitly inactive. `radio-bg` starts a headless paired SND/W/F worker through the shared coordinator, routes stream-tagged commands, publishes filtered W/F metadata/metrics, and restarts the pair on receiver switch. The pure dashboard displays desired/active receiver, SND/W/F states, audio state, and zoom while legacy operation details remain available.
 
 Add paired-session lifecycle and status to `kiwi-tui` without embedding graphics first.
 

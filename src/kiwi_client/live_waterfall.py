@@ -170,10 +170,25 @@ def _capture_metadata(config: LiveWaterfallCaptureConfig) -> WaterfallCaptureMet
     )
 
 
+class _NullCaptureWriter:
+    def add_tx_cmd(self, *args, **kwargs):
+        pass
+
+    def add_rx_msg(self, *args, **kwargs):
+        pass
+
+    def add_rx_binary(self, *args, **kwargs):
+        pass
+
+    def write(self, *args, **kwargs):
+        pass
+
+
 async def capture_live_waterfall(
     config: LiveWaterfallCaptureConfig,
     *,
     allow_live: bool = False,
+    save_events: bool = True,
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
     frame_callback: Callable[[WaterfallFrame], None] | None = None,
@@ -192,7 +207,7 @@ async def capture_live_waterfall(
             raise LiveCaptureError("live waterfall capture requires optional dependency: pip install '.[live]'") from exc
         websocket_connect = websockets.connect
 
-    writer = JsonlCaptureWriter(_capture_metadata(config))
+    writer = JsonlCaptureWriter(_capture_metadata(config)) if save_events else _NullCaptureWriter()
     start = time.monotonic()
     frames = 0
     last_keepalive = start

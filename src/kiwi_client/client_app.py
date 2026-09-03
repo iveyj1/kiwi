@@ -23,13 +23,18 @@ from kiwi_client.commands import AgcSettings, encode_agc, encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
+from kiwi_client.live_session import RoutedSessionCommand, run_live_paired_session
+from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
 from kiwi_client.session_manager import (
     RadioSessionManager,
     RadioSessionSnapshot,
+    RecenterWaterfall,
+    SelectFrequency,
     SetSessionIntent,
     TransportUpdate,
+    ZoomWaterfall,
 )
 from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
@@ -214,6 +219,17 @@ class ClientOperations(Protocol):
         status_callback: StatusCallback | None = None,
     ) -> dict[str, Any]: ...
 
+    def paired(
+        self,
+        waterfall_config: LiveWaterfallCaptureConfig,
+        snd_config: LiveSndPlaybackConfig,
+        *,
+        null_sink: bool,
+        stop_event: Event,
+        command_queue: queue.Queue,
+        status_callback: StatusCallback,
+    ) -> dict[str, Any]: ...
+
     def record(
         self,
         config: LiveSndWavRecordConfig,
@@ -258,6 +274,29 @@ class LiveClientOperations:
         data = asdict(result)
         data["path"] = str(result.path)
         return data
+
+    def paired(
+        self,
+        waterfall_config: LiveWaterfallCaptureConfig,
+        snd_config: LiveSndPlaybackConfig,
+        *,
+        null_sink: bool,
+        stop_event: Event,
+        command_queue: queue.Queue,
+        status_callback: StatusCallback,
+    ) -> dict[str, Any]:
+        sink = NullAudioSink() if null_sink else SoundDeviceSink()
+        return asyncio.run(
+            run_live_paired_session(
+                waterfall_config,
+                snd_config,
+                sink,
+                allow_live=True,
+                stop_event=stop_event,
+                command_queue=command_queue,
+                status_callback=status_callback,
+            )
+        )
 
     def record(
         self,
@@ -308,7 +347,26 @@ class ClientController:
         self.session = RadioSessionState(desired_receiver=self.state.receiver)
         self.paired_session = RadioSessionManager(paired_snapshot_from_client_state(self.state))
         self._background_session_generation: int | None = None
+        self._waterfall_speed = 1
+        self._waterfall_interp = 13
         self.running = True
+
+    def configure_waterfall_session(
+        self,
+        *,
+        center_khz: float,
+        zoom: int,
+        speed: int,
+        interp: int,
+    ) -> None:
+        """Apply frontend configuration to shared W/F session state."""
+        self.paired_session.state = replace(
+            self.paired_session.state,
+            waterfall_center_khz=float(center_khz),
+            waterfall_zoom=int(zoom),
+        )
+        self._waterfall_speed = int(speed)
+        self._waterfall_interp = int(interp)
 
     def execute(self, line: str) -> dict[str, Any] | None:
         """Execute one shell command entry and return a JSON-serializable response."""
@@ -437,6 +495,15 @@ class ClientController:
             self._require_arg_count(args, 1, "step-pair <+/-n>")
             self.state = step_mode_pair(self.state, self.state.mode, int(args[0]))
             return {"type": "state", "state": self.state.as_dict()}
+        if command == "wf-center":
+            if len(args) > 1:
+                raise ClientCommandError("usage: wf-center [frequency_khz]")
+            if args:
+                self.paired_session.dispatch(SelectFrequency(float(args[0])))
+            return self._session_action_response(RecenterWaterfall())
+        if command == "wf-zoom":
+            self._require_arg_count(args, 1, "wf-zoom <+/-levels>")
+            return self._session_action_response(ZoomWaterfall(int(args[0])))
         if command == "volume":
             self._require_arg_count(args, 1, "volume <percent>")
             return self._set_volume(self._clamp_volume(int(args[0])))
@@ -481,6 +548,11 @@ class ClientController:
             self._require_arg_count(positional, 0, "play-bg --allow-live [--null-sink]")
             self._require_allow_live(flags, "play-plan")
             return self._start_playback_background("--null-sink" in flags)
+        if command == "radio-bg":
+            positional, flags = self._parse_flags(args, {"--allow-live", "--null-sink"})
+            self._require_arg_count(positional, 0, "radio-bg --allow-live [--null-sink]")
+            self._require_allow_live(flags, "play-plan")
+            return self._start_paired_background("--null-sink" in flags)
         if command == "stop":
             return self._stop_background()
         if command == "wait":
@@ -548,10 +620,11 @@ class ClientController:
         self._sync_paired_session(selection_follows_tune=False)
         status = self.background.status()
         generation = self._background_session_generation
-        if status.name != "play" or generation is None or generation != self.paired_session.state.generation:
+        if status.name not in ("play", "radio") or generation is None or generation != self.paired_session.state.generation:
             return self.paired_session.state
         if status.running:
-            snd_status = "stopping" if status.stop_requested else "running"
+            metrics = status.metrics or {}
+            snd_status = "stopping" if status.stop_requested else metrics.get("snd_status", "running")
             self.paired_session.dispatch(
                 TransportUpdate(
                     "snd",
@@ -560,21 +633,29 @@ class ClientController:
                     active_receiver=self.state.receiver,
                 )
             )
-            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+            wf_status = metrics.get("wf_status", "inactive" if status.name == "play" else "waiting")
+            self.paired_session.dispatch(TransportUpdate("wf", wf_status, generation=generation))
         elif status.error:
+            metrics = status.metrics or {}
+            failed_stream = "wf" if metrics.get("wf_status") == "failed" else "snd"
+            other_stream = "snd" if failed_stream == "wf" else "wf"
             self.paired_session.dispatch(
-                TransportUpdate("snd", "failed", generation=generation, error=status.error)
+                TransportUpdate(failed_stream, "failed", generation=generation, error=status.error)
             )
-            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+            self.paired_session.dispatch(
+                TransportUpdate(other_stream, "stopped" if status.name == "radio" else "inactive", generation=generation)
+            )
         else:
             self.paired_session.dispatch(TransportUpdate("snd", "stopped", generation=generation))
-            self.paired_session.dispatch(TransportUpdate("wf", "inactive", generation=generation))
+            self.paired_session.dispatch(
+                TransportUpdate("wf", "stopped" if status.name == "radio" else "inactive", generation=generation)
+            )
         return self.paired_session.state
 
     def session_status(self) -> RadioSessionState:
         """Return a session snapshot derived from controller intent and worker status."""
         status = self.background.status()
-        if status.name == "play" and self.session.desired_playback:
+        if status.name in ("play", "radio") and self.session.desired_playback:
             if status.running:
                 mode = "stopping" if status.stop_requested else "playing"
                 return replace(
@@ -598,7 +679,7 @@ class ClientController:
             mode="idle" if not self.session.desired_playback else self.session.mode,
             desired_receiver=self.state.receiver,
             operation_name=status.name,
-            error=status.error if status.name == "play" and status.error else None,
+            error=status.error if status.name in ("play", "radio") and status.error else None,
         )
 
     def switch_receiver(
@@ -611,19 +692,21 @@ class ClientController:
     ) -> tuple[dict[str, Any] | None, str | None]:
         """Switch receiver, preserving/recovering playback intent when appropriate."""
         status = self.background.status()
+        interactive_name = status.name if status.name in ("play", "radio") else None
+        start_interactive = self._start_paired_background if interactive_name == "radio" else self._start_playback_background
         should_start_after_failed = (
             preserve_playback
-            and status.name == "play"
+            and interactive_name is not None
             and bool(status.error)
             and not status.running
             and self.session.desired_playback
         )
         if should_start_after_failed:
             state_response = self._set_receiver_response(receiver)
-            start_response = self._start_playback_background(self.last_play_bg_null_sink)
+            start_response = start_interactive(self.last_play_bg_null_sink)
             return {"type": "batch", "responses": [state_response, start_response], "session": self.session_status().as_dict()}, f"Receiver: {self.state.receiver}; started playback"
 
-        if not preserve_playback or not status.running or status.name != "play":
+        if not preserve_playback or not status.running or interactive_name is None:
             response = self._set_receiver_response(receiver)
             return response, f"Receiver: {self.state.receiver}"
 
@@ -637,12 +720,12 @@ class ClientController:
             return {"type": "operation-status", "operation": stopped.as_dict(), "session": self.session_status().as_dict()}, "Stopping playback before receiver switch..."
 
         state_response = self._set_receiver_response(receiver)
-        start_response = self._start_playback_background(null_sink)
+        start_response = start_interactive(null_sink)
         startup_status = self.background.join(timeout=startup_grace_seconds)
         if startup_status.error and not startup_status.running:
             error = startup_status.error
             self._set_receiver_response(previous_receiver)
-            restore_response = self._start_playback_background(null_sink)
+            restore_response = start_interactive(null_sink)
             return (
                 {
                     "type": "operation-status",
@@ -697,16 +780,58 @@ class ClientController:
         )
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
+    def _start_paired_background(self, null_sink: bool) -> dict[str, Any]:
+        snd_config = self._playback_config()
+        wf_config = LiveWaterfallCaptureConfig(
+            host=self.state.host,
+            port=self.state.port,
+            output=Path("<interactive-wf>"),
+            center_khz=self.paired_session.state.waterfall_center_khz,
+            zoom=self.paired_session.state.waterfall_zoom,
+            speed=self._waterfall_speed,
+            interp=self._waterfall_interp,
+            duration_seconds=self.state.duration_seconds,
+            max_frames=self.state.max_frames,
+            receivers_restricted=self.state.receivers_restricted,
+            allowed_receivers=self.state.allowed_receivers,
+        )
+        self.last_play_bg_null_sink = null_sink
+        paired = self.paired_session.dispatch(SetSessionIntent(running=True, receiver=self.state.receiver))
+        self._background_session_generation = paired.state.generation
+        self.paired_session.state = replace(self.paired_session.state, audio_enabled=not null_sink)
+        self.session = replace(
+            self.session,
+            mode="starting",
+            desired_receiver=self.state.receiver,
+            active_receiver=self.state.receiver,
+            desired_playback=True,
+            operation_name="radio",
+            error=None,
+            generation=self.session.generation + 1,
+        )
+        status = self.background.start(
+            "radio",
+            lambda stop_event, command_queue, status_callback: self.operations.paired(
+                wf_config,
+                snd_config,
+                null_sink=null_sink,
+                stop_event=stop_event,
+                command_queue=command_queue,
+                status_callback=status_callback,
+            ),
+        )
+        return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
+
     def _stop_background(self) -> dict[str, Any]:
         status = self.background.stop()
-        if status.name == "play":
+        if status.name in ("play", "radio"):
             self.session = replace(self.session, mode="stopping", desired_playback=False, error=None)
             self.paired_session.dispatch(SetSessionIntent(running=False))
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
 
     def _wait_background(self, timeout: float | None) -> dict[str, Any]:
         status = self.background.join(timeout=timeout)
-        if status.name == "play" and not status.running:
+        if status.name in ("play", "radio") and not status.running:
             if status.error:
                 self.session = replace(self.session, mode="failed", active_receiver=None, error=status.error)
             else:
@@ -745,14 +870,34 @@ class ClientController:
     def _state_response_with_active_command(self, command: str) -> dict[str, Any]:
         response: dict[str, Any] = {"type": "state", "state": self.state.as_dict()}
         current_status = self.background.status()
-        if not current_status.running or current_status.name != "play":
+        if not current_status.running or current_status.name not in ("play", "radio"):
             return response
+        routed_command = RoutedSessionCommand("snd", command) if current_status.name == "radio" else command
         try:
-            status = self.background.send_command(command)
+            status = self.background.send_command(routed_command)
         except RuntimeError:
             return response
         response["active_command"] = command
         response["operation"] = status.as_dict()
+        return response
+
+    def _session_action_response(self, action) -> dict[str, Any]:
+        result = self.paired_session.dispatch(action)
+        response: dict[str, Any] = {
+            "type": "paired-session",
+            "paired_session": result.state.as_dict(),
+            "commands": {
+                "snd": list(result.commands.snd),
+                "wf": list(result.commands.waterfall),
+            },
+        }
+        status = self.background.status()
+        if status.running and status.name == "radio":
+            for command in result.commands.snd:
+                self.background.send_command(RoutedSessionCommand("snd", command))
+            for command in result.commands.waterfall:
+                self.background.send_command(RoutedSessionCommand("wf", command))
+            response["operation"] = self.background.status().as_dict()
         return response
 
     def _handle_add_receiver(self, args: list[str]) -> dict[str, Any]:
@@ -1111,6 +1256,9 @@ def command_aliases() -> dict[str, str]:
         "du": "duration",
         "fr": "frames",
         "pb": "play-bg",
+        "ra": "radio-bg",
+        "wc": "wf-center",
+        "wz": "wf-zoom",
         "rb": "record-bg",
         "cb": "capture-bg",
         "sp": "stop",
@@ -1132,6 +1280,8 @@ def available_commands() -> list[str]:
         "filter <low_cut_hz> <high_cut_hz>",
         "tune-step <+/-hz|small|medium|large>",
         "step-pair <+/-n>",
+        "wf-center [frequency_khz]",
+        "wf-zoom <+/-levels>",
         "volume <percent>",
         "volume-step <delta_percent>",
         "agc [on|off|hang on|off|threshold <value>|slope <value>|decay <ms>|gain <value>|set key=value ...]",
@@ -1144,6 +1294,7 @@ def available_commands() -> list[str]:
         "play-plan",
         "play --allow-live [--null-sink]",
         "play-bg --allow-live [--null-sink]",
+        "radio-bg --allow-live [--null-sink]",
         "stop",
         "wait [seconds]",
         "operation-status",
@@ -1155,7 +1306,7 @@ def available_commands() -> list[str]:
         "capture-bg <output.jsonl> --allow-live [--overwrite]",
         "help",
         "quit",
-        "aliases: ?=status, re=receiver, ad=add-receiver, tu=tune, mo=mode, fi=filter, ag=agc, du=duration, fr=frames, pb=play-bg, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
+        "aliases: ?=status, re=receiver, ad=add-receiver, tu=tune, mo=mode, fi=filter, ag=agc, du=duration, fr=frames, pb=play-bg, ra=radio-bg, wc=wf-center, wz=wf-zoom, rb=record-bg, cb=capture-bg, sp=stop, he=help, q/qu=quit",
     ]
 
 

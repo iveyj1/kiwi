@@ -233,6 +233,28 @@ def test_capture_live_waterfall_contextualizes_frequency_from_msg_metadata(tmp_p
     assert metrics[0]["bin_width_hz"] == pytest.approx(7500_000 / 1024)
 
 
+def test_streaming_waterfall_can_disable_unbounded_fixture_event_storage(tmp_path: Path):
+    output = tmp_path / "unused.jsonl"
+    config = LiveWaterfallCaptureConfig(
+        host="10.0.0.40",
+        port=8073,
+        output=output,
+        timestamp=123456,
+        max_frames=1,
+    )
+
+    asyncio.run(
+        capture_live_waterfall(
+            config,
+            allow_live=True,
+            save_events=False,
+            websocket_connect=FakeConnect([WF_PAYLOAD]),
+        )
+    )
+
+    assert not output.exists()
+
+
 def test_capture_live_waterfall_uses_separate_ascii_render_scale(tmp_path: Path):
     output = tmp_path / "wf.jsonl"
     config = LiveWaterfallCaptureConfig(

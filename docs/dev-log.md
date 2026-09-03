@@ -421,6 +421,26 @@ New controller and dashboard tests cover audio-only lifecycle mapping and paired
 
 Define and harness a paired TUI operation using `PairedSessionCoordinator`, initially publishing W/F state/metrics without embedding terminal graphics.
 
+## 2026-09-03 — Headless paired TUI operation
+
+### Finding
+
+The existing continuous terminal viewer used `capture_live_waterfall()` with a temporary output path, but the capture writer retained every event in memory until shutdown. Unlimited interactive W/F therefore had unbounded fixture-event growth even though the temporary file was not needed.
+
+### Decision
+
+Added `src/kiwi_client/live_session.py` with a headless paired operation built on `PairedSessionCoordinator`. `radio-bg --allow-live [--null-sink]` starts primary SND then W/F without an embedded raster, publishes SND/W/F status plus filtered W/F metrics, and routes `RoutedSessionCommand` values to independent queues. Existing raw active modulation commands default to SND compatibility. `wf-center [frequency_khz]` and `wf-zoom <+/-levels>` use typed session actions and route to W/F. Receiver switching restarts the same audio-only or paired operation type.
+
+Added optional no-capture mode to live W/F streaming. Headless paired sessions and temporary terminal viewing no longer retain fixture events; explicit `--save-fixture` behavior is unchanged.
+
+### Test result
+
+Fake SND/W/F runners verify SND-first startup, status publication, filtered metrics, stream command routing, and coordinated stop. Controller tests cover configured W/F startup values, SND tune routing, W/F center/zoom routing, and paired receiver restart. A fake-WebSocket regression verifies no fixture is written when event storage is disabled. Targeted live/session/controller/TUI tests: 154 passed before final metric filtering. Full harness baseline: 310 tests passed in 3.99 seconds. No live connection was made.
+
+### Follow-up
+
+Define a bounded renderer-neutral snapshot publisher for future native GUI and optional terminal-pane consumers.
+
 ## YYYY-MM-DD
 
 ### Finding

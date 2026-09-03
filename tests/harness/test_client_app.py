@@ -42,6 +42,20 @@ class FakeOperations:
             status_callback({"smeter": 850, "rssi_db": -42.0, "snd_frames": 1})
         return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set()), "commands": commands}
 
+    def paired(self, waterfall_config, snd_config, *, null_sink, stop_event, command_queue, status_callback):
+        self.calls.append(("radio", waterfall_config, snd_config, null_sink, stop_event, command_queue, status_callback))
+        status_callback({"snd_status": "running", "wf_status": "running", "wf_frames": 1})
+        commands = []
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            try:
+                commands.append(command_queue.get(timeout=0.02))
+            except Exception:
+                pass
+            if stop_event.is_set() and command_queue.empty():
+                break
+        return {"commands": commands, "stopped": stop_event.is_set()}
+
     def record(self, config, *, stop_event=None, status_callback=None):
         self.calls.append(("record", config, stop_event, status_callback))
         if stop_event is not None:
@@ -325,6 +339,53 @@ def test_background_playback_maps_to_generation_aware_shared_lifecycle():
     assert stopped.snd_status == "stopped"
     assert stopped.wf_status == "stopped"
     assert stopped.active_receiver is None
+
+
+def test_radio_background_routes_tune_to_snd_and_reports_both_streams():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+    controller.configure_waterfall_session(center_khz=855.0, zoom=7, speed=3, interp=12)
+
+    controller.execute("radio-bg --allow-live --null-sink")
+    deadline = time.monotonic() + 1.0
+    while controller.paired_session_status().wf_status != "running" and time.monotonic() < deadline:
+        time.sleep(0.01)
+    tuned = controller.execute("tune 6000.125")
+    centered = controller.execute("wf-center 6000.125")
+    zoomed = controller.execute("wf-zoom +1")
+    controller.execute("stop")
+    finished = controller.execute("wait 1")
+
+    radio_call = next(call for call in operations.calls if call[0] == "radio")
+    assert radio_call[1].center_khz == 855.0
+    assert radio_call[1].zoom == 7
+    assert radio_call[1].speed == 3
+    assert radio_call[1].interp == 12
+    assert tuned["active_command"] == "SET mod=am low_cut=-5000 high_cut=5000 freq=6000.125"
+    commands = finished["operation"]["result"]["commands"]
+    assert [(command.stream, command.command) for command in commands] == [
+        ("snd", tuned["active_command"]),
+        ("wf", centered["commands"]["wf"][0]),
+        ("wf", zoomed["commands"]["wf"][0]),
+    ]
+    assert centered["commands"]["wf"] == ["SET zoom=7 cf=6000.125"]
+    assert zoomed["commands"]["wf"] == ["SET zoom=8 cf=6000.125"]
+    assert finished["operation"]["result"]["stopped"] is True
+
+
+def test_client_switch_receiver_restarts_active_paired_radio_session():
+    operations = FakeOperations()
+    controller = ClientController(operations=operations)
+    controller.execute("radio-bg --allow-live --null-sink")
+
+    response, message = controller.switch_receiver("10.0.0.40:8073")
+    controller.execute("stop")
+    controller.execute("wait 1")
+
+    receivers = [f"{call[1].host}:{call[1].port}" for call in operations.calls if call[0] == "radio"]
+    assert receivers == ["10.0.0.41:8073", "10.0.0.40:8073"]
+    assert response["type"] == "batch"
+    assert message == "Receiver: 10.0.0.40:8073; restarted playback"
 
 
 def test_client_switch_receiver_idle_updates_session_without_playback():

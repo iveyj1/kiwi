@@ -1123,6 +1123,7 @@ async def view_live_waterfall(
     audio_start: bool = False,
     audio_sink_factory: Callable[[], AudioSink] = SoundDeviceSink,
     audio_runner: Callable[..., Any] = play_live_snd,
+    save_events: bool = True,
 ) -> Path:
     """Receive frames promptly while a bounded background renderer draws the latest state."""
     redraw_requested = asyncio.Event()
@@ -1184,6 +1185,7 @@ async def view_live_waterfall(
         return await capture_live_waterfall(
             config,
             allow_live=allow_live,
+            save_events=save_events,
             stop_event=paired_stop_event,
             frame_callback=receive_frame,
             command_queue=paired_command_queue,
@@ -1493,6 +1495,7 @@ def main(argv: list[str] | None = None) -> int:
                     audio_config=audio_config,
                     audio_start=args.audio,
                     audio_sink_factory=NullAudioSink if args.null_audio else SoundDeviceSink,
+                    save_events=True,
                 )
             )
         else:
@@ -1507,6 +1510,7 @@ def main(argv: list[str] | None = None) -> int:
                         audio_config=audio_config,
                         audio_start=args.audio,
                         audio_sink_factory=NullAudioSink if args.null_audio else SoundDeviceSink,
+                        save_events=False,
                     )
                 )
         return 0

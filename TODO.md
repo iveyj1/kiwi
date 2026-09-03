@@ -1,27 +1,26 @@
 # TODO
 
-## Current slice — Paired TUI operation design
+## Current slice — Renderer snapshot boundary
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
 Completed in this branch:
 
-- Added UI-neutral paired transport coordinator and typed interactive session model.
-- Added `ClientController` state and generation-aware audio-only lifecycle adapters.
-- TUI dashboard can display desired/active receiver, SND/W/F status, audio state, and W/F zoom while retaining legacy operation details.
-- Existing receiver-switch rollback behavior remains harnessed.
-- Full harness: 306 tests passed.
+- Added shared paired coordinator, typed session model, and controller/TUI lifecycle adapters.
+- Added `radio-bg` for headless paired SND/W/F operation, distinct stream command routing, W/F status/metadata metrics, and paired receiver restart.
+- Added `wf-center` and `wf-zoom` controller/TUI commands.
+- Continuous headless and terminal W/F operation no longer accumulates an unbounded in-memory fixture unless saving was requested.
+- Full harness baseline before final documentation: 310 tests passed.
 
-Next goal: design the smallest paired TUI operation that replaces startup `play-bg` when W/F is requested, without embedding graphics yet.
+Next goal: define a bounded renderer-neutral waterfall snapshot publisher that a native GUI or optional terminal pane can consume without owning transport state.
 
 Done criteria:
 
-- Define explicit start/stop command/API semantics for audio-only versus paired interactive sessions.
-- Reuse `PairedSessionCoordinator`; do not duplicate SND/W/F ordering logic.
-- Publish W/F metadata/frame cadence metrics to the controller without terminal-renderer dependencies.
-- Route typed controller SND/W/F commands to the correct queues.
-- Add fake-runner lifecycle tests before exposing any live command.
-- Do not connect to a receiver.
+- Publish immutable mapped frame/history snapshots independently from Kitty/curses.
+- Bound producer/consumer memory and coalesce superseded display snapshots.
+- Preserve numeric history needed for future zoom remapping.
+- Add fixture/fake-consumer tests and a small native toolkit benchmark plan before selecting a GUI dependency.
+- Do not embed Kitty graphics into curses in this slice.
 
 ## Plan
 

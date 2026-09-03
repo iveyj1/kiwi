@@ -288,6 +288,9 @@ Supported commands:
 - `play-plan`
 - `play --allow-live [--null-sink]`
 - `play-bg --allow-live [--null-sink]`
+- `radio-bg --allow-live [--null-sink]` (headless paired SND/W/F; no embedded raster yet)
+- `wf-center [frequency_khz]`
+- `wf-zoom <+/-levels>`
 - `stop`
 - `wait [seconds]`
 - `operation-status`
@@ -311,11 +314,16 @@ Command aliases:
 - `du` -> `duration`
 - `fr` -> `frames`
 - `pb` -> `play-bg`
+- `ra` -> `radio-bg`
+- `wc` -> `wf-center`
+- `wz` -> `wf-zoom`
 - `rb` -> `record-bg`
 - `cb` -> `capture-bg`
 - `sp` -> `stop`
 - `he` -> `help`
 - `q` / `qu` -> `quit`
+
+`radio-bg` is the first TUI integration stage. It opens primary SND before paired W/F through the shared session coordinator, publishes both stream states and W/F metadata in the dashboard, and accepts stream-routed commands. It intentionally has no embedded waterfall image yet. Receiver switching restarts the pair; `stop` ends both streams. Continuous W/F operation disables fixture-event accumulation unless explicit capture is requested.
 
 AGC commands use the locally verified KiwiSDR command shape `SET agc=<0|1> hang=<0|1> thresh=<n> slope=<n> decay=<ms> manGain=<n>`. Examples:
 

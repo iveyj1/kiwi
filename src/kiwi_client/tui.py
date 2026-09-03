@@ -87,6 +87,8 @@ COMMAND_HINTS = [
     CommandHint("filter", "set passband", "filter <low_cut_hz> <high_cut_hz>", "Tuning"),
     CommandHint("tune-step", "step frequency", "tune-step <+/-hz|small|medium|large>", "Tuning"),
     CommandHint("step-pair", "cycle step pair", "step-pair <+/-n>", "Tuning"),
+    CommandHint("wf-center", "recenter paired W/F", "wf-center [frequency_khz]", "Tuning"),
+    CommandHint("wf-zoom", "change paired W/F zoom", "wf-zoom <+/-levels>", "Tuning"),
     CommandHint("volume", "set local volume", "volume <percent>", "Audio controls"),
     CommandHint("volume-step", "step local volume", "volume-step <delta_percent>", "Audio controls"),
     CommandHint(
@@ -103,6 +105,7 @@ COMMAND_HINTS = [
     CommandHint("play-plan", "show play plan", "play-plan", "Playback"),
     CommandHint("play", "play now", "play --allow-live [--null-sink]", "Playback"),
     CommandHint("play-bg", "start playback worker", "play-bg --allow-live [--null-sink]", "Playback"),
+    CommandHint("radio-bg", "start paired SND/W/F worker", "radio-bg --allow-live [--null-sink]", "Playback"),
     CommandHint("record-plan", "show record plan", "record-plan <output.wav>", "Recording/capture"),
     CommandHint("record", "record now", "record <output.wav> --allow-live [--overwrite]", "Recording/capture"),
     CommandHint("record-bg", "start record worker", "record-bg <output.wav> --allow-live [--overwrite]", "Recording/capture"),
@@ -391,7 +394,7 @@ def render_dashboard(
         f"Volume: {state.volume_percent}%",
         f"Live limits: {state.duration_seconds:g}s / {state.max_frames} SND frames",
         "",
-        "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, record-bg, capture-bg, stop, help, quit",
+        "Commands: status, receiver, tune, mode, filter, duration, frames, play-bg, radio-bg, record-bg, capture-bg, stop, help, quit",
     ])
     if paired_session is not None:
         lines.extend([
@@ -781,6 +784,12 @@ def run_tui(controller: ClientController | None = None, *, config: KiwiClientCon
             controller.presets.update(presets)
         if not controller.receiver_presets:
             controller.receiver_presets.update(receiver_presets)
+    controller.configure_waterfall_session(
+        center_khz=config.waterfall.center_khz,
+        zoom=config.waterfall.zoom,
+        speed=config.waterfall.speed,
+        interp=config.waterfall.interp,
+    )
     start_startup_playback(controller, config)
     curses.wrapper(_run_curses, controller, config)
 

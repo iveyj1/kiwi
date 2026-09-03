@@ -63,7 +63,7 @@ def test_render_command_hints_show_grouped_top_level_shortcuts_and_descriptions(
     assert "    tu (tune) — set frequency" in text
     assert "    mo (mode) — set demod mode" in text
     assert "    pb (play-bg) — start playback worker" in text
-    assert len(text.splitlines()) <= 25
+    assert len(text.splitlines()) <= 27
 
 
 def test_render_command_hints_filter_by_typed_prefix():
