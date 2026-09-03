@@ -33,7 +33,7 @@ Important reference observations, not yet locally fixture-verified in this proje
   - `SET maxdb=<dB> mindb=<dB>`
   - `SET wf_speed=<1..4>`
   - `SET wf_comp=<0|1>`
-  - `SET interp=<value>`
+  - `SET interp=<value>` (`0..4` = max/min/last/drop/CMA FFT-bin reduction; `10..14` = same with CIC compensation)
 - Reference code commonly starts with uncompressed waterfall data: `SET wf_comp=0`.
 - Reference code maps raw byte samples to approximate dBm with `dBm = sample - 255` before applying waterfall calibration.
 - Reference default or compatibility waterfall calibration is often `wf_cal = -13` dB.
@@ -167,10 +167,13 @@ Implemented user-visible offline preview:
 - `python3 -m kiwi_client.waterfall_preview tests/fixtures/kiwi/wf-basic.jsonl`
 - console script: `kiwi-wf-preview`
 
-Recommended next renderers:
+Additional implemented renderers:
 
-1. Optional ANSI 256-color terminal preview after ASCII tests exist.
-3. PNG export later if dependency policy is acceptable or if using only optional dependencies.
+1. Test-rig static PNG export using optional matplotlib.
+2. Production dependency-free RGB/PNG raster helpers with a fixed-height history buffer.
+3. Standalone Kitty graphics fixture/live viewer via `kiwi-wf-terminal`.
+
+ANSI color remains a possible lower-resolution fallback; Sixel and a native desktop backend remain future options.
 
 Deterministic scaling modes:
 
@@ -283,17 +286,13 @@ The current background worker supports one operation at a time. Live audio plus 
 2. Add a multi-operation/session manager capable of independent SND and W/F workers.
 3. Treat waterfall display as mutually exclusive with playback initially.
 
-Recommendation: start with standalone offline and then standalone live W/F view before integrating live waterfall into the existing TUI playback session.
+The standalone ASCII and Kitty live W/F views now implement that recommendation. Integrating W/F with the existing audio TUI still requires independent SND/W/F operation ownership or a multi-operation session manager.
 
 ## Open questions
 
-- Confirm exact stream byte layout from local receiver fixtures: 3-byte tag, one separator/flag byte, 12-byte W/F header, payload.
-- Confirm whether local receivers require `SET interp` and preferred default.
-- Confirm `flags_x_zoom_server` bit layout.
-- Confirm `x_bin_server` meaning and whether it is needed for display frequency mapping.
-- Confirm default MAX_FREQ used by target receivers for span calculations.
-- Decide whether first display uses raw dBm, calibrated dBm, or normalized intensity.
-- Decide dependency policy for PNG rendering.
+- Continue using receiver-reported `bandwidth` rather than a hard-coded MAX_FREQ for display mapping.
+- Decide whether the production display should apply `wf_cal` to raw `sample - 255` values.
+- Refine preferred adaptive-label density from normal use.
 - Decide when live audio and live waterfall should be allowed concurrently.
 
 ## Recommended implementation order
@@ -306,4 +305,7 @@ Recommendation: start with standalone offline and then standalone live W/F view 
 6. Capture a short local W/F fixture.
 7. Update `docs/kiwi-protocol.md` with fixture-backed W/F facts.
 8. Add a standalone live W/F preview.
-9. Decide whether to integrate a compact pane into the curses TUI or move toward a richer renderer.
+9. Done: add a backend-neutral raster history/color model and standalone Kitty renderer.
+10. Done: add fixture-backed frequency/bin mapping and adaptive labels.
+11. Done: capture zoom-7 local AM evidence confirming known 760/950 kHz carriers and bin orientation.
+12. Add tuned-frequency/passband overlays and decide whether to integrate raster output with the curses TUI, add a native desktop backend, or retain a companion viewer.

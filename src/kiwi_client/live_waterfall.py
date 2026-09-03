@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import queue
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +15,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from kiwi_client.capture import JsonlCaptureWriter, WaterfallCaptureMetadata
-from kiwi_client.commands import encode_auth, encode_keepalive
+from kiwi_client.commands import encode_auth, encode_keepalive, encode_waterfall_view
 from kiwi_client.live_capture import (
     LiveCaptureError,
     allowed_receiver_names,
@@ -24,10 +25,26 @@ from kiwi_client.live_capture import (
     snd_loop_allowed,
 )
 from kiwi_client.protocol import parse_msg
-from kiwi_client.waterfall import WaterfallSequenceTracker, parse_waterfall_uncompressed
+from kiwi_client.waterfall import (
+    WaterfallFrame,
+    WaterfallReceiverState,
+    WaterfallSequenceTracker,
+    contextualize_waterfall_frame,
+    decode_waterfall_interpolation,
+    parse_waterfall_uncompressed,
+)
 from kiwi_client.waterfall_render import DEFAULT_ASCII_RAMP, render_ascii_waterfall_row
 
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
+
+
+def _is_websocket_connection_closed(exc: BaseException) -> bool:
+    """Identify optional websockets closure errors without requiring it for fixture use."""
+    try:
+        from websockets.exceptions import ConnectionClosed
+    except ImportError:
+        return False
+    return isinstance(exc, ConnectionClosed)
 
 
 @dataclass(frozen=True)
@@ -70,6 +87,10 @@ class LiveWaterfallCaptureConfig:
             raise LiveCaptureError("zoom must be >= 0")
         if self.speed < 1 or self.speed > 4:
             raise LiveCaptureError("waterfall speed must be in range 1..4")
+        try:
+            decode_waterfall_interpolation(self.interp)
+        except ValueError as exc:
+            raise LiveCaptureError(str(exc)) from exc
         if self.maxdb <= self.mindb:
             raise LiveCaptureError("maxdb must be greater than mindb")
         if self.ascii_maxdb <= self.ascii_mindb:
@@ -99,7 +120,7 @@ class LiveWaterfallCaptureConfig:
     def setup_commands(self) -> list[str]:
         """Return setup commands sent after auth."""
         return [
-            f"SET zoom={self.zoom} cf={self.center_khz:.3f}",
+            encode_waterfall_view(self.zoom, self.center_khz),
             f"SET maxdb={self.maxdb} mindb={self.mindb}",
             f"SET wf_speed={self.speed}",
             "SET wf_comp=0",
@@ -109,6 +130,7 @@ class LiveWaterfallCaptureConfig:
 
     def dry_run_plan(self) -> dict[str, Any]:
         """Return a JSON-serializable plan without connecting."""
+        interpolation = decode_waterfall_interpolation(self.interp)
         return {
             "receiver": self.receiver,
             "websocket_uri": self.websocket_uri(),
@@ -122,6 +144,8 @@ class LiveWaterfallCaptureConfig:
             "ascii_ramp": self.ascii_ramp,
             "speed": self.speed,
             "interp": self.interp,
+            "interp_method": interpolation.method,
+            "interp_cic_compensation": interpolation.cic_compensation,
             "duration_seconds": self.duration_seconds,
             "max_frames": self.max_frames,
             "compression": self.compression,
@@ -152,6 +176,8 @@ async def capture_live_waterfall(
     allow_live: bool = False,
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
+    frame_callback: Callable[[WaterfallFrame], None] | None = None,
+    command_queue: queue.Queue[str] | None = None,
     websocket_connect: Callable[..., Any] | None = None,
 ) -> Path:
     """Run one guarded live W/F capture and write a JSONL fixture."""
@@ -171,68 +197,95 @@ async def capture_live_waterfall(
     frames = 0
     last_keepalive = start
     sequence = WaterfallSequenceTracker()
+    waterfall_state = WaterfallReceiverState()
 
-    async with websocket_connect(
-        config.websocket_uri(),
-        max_queue=0,
-        close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
-    ) as websocket:
-        for command in [encode_auth(), *config.setup_commands()]:
-            writer.add_tx_cmd(time.monotonic() - start, command, stream="wf")
-            await websocket.send(command)
-
-        while snd_loop_allowed(start, frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
-            if stop_event is not None and stop_event.is_set():
-                break
-            now = time.monotonic()
-            if keepalive_due(now, last_keepalive, sent_setup=True):
-                command = encode_keepalive()
-                writer.add_tx_cmd(now - start, command, stream="wf")
+    try:
+        connection = websocket_connect(
+            config.websocket_uri(),
+            max_queue=0,
+            ping_interval=None,
+            close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
+        )
+        async with connection as websocket:
+            for command in [encode_auth(), *config.setup_commands()]:
+                writer.add_tx_cmd(time.monotonic() - start, command, stream="wf")
                 await websocket.send(command)
-                last_keepalive = now
-            remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
-            if remaining == 0:
-                break
-            try:
-                message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
-            except asyncio.TimeoutError:
-                continue
-            t = time.monotonic() - start
-            if isinstance(message, str):
-                text = message
-                writer.add_rx_msg(t, text, stream="wf")
-                params = parse_msg(text).params
-                raise_for_kiwi_error(params, receiver=config.receiver)
-                continue
 
-            payload = bytes(message)
-            if payload.startswith(b"MSG"):
-                text = payload.decode("utf-8", errors="replace")
-                writer.add_rx_msg(t, text, stream="wf")
-                params = parse_msg(text).params
-                raise_for_kiwi_error(params, receiver=config.receiver)
-                continue
+            while snd_loop_allowed(start, frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
+                if stop_event is not None and stop_event.is_set():
+                    break
+                now = time.monotonic()
+                if keepalive_due(now, last_keepalive, sent_setup=True):
+                    command = encode_keepalive()
+                    writer.add_tx_cmd(now - start, command, stream="wf")
+                    await websocket.send(command)
+                    last_keepalive = now
+                if command_queue is not None:
+                    while True:
+                        try:
+                            command = command_queue.get_nowait()
+                        except queue.Empty:
+                            break
+                        writer.add_tx_cmd(now - start, command, stream="wf")
+                        await websocket.send(command)
+                remaining = receive_poll_timeout(start, duration_seconds=config.duration_seconds)
+                if remaining == 0:
+                    break
+                try:
+                    message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    continue
+                t = time.monotonic() - start
+                if isinstance(message, str):
+                    text = message
+                    writer.add_rx_msg(t, text, stream="wf")
+                    params = parse_msg(text).params
+                    raise_for_kiwi_error(params, receiver=config.receiver)
+                    waterfall_state = waterfall_state.apply_msg_params(params)
+                    continue
 
-            writer.add_rx_binary(t, payload, stream="wf")
-            if payload.startswith(b"W/F"):
-                frame = parse_waterfall_uncompressed(payload)
-                status = sequence.observe(frame)
-                frames += 1
-                if status_callback is not None:
-                    metrics = {
-                        "wf_seq": frame.sequence,
-                        "wf_frames": frames,
-                        "sequence_gaps": status.missing_count,
-                        "out_of_order": status.out_of_order,
-                        "repeated_zero_sequence": status.repeated_zero,
-                        "ascii_row": render_ascii_waterfall_row(
-                            frame,
-                            min_dbm=config.ascii_mindb,
-                            max_dbm=config.ascii_maxdb,
-                            ramp=config.ascii_ramp,
-                        ),
-                    }
-                    status_callback(metrics)
+                payload = bytes(message)
+                if payload.startswith(b"MSG"):
+                    text = payload.decode("utf-8", errors="replace")
+                    writer.add_rx_msg(t, text, stream="wf")
+                    params = parse_msg(text).params
+                    raise_for_kiwi_error(params, receiver=config.receiver)
+                    waterfall_state = waterfall_state.apply_msg_params(params)
+                    continue
+
+                writer.add_rx_binary(t, payload, stream="wf")
+                if payload.startswith(b"W/F"):
+                    frame = contextualize_waterfall_frame(
+                        parse_waterfall_uncompressed(payload),
+                        waterfall_state,
+                    )
+                    status = sequence.observe(frame)
+                    frames += 1
+                    if frame_callback is not None:
+                        frame_callback(frame)
+                    if status_callback is not None:
+                        metrics = {
+                            "wf_seq": frame.sequence,
+                            "wf_frames": frames,
+                            "sequence_gaps": status.missing_count,
+                            "out_of_order": status.out_of_order,
+                            "repeated_zero_sequence": status.repeated_zero,
+                            "start_khz": frame.start_khz,
+                            "center_khz": frame.center_khz,
+                            "span_khz": frame.span_khz,
+                            "bin_width_hz": frame.bin_width_hz,
+                            "ascii_row": render_ascii_waterfall_row(
+                                frame,
+                                min_dbm=config.ascii_mindb,
+                                max_dbm=config.ascii_maxdb,
+                                ramp=config.ascii_ramp,
+                            ),
+                        }
+                        status_callback(metrics)
+    except Exception as exc:
+        if _is_websocket_connection_closed(exc):
+            raise LiveCaptureError(f"waterfall WebSocket closed: {exc}") from exc
+        raise
 
     writer.write(config.output)
     return config.output
@@ -251,7 +304,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--render-min-db", type=int, help="local ASCII render min dB; defaults to --min-db")
     parser.add_argument("--ramp", default=DEFAULT_ASCII_RAMP, help="ASCII intensity ramp from dim to bright")
     parser.add_argument("--speed", type=int, default=1)
-    parser.add_argument("--interp", type=int, default=13)
+    parser.add_argument(
+        "--interp",
+        type=int,
+        default=13,
+        help="FFT-bin reduction: 0..4=max/min/last/drop/CMA; 10..14=same with CIC compensation",
+    )
     parser.add_argument("--duration-seconds", type=float, default=3.0)
     parser.add_argument("--max-frames", type=int, default=5)
     parser.add_argument("--timestamp", type=int)

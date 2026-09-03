@@ -219,6 +219,146 @@ Changed standalone live W/F ASCII preview defaults to 50 rows and a 60-second ca
 
 Bookmarked future terminal raster-image waterfall work in `docs/terminal-waterfall-renderer.md`. The spec proposes a standalone optional `kiwi-wf-terminal` command with Kitty graphics first, Sixel later, an in-memory waterfall image buffer, deterministic dBm-to-RGB rendering, and harness tests that do not require a graphics-capable terminal.
 
+## 2026-08-26
+
+### Finding
+
+The live ASCII waterfall emits one 1024-character string per 1024-bin W/F frame. Normal terminal wrapping makes a single radio frame occupy several terminal rows; the receiver data itself already has enough horizontal samples for a detailed raster view.
+
+The first user test in Kitty showed protocol acknowledgement text at the left, blank lines between updates, and a native-size 1024x100-pixel image that was too short. Kitty replies when an image id is used, and image placement moves the cursor by default; the program was neither suppressing replies nor disabling cursor movement.
+
+After quiet/fixed-cursor placement was added, the next user test showed no waterfall during live operation but displayed it when the process was killed. With `C=1`, the first image remained anchored at the shell command's cursor, normally near the bottom of the terminal; most or all of its placement rectangle was therefore clipped below the viewport until process-exit scrolling exposed it.
+
+User experimentation showed that lowering `--interp` did not monotonically reduce apparent smoothing. The newly available `~/kiwiclient` reference and upstream Kiwi server source explain why: `interp` is a categorical FFT-bin reduction selector. Modes `0..4` are max/min/last/drop/CMA and `10..14` add CIC compensation. Default `13` is drop+CIC, not “smoothing level 13.”
+
+Kiwi server/browser source also resolves W/F frequency coordinates: `x_bin_server` is the left edge on a `wf_fft_size << zoom_max` precision grid, the low 16 bits of `flags_x_zoom_server` carry zoom, and span is receiver bandwidth divided by `2**zoom`. The existing local zoom-0 fixture supplies enough MSG metadata to prove full-band `0..30000 kHz` mapping even though its original center request was 5000 kHz.
+
+A short local zoom-7 capture centered at 855 kHz mapped known AM carriers near 760 and 950 kHz to `760.127` and `949.870 kHz`. This confirms the source-derived nonzero-zoom formula and low-to-high bin orientation on `10.0.0.40:8073`.
+
+### Decision
+
+Added `WaterfallHistory` as a renderer-neutral fixed-height dBm ring buffer, deterministic black/blue/cyan/yellow/white RGB mapping, and a dependency-free PNG encoder in `src/kiwi_client/waterfall_raster.py`. Added `src/kiwi_client/waterfall_terminal.py` / `kiwi-wf-terminal` with a pure chunked Kitty graphics encoder, conservative Kitty/Ghostty/WezTerm capability detection, fixture mode, guarded live mode, fixed image-id replacement, display throttling, and optional fixture saving. ASCII and matplotlib paths remain available.
+
+The live W/F capture API now offers a parsed `WaterfallFrame` callback. Raster consumers therefore do not need to extract an ASCII row from generic status metrics, while existing ASCII preview behavior remains compatible.
+
+Kitty transmissions now use `q=2` to suppress responses, `C=1` to prevent cursor movement, and a stable placement id as well as image id. Default placement now uses the detected terminal width and half its height; explicit `--terminal-columns` / `--terminal-rows` values still override it. The backend reserves that row rectangle once before the first draw, moves back to its top-left anchor, performs every update there, and restores the cursor below the image when finished.
+
+Added a decoded W/F interpolation model and validation. Dry-run plans now report both the reduction method and CIC state, CLI help describes the categories, and unsupported values `5..9` are rejected before a connection. For least aggregation, `13` is already drop sampling with CIC compensation; `3` provides drop sampling without compensation. This setting does not control Kitty's spatial scaling.
+
+Added `WaterfallReceiverState` and renderer-independent frame contextualization for start/center/span/bin width. Live capture accumulates W/F MSG metadata and delivers contextualized frames. Fixture preview does the same offline. The Kitty backend renders a frequency ruler as terminal text above the image, preserving all 1024 raster bins.
+
+Replaced the fixed three-label policy with adaptive labels: choose 1/2/5 × power-of-ten major spacing from span and terminal width, derive decimal precision from the interval, preserve mapped edge labels, place interior labels proportionally, and omit overlaps. Narrow terminals retain edges while wider views gain useful major frequencies.
+
+Added renderer-side tuned/passband overlays. A white column marks tuned frequency and orange columns mark enabled low/high passband edges. Overlay rendering copies the RGB image and leaves numeric history untouched; out-of-span markers are omitted and reversed passbands are rejected.
+
+Added `WaterfallConfig` and normal config discovery to `kiwi-wf-terminal`. `[waterfall]` persists center/zoom, history/terminal rows, local render range, receiver speed, refresh cap, interpolation, label density, and overlay settings. Parser defaults remain unset until config merge, so explicit CLI values take precedence. Root local defaults record the currently useful 5000 kHz, zoom 7, 300-row, 30-cell, speed-4, 12-Hz, interp-13 setup with a ±5 kHz passband. Terminal viewer duration/frame limits now inherit `[live]`; root zeros therefore preserve continuous interactive use while built-in guarded defaults remain finite.
+
+Click/tune interaction remains future work. Simultaneous TUI audio and waterfall still requires independent SND/W/F session ownership; the raster viewer remains a standalone companion command.
+
+### Test result
+
+Added harness coverage for history scrolling/padding/orientation, frame-width rejection, fixed RGB values and clamping, PNG structure, Kitty base64 chunking, terminal capability checks, fixture rendering, fake-backend rendering, parsed live frame callbacks, and a fake-WebSocket guarded live viewer.
+
+The system Python had neither pip nor pytest and is PEP 668 externally managed. `setup-python` now creates an ignored `.kiwi-venv`, installs the editable package and all current extras there, verifies imports, and prints activation/direct-test commands.
+
+Initial targeted waterfall tests passed: 32 tests. After the first Kitty visual-test fixes, terminal renderer tests passed: 8 tests; the full harness passed: 221 tests in 3.26 seconds. After adding visible-area reservation and cursor restoration, terminal renderer tests passed: 9 tests and the full harness passed: 222 tests in 2.70 seconds. Interpolation mapping/validation targeted tests passed: 41 tests; the full harness passed: 234 tests in 2.77 seconds. Dry-run output reports `interp_method=drop` / CIC enabled for `13`, and an unsupported `5` exits before connecting.
+
+Frequency mapping/ruler coverage includes synthetic zoom-2 flag masking, local zoom-0 fixture metadata, fake-WebSocket live contextualization, fixed-width ruler placement, and Kitty reserved-area integration. The full harness passed: 240 tests (latest run 2.84 seconds). Offline fixture protocol output contains full-band ruler labels. `python3 -m compileall -q src tests` and `git diff --check` passed.
+
+Adaptive ruler tests cover nice-step selection, interval precision, narrow edge-only layout, AM-band labels, narrowband labels, and non-overlap. After 248 harness tests passed, one guarded local capture was made on `10.0.0.40:8073` at 2026-08-27 04:43:33 UTC / 00:43:33 local: center 855 kHz, zoom 7, speed 4, interp 13, uncompressed, five frames. Fixture `local-wf-am-855-zoom7.jsonl` maps `737.811327..972.186327 kHz` at `228.881836 Hz/bin`; known 760/950 kHz carrier regressions were added. Final full harness after adding explicit medium-width policy coverage: 250 tests in 2.74 seconds.
+
+Overlay tests cover tuned/passband column mapping, colors, immutability, out-of-span omission, reversed cuts, and viewer integration. Config tests cover built-in/root defaults, TOML overlays, and CLI precedence including boolean disable overrides. Targeted overlay/config tests passed: 37 tests. Full harness: 255 tests (latest run 3.38 seconds). Dry-run verification confirmed root duration/frame zeros as well as overlay/default values. Dry-run inspection confirmed root config resolves to center 5000 kHz, zoom 7, 300 history rows, speed 4, refresh 12 Hz, tuned 5000 kHz, and ±5 kHz passband. No live receiver connection was needed.
+
+Investigated a user-reported W/F failure after the Kitty terminal had been unfocused: updates appeared to jump through accumulated time and `websockets` raised `ConnectionClosedError: sent 1011 (internal error) keepalive ping timeout`. Root cause was synchronous raster/PNG/terminal output inside the asyncio receive callback. A background terminal can stop draining graphics output, block stdout, and starve both receive processing and the library's ping/pong timer.
+
+Changed live terminal display to append parsed frames without drawing, signal a single coalescing redraw event, and run raster generation plus terminal output with `asyncio.to_thread()`. Numeric history remains current while the renderer is blocked; when output resumes, one latest-state image replaces stale requests. Added locking and generation tracking so history snapshots are safe and a frame arriving during a draw schedules one later redraw. W/F connections now pass `ping_interval=None` because Kiwi application `SET keepalive` is already sent, and WebSocket closure is wrapped as `LiveCaptureError` for concise CLI reporting without reconnect.
+
+Harness coverage verifies `ping_interval=None`, clean closure conversion, ingestion of 25 immediate frames, one coalesced image, and that drawing occurs off the event-loop thread. Targeted tests: 32 passed. Full harness: 257 passed in 3.71 seconds. No live receiver test was needed or performed for the deterministic backpressure fix.
+
+Cursor tests cover bin-center snapping, movement/clamping, context changes, magenta overlay precedence, split escape-sequence decoding, status/ruler layout, config defaults, pseudo-terminal movement/quit, and exact terminal restoration. Targeted cursor/config tests: 68 passed before the pseudo-terminal case was added. Full harness: 265 passed in 3.85 seconds. No live connection was used.
+
+The blocking regression duplicates a pseudo-terminal input descriptor as output and verifies keyboard startup leaves the shared blocking status unchanged. A CLI harness also verifies output `BlockingIOError` is reported without `Traceback`. Targeted terminal tests: 28 passed; full harness: 266 passed in 3.16 seconds.
+
+Fixed standalone W/F receiver-policy propagation after a user-added `misdr.proxy.kiwisdr.com:8073` allowlist entry was ignored. Config discovery was working, but `_capture_config()` omitted `[receivers].restricted` and `[receivers].allowed`, causing `LiveWaterfallCaptureConfig` to fall back to its built-in local-only policy. Both temporary display and saved-fixture configurations now receive the loaded policy, while `--allow-live` remains mandatory. Dry-run output includes the resolved policy. Restricted-proxy and unrestricted synthetic tests validate without network access; targeted config/terminal tests: 36 passed, full harness: 268 passed in 3.09 seconds.
+
+User validation found the cursor step functional and the current slice acceptable. Final-product requirement: tuning selection must advance on configured round frequency steps, not FFT/source-bin increments. Implemented exact cursor frequency on a zero-anchored grid, independent bin-resolution metadata, per-mode main/small step pairs from existing tuning config, and `t`/`T` pair cycling. Main and shifted movement now use main/small steps respectively; the marker projects exact selection to the nearest raster column. Harness coverage includes snapping, clamping, exact preservation across resolution changes, key decoding, pair cycling, status, and config. Full harness: 269 passed in 3.11 seconds. No live connection was used.
+
+Added queued interactive W/F navigation. `c` emits `SET zoom=<current> cf=<exact cursor>`, `+`/`=` zoom in, and `-` zooms out, bounded by local zoom limits. `capture_live_waterfall()` drains a command queue inside the existing session and records dynamic commands in saved fixtures. Pure encoder, fake-WebSocket send, key decoding, exact-center, and bound tests pass. Full harness: 272 passed in 3.14 seconds; no live connection was used.
+
+Added coordinated but separately owned SND audio to `kiwi-wf-terminal`. Enter queues an exact `SET mod` tune, `--audio`/`[waterfall].audio` enables local output initially, `a` toggles output, and `--null-audio` provides device-free diagnostics. Audio config inherits receiver policy, limits, fades, mode/passband, command precision, and CW offset. Audio status appears in the terminal row; runner errors are isolated from rendering and viewer shutdown stops both tasks. Fake-runner tests cover toggle, exact AM tune, error isolation, and CW radio offset; dry-run exposes the full SND plan. Full harness: 275 passed in 3.18 seconds. No live receiver or audio device was used.
+
+First proxy tests exposed W/F closure code 1005 when audio was added, including immediate `--audio`. Shared timestamp was necessary but insufficient: browser startup opens SND before W/F, while the project scheduled W/F first. `play_live_snd()` now signals readiness after SND open/auth; combined startup waits for it before opening W/F and aborts cleanly if primary SND fails. To support later `a` toggles without reversing pair order, combined live mode always retains the primary SND stream and uses a lazy `SwitchableAudioSink` to mute/enable local output. Fake ordering, failure, muted sink, and restoration tests pass; full harness: 280 passed in 3.33 seconds. No automatic external retest was made.
+
+User retest confirmed combined W/F and audible SND are working after the SND-primary ordering fix. Report received around 2026-08-28 03:07 UTC / 2026-08-27 23:07 local against `misdr.proxy.kiwisdr.com:8073`, using `--audio` and the working config defaults (5000 kHz AM, ±5 kHz passband, W/F zoom 7, speed 4, interp 13). This validates shared timestamp plus SND-ready-before-W/F ordering on the proxy. No project-side external connection or fixture capture was made.
+
+User follow-up after repeating normal operation: the viewer is much improved and no further connection crash was reported. Time progression remains somewhat jumpy, but matches familiar Kiwi browser-client behavior and is therefore provisionally treated as receiver delivery/render cadence rather than a terminal-client backlog. Timing instrumentation remains available as a future fixture-backed diagnostic if needed. The observed `4882.8`, `5000`, and `5117.2 kHz` ruler labels are expected at center 5000 kHz / zoom 7: the mapped span is 234.375 kHz, giving edges near 5000 ±117.1875 kHz.
+
+Checkpointed the completed raster viewer on integration branch `wf1` as commit `6358c1b` and started cursor work on `feature/wf-cursor-readout`, following the new feature-branch workflow while leaving `main` closed.
+
+Added renderer-neutral `WaterfallCursor` state snapped to source-bin centers, clamped movement, and nearest-frequency preservation across mapped-span changes. The raster overlay now uses magenta for the local cursor, distinct from white tuned frequency and orange passband edges. A second terminal text row reports cursor frequency, tuned offset, source-bin width, and controls.
+
+Added incremental keyboard decoding for `h`/`l`, arrows, `H`/`L`, shifted arrows, `0`, and `q`. Live input uses cbreak mode, restores prior termios state in `finally`, and only changes local cursor/display state. It does not send W/F recenter, zoom, SND tuning, or admin commands. Cursor changes enter the existing one-bit redraw/coalescing path.
+
+The first user run exposed `BlockingIOError: [Errno 11] write could not complete without blocking`. Cursor input had called `os.set_blocking(input_fd, False)`. Shell stdin and stdout may be duplicates sharing one open-file description, so the `O_NONBLOCK` status also affected graphics output and made the renderer fail with `EAGAIN`. Removed all keyboard changes to descriptor blocking mode: asyncio `add_reader()` already calls the read callback only when input is ready. Cbreak attributes are still restored. Main now also converts any unrelated output `OSError` into a concise CLI error instead of a traceback.
+
+### Follow-up
+
+Have the user evaluate local cursor visibility, key feel, and status density from `wf1` after merge. Next add receiver W/F recenter/zoom command transport under fake-WebSocket coverage; keep actual audio tuning as a separate coordinated-session slice.
+
+## 2026-09-03
+
+### Finding
+
+Project review found `wf1` aligned with the handoff notes: the latest completed baseline is the combined Kitty raster W/F viewer with paired primary SND audio. The working tree was clean except for local Pi provider-payload logs. `TODO.md` still contained many completed historical slices, and `MANIFEST.md` referenced a missing `README.md`.
+
+### Decision
+
+Removed the local Pi provider-payload logs, collapsed `TODO.md` to current status plus next slice candidates, and refreshed `MANIFEST.md` without changing `config.toml`.
+
+### Test result
+
+Full harness after cleanup: `.kiwi-venv/bin/python -m pytest -q` passed, 280 tests in 3.48 seconds.
+
+### Follow-up
+
+Run the full harness and then choose the next slice: attended combined-viewer evaluation, compact status/key-help refinement, optional timing diagnostics, or UI direction decision.
+
+## 2026-09-03 — Waterfall redraw cadence
+
+### Finding
+
+User validation confirmed cursor movement, Enter-to-tune, recenter/zoom controls, and live audio all work. The cursor is intentionally magenta. At `rows=500`, `terminal_rows=40`, `refresh_hz=20`, and `speed=4`, the process used about 40% CPU while presenting roughly four visible updates per second. A second test with `rows=200`, `terminal_rows=20`, `refresh_hz=50`, and `speed=4` showed a feature crossing the display in only about 14 visible jumps. Since the receiver reports about 23 W/F frames/sec at speed 4, increasing the redraw cap above source cadence did not solve full-image render/terminal pressure.
+
+### Decision
+
+Added a bounded RGB history parallel to numeric dBm history so each received row is color-mapped once rather than rebuilding every retained row on each redraw. Changed transient PNG compression from zlib default level 6 to level 1 and changed redraw scheduling to preserve draw-start cadence rather than waiting a full refresh interval after each completed draw. One-bit redraw coalescing and off-event-loop terminal output remain unchanged.
+
+### Test result
+
+New deterministic tests cover cached row conversion, padding/orientation, bounded history, width rejection, fast PNG compression, and redraw deadline behavior. Targeted raster/terminal tests passed: 53. Full harness passed: 283 tests in 3.51 seconds. `compileall` and `git diff --check` passed before documentation updates. A synthetic 1024×500 benchmark improved snapshot plus PNG work from about 235 ms (75 ms recoloring + 160 ms level-6 PNG) to about 18 ms (sub-millisecond cached snapshot + 17 ms level-1 PNG), with data-dependent encoded size increasing from about 502 KB to 606 KB.
+
+### Follow-up
+
+Post-merge user validation found a broad optimum around `refresh_hz=20`. Motion now has more frequent, smaller jumps, making individual transitions difficult to count and noticeably improving the previous jarring presentation. `rows=400` / `terminal_rows=20` gives a useful approximately one-source-row-per-displayed-pixel presentation at both half and full terminal width. Zooming in appeared to slow vertical travel; leave whether this is receiver or renderer cadence as an open question until measured. Treat cadence optimization as successful for now; add achieved draw/terminal timing counters only if remaining jumps become operationally problematic. CPU after optimization was not recorded.
+
+Future zoom rendering should preserve old W/F history like the KiwiSDR web client: remap prior rows onto the new frequency scale, stretch/resample overlapping data where necessary, and fill frequencies not covered by old rows with black.
+
+Also consider an optional small bounded W/F jitter/playout buffer. The goal would be steady timed row release despite bursty network arrival, trading a controlled amount of latency for smoothness. Any experiment must measure receive cadence first, keep network ingestion nonblocking, cap queued frames, define underflow/overflow behavior, and remain separate from terminal redraw coalescing.
+
+## 2026-09-03 — Direct waterfall frequency entry
+
+### Decision
+
+Added interactive direct frequency entry to `kiwi-wf-terminal`. Pressing `f` opens a status-row kHz prompt; decimal digits and one decimal point edit the value, Backspace removes a character, Esc cancels, and Enter applies. A valid finite non-negative value updates the tuned frequency, queues an exact mode/passband SND modulation command (including CW offset), and queues W/F recenter at the current zoom. Frequencies outside the old visible span remain pending until a recentered contextual frame can place the magenta cursor exactly. Empty/invalid input sends no receiver commands.
+
+### Test result
+
+Pure decoder/parser/model tests and pseudo-terminal routing tests cover editing, cancellation, exact AM commands, CW offset, pending cursor placement, visible prompt status, invalid input isolation, and terminal restoration. Targeted terminal harness: 47 tests passed. Full harness: 289 tests passed in 3.49 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+User-attended validation of `f` entry after merge.
+
 ## YYYY-MM-DD
 
 ### Finding

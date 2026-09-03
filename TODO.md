@@ -2,50 +2,73 @@
 
 ## Current slice
 
-Goal: Waterfall fixture inspection and sequence semantics.
+Goal: user-attended validation of direct frequency entry in `kiwi-wf-terminal`.
+
+Validation:
+
+- Press `f`, type a frequency in kHz, and use Backspace if needed.
+- Press Esc and confirm no tuning occurs.
+- Repeat entry and press Enter; confirm SND tunes, W/F recenters at the current zoom, and the magenta cursor moves to the exact frequency when the new span arrives.
+- Confirm existing Enter-to-cursor tuning and other navigation controls remain operational.
+
+## Current status
+
+Integration branch: `wf1`; `main` remains closed.
+
+Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio, optimized redraw cadence, and direct `f` frequency entry. The full harness passes 289 tests.
+
+Keep `config.toml` unchanged for now: it intentionally has `[live].allow_live = true`, unlimited live caps, `[receivers].restricted = false`, and the MISDR proxy allowlisted.
+
+## Next slice candidates
+
+### 1. Attended combined-viewer evaluation
+
+Goal: verify normal interactive behavior now that the combined W/F+SND startup crash is fixed.
 
 Done criteria:
 
-- Generated static W/F PNG inspection path is usable from a fresh setup.
-- `setup-python` installs the development, live, playback, and waterfall image dependencies needed to run the full harness on a new machine with Python already installed.
-- Missing waterfall image libraries report a clear remediation command.
-- The standalone live ASCII preview prints 50 rows by default.
-- The standalone live ASCII preview can adjust local display scale separately from receiver-side W/F min/max dB settings.
-- The local W/F fixture `tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl` is inspected for plausible bin orientation/scaling.
-- Repeated local W/F `seq=0` behavior is investigated before sequence tracking treats repeated zero as dropout.
-- `docs/kiwi-protocol.md`, `docs/waterfall-rendering.md`, and `docs/dev-log.md` are updated if protocol/rendering conclusions change.
+- User or attended operator tests mute/audio toggle (`a`), Enter tune-to-cursor, `c` recenter, `+`/`-` zoom, and `q` shutdown.
+- Use local receivers first unless explicitly evaluating the configured proxy.
+- Record receiver, UTC/local time, frequency/mode/passband, W/F zoom/speed/interp, and observed behavior in `docs/dev-log.md` or `docs/radio-lab.md`.
+- Add or update deterministic harness coverage before changing behavior.
 
-Test command: `python3 -m pytest`
+### 2. Compact status/key-help refinement
 
-Live-radio needed: not initially; use existing fixtures first. If more W/F frames are needed, perform a short guarded local-only capture after harness tests pass.
-
-Goal: Support sub-Hz Kiwi tuning commands.
+Goal: improve `kiwi-wf-terminal` status readability if normal use shows truncation or clutter.
 
 Done criteria:
 
-- Add configurable Kiwi modulation command frequency precision.
-- Preserve existing 3-decimal default command formatting unless configured otherwise.
-- Root config enables 4-decimal command frequency formatting for local sub-Hz step testing.
-- Active playback retune commands and live setup plans use configured command precision.
-- Harness tests prove a sub-Hz step emits a sub-Hz `SET mod ... freq=` value.
-- Update root `config.toml`, user docs, radio parameter docs, Kiwi protocol notes, and dev log.
+- Add pure status-row/layout tests for narrow and medium terminal widths.
+- Preserve current controls and audio/error visibility.
+- Update `docs/user-guide.md` if displayed controls/status change.
 
-Test command: `python3 -m pytest tests/protocol/test_commands.py tests/harness/test_config.py tests/harness/test_client_app.py tests/harness/test_tui.py && python3 -m pytest`
+### 3. Optional W/F timing diagnostics
 
-Live-radio needed: no; command encoding behavior only.
+Goal: instrument apparent temporal jumps only if they remain operationally problematic.
 
-Docs to update: `docs/user-guide.md`, `docs/radio-parameters.md`, `docs/kiwi-protocol.md`, `docs/dev-log.md`.
+Done criteria:
 
-## Next
+- Add fixture/fake-runner diagnostics for receive cadence, coalesced redraw count, dropped redraw requests, render duration, and terminal-output duration.
+- Keep diagnostics optional and low overhead.
+- Do not change buffering policy until measurements justify it.
 
-- Add frequency/bin mapping from local W/F metadata (`center_freq`, `bandwidth`, `wf_fft_size`, zoom/start).
-- When ready for richer terminal display, implement the bookmarked `docs/terminal-waterfall-renderer.md` spec.
-- Decide whether to integrate a compact waterfall pane into the curses TUI or keep standalone live preview first.
+### 4. Product direction decision
+
+Goal: decide whether waterfall remains a standalone companion or moves into another UI.
+
+Options:
+
+- Keep `kiwi-wf-terminal` as the primary W/F companion viewer.
+- Integrate a compact waterfall pane into the curses TUI.
+- Add a native desktop raster backend.
 
 ## Later
 
-- Basic desktop client: connect, tune, mode, audio.
-- Waterfall decode and rendering.
-- Recording pipeline.
-- MF/LF beacon detector.
-- Long-integration/correlation analysis.
+- Compressed SND ADPCM decode.
+- Stereo/IQ SND decode.
+- Longer controlled recording/playback with explicit gap/sample-rate policy.
+- Beacon detector: start with synthetic carrier-present/absent, offset, noise, fading, weak-threshold, and false-positive fixtures before live captures.
+- Investigate whether received W/F cadence decreases with zoom or only presented redraw cadence changes.
+- Evaluate an optional small bounded W/F jitter/playout buffer. Measure whether timed frame release smooths bursty arrival without excessive latency; explicitly test target depth, underflow/overflow, oldest-frame dropping, and clean shutdown while keeping network receive nonblocking.
+- Preserve old waterfall history across zoom/recenter changes by remapping each row onto the new frequency scale, stretching/resampling overlap and filling uncovered frequencies with black, similar to the KiwiSDR web client.
+- Advanced long-integration/correlation analysis after recording and detector harnesses mature.

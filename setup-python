@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python3 -m pip install -e '.[dev,live,playback,image]'
-python3 - <<'PY'
+venv_dir="${KIWI_CLIENT_VENV:-.kiwi-venv}"
+
+if [[ ! -x "$venv_dir/bin/python" ]]; then
+    python3 -m venv "$venv_dir"
+fi
+
+"$venv_dir/bin/python" -m pip install -e '.[dev,live,playback,image]'
+"$venv_dir/bin/python" - <<'PY'
 import importlib.util
 import sys
 
@@ -17,7 +23,9 @@ if missing:
     print("setup-python did not make all required project libraries importable:", file=sys.stderr)
     for item in missing:
         print(f"  - {item}", file=sys.stderr)
-    print("Try: python3 -m pip install -e '.[dev,live,playback,image]'", file=sys.stderr)
     raise SystemExit(1)
-print("Kiwi client Python dependencies are installed.")
+print("Kiwi client Python dependencies are installed in the project virtual environment.")
 PY
+
+printf 'Activate it with: source %q/bin/activate\n' "$venv_dir"
+printf 'Or run tests directly: %q/bin/python -m pytest\n' "$venv_dir"

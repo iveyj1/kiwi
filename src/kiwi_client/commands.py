@@ -35,6 +35,14 @@ def encode_ident_user(name: str) -> str:
     return f"SET ident_user={name}"
 
 
+def encode_waterfall_view(zoom: int, center_khz: float, *, frequency_decimals: int = 3) -> str:
+    """Encode a non-admin W/F recenter/zoom command."""
+    if zoom < 0:
+        raise ValueError("waterfall zoom must be non-negative")
+    decimals = max(0, int(frequency_decimals))
+    return f"SET zoom={zoom:d} cf={center_khz:.{decimals}f}"
+
+
 def encode_keepalive() -> str:
     """Encode a keepalive command."""
     return "SET keepalive"

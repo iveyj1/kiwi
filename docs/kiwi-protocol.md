@@ -81,6 +81,8 @@ Initial reference facts from `kiwiclient/kiwi/client.py` and `kiwiclient/test/ki
 - Non-camping stereo/IQ mode prepends a 10-byte little-endian GPS timestamp structure to sample data, then interleaves signed 16-bit big-endian I/Q samples.
 - Normal non-camping mono defaults to compression enabled unless the client sends `SET compression=0`; fixture-first tests should start with uncompressed mono and add compressed ADPCM later.
 - The reference fake server emits synthetic SND frames but uses zero S-meter, so it does not prove S-meter endianness.
+- Project W/F sessions disable the `websockets` library's protocol-level ping timer (`ping_interval=None`) and use Kiwi `SET keepalive` commands. Browser WebSocket clients do not originate protocol pings, and a user-observed background-terminal output stall caused the library's default 20-second ping timeout to close an otherwise valid W/F stream with code 1011. Fake-connector coverage verifies this connection option and clean closure reporting.
+- Combined browser operation opens `SND` and then `W/F` with the same `kiwi.conn_tstamp` (`openwebrx.js` calls `owrx_ws_open_snd()` before `owrx_ws_open_wf()`; `web/kiwi/kiwi_util.js` `open_websocket()` uses `kiwi.conn_tstamp`), identifying one paired client session. Shared timestamp alone was insufficient on `misdr.proxy.kiwisdr.com:8073`: reverse W/F-first ordering still closed W/F with code 1005. The combined viewer now opens/authenticates primary SND before W/F and keeps SND connected while local output is muted. User retest confirmed audible combined operation on that proxy. Harness coverage verifies SND-ready-before-W/F ordering, startup failure behavior, shared generated URIs, and explicit `--timestamp`.
 
 First fixture coverage:
 
@@ -121,6 +123,16 @@ Reference-backed planning facts, not yet locally fixture-verified:
 - Uncompressed W/F setup uses `SET wf_comp=0`.
 - Reference setup commands include `SET zoom=<zoom> cf=<center_khz>`, `SET maxdb=<maxdb> mindb=<mindb>`, `SET wf_speed=<1..4>`, `SET wf_comp=<0|1>`, and `SET interp=<value>`.
 
+Reference-source-backed `SET interp` semantics:
+
+- `interp` is a categorical reduction method used when mapping FFT values into waterfall output bins, not a monotonic smoothing amount.
+- Base methods are `0=max`, `1=min`, `2=last`, `3=drop`, and `4=CMA` (averaging the FFT values mapped to one output bin).
+- Values `10..14` select the corresponding base method `0..4` with CIC passband compensation enabled.
+- Kiwi UI/reference default `13` therefore means drop sampling plus CIC compensation. `3` is drop sampling without CIC compensation.
+- `kiwiclient` accepts only `0..4` or `10..14`. Current project clients apply the same validation before connecting.
+- Kiwi server source evidence: `rx/rx_waterfall.h` (`WF_CIC_COMP`, `wf_interp_t`) and `rx/rx_waterfall.cpp` (`interp_s`, `SET interp` parsing, FFT-bin reduction switch).
+- Local reference evidence: `~/kiwiclient/kiwi/client.py` `_set_wf_interp()` and `~/kiwiclient/kiwirecorder.py`; reference comments identify `13` as the Kiwi UI default and `10` as MAX+CIC for peak extraction.
+
 Evidence:
 
 - `kiwiclient/kiwi/client.py`
@@ -135,11 +147,21 @@ Local captured W/F observations:
 - The receiver reported `MSG wf_fft_size=1024 wf_fps=23 wf_fps_max=23 zoom_max=14 zoom_cap=14 rx_chans=4 wf_chans=4 wf_chans_real=4 wf_cal=-13 wf_setup` followed by `MSG zoom=0 start=0` and `MSG wf_fps=1`.
 - The two captured W/F frames decoded with complete-message layout: 3-byte `W/F` tag, one raw flags byte, 12-byte little-endian W/F header, and 1024 raw bin bytes.
 - Both captured frames had `raw_flags=32`, `x_bin_server=0`, `flags_x_zoom_server=0`, and `seq=0`. Because the two frames have different bin data and plausible waterfall intensity ranges, repeated `seq=0` is treated by the local tracker as an inactive/unknown W/F sequence counter rather than a real dropout. More captures are still needed before assigning exact sequence semantics.
+- Kiwi server/browser source defines a high-precision frequency grid with `max_bins = wf_fft_size << zoom_max`. `x_bin_server` is the left edge on that grid. The low 16 bits of `flags_x_zoom_server` are zoom; upper bits include `0x00010000` compression and `0x00020000` no-sync flags.
+- Mapping is `start_hz = x_bin_server / max_bins * bandwidth_hz`, `span_hz = bandwidth_hz / 2**zoom`, and `bin_width_hz = span_hz / payload_bin_count`. Displayed bin frequencies use bin centers when needed.
+- The local zoom-0 fixture therefore maps to `0..30000 kHz`, center `15000 kHz`, and `29296.875 Hz/bin`, despite its original `SET zoom=0 cf=5000` request; the server clamps the full-band zoom-0 start to zero.
+- Evidence: local fixture MSG/frame fields, `~/kiwiclient/kiwi/client.py` zoom/span helpers, upstream `rx/rx_waterfall.cpp`, `rx/rx_waterfall.h`, and browser `bins_at_zoom()` / `bin_to_freq()` helpers. Synthetic zoom-2 tests cover nonzero start and W/F flag masking.
 
 Still to verify with project fixtures:
 
-- `x_bin_server` and `flags_x_zoom_server` semantics.
-- Frequency span/bin mapping for local receiver versions.
+- `tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl` captured five speed-4 frames from `10.0.0.40:8073` centered at 855 kHz. The server reported zoom 7 and start bin 412614.
+- Mapping gives start `737.811327 kHz`, center `854.998827 kHz`, end `972.186327 kHz`, span `234.375 kHz`, and `228.881836 Hz/bin`.
+- Averaged fixture peaks map to approximately `760.127 kHz` and `949.870 kHz`, matching the known 760 and 950 kHz AM signals and confirming low-to-high bin orientation at nonzero zoom.
+- Receiver metadata reports `wf_fps=23` at speed 4. The five-frame startup capture is intentionally too short to infer steady timing from event timestamps alone.
+- After terminal-output backpressure was removed, a user still observed somewhat jumpy time progression resembling normal Kiwi browser-client operation, without the previous connection failure. This is provisional observational evidence of receiver/delivery/render cadence, not yet fixture-timed protocol behavior.
+
+Still to verify with project fixtures:
+
 - Calibration and display scaling policy.
 - Timing/update behavior for each `wf_speed` value.
 - Compressed W/F payload behavior.
@@ -197,6 +219,15 @@ Evidence: `kiwiclient/kiwi/client.py` `_set_snd_comp()`.
 Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
 Failure behavior: TBD.
 
+Command: SET zoom=<zoom> cf=<center_khz>
+Direction: client -> server W/F
+Purpose: Set or dynamically recenter/zoom the waterfall around an exact selected frequency.
+Fields: integer zoom level and center frequency in kHz; interactive cursor path emits four decimals.
+Example: SET zoom=8 cf=5000.1250
+Evidence: existing setup/reference behavior plus fake-WebSocket dynamic command harness.
+Fixture/test: `tests/protocol/test_commands.py`, `tests/harness/test_live_waterfall.py`, `tests/harness/test_waterfall_terminal.py`.
+Failure behavior: command is bounded locally to zoom `0..zoom_max`; no automatic reconnect.
+
 Command: SET keepalive
 Direction: client -> server
 Purpose: Keep SND session alive.
@@ -204,7 +235,7 @@ Fields: none.
 Example: SET keepalive
 Evidence: `kiwiclient/kiwi/client.py` `_set_keepalive()` and SND receive loop.
 Fixture/test: `tests/fixtures/kiwi/snd-setup-commands.jsonl`, `tests/protocol/test_commands.py`.
-Failure behavior: timeout behavior TBD.
+Failure behavior: project clients send application keepalives periodically. W/F transport closure is converted to a concise `LiveCaptureError`; the standalone viewer does not reconnect automatically.
 ```
 
 Record each future command as:

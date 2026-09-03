@@ -4,6 +4,13 @@ This file should describe user-visible behavior as the application develops.
 
 ## Basic client
 
+Prepare an isolated project Python environment and install all current extras with:
+
+```bash
+./setup-python
+source .kiwi-venv/bin/activate
+```
+
 The first basic client is a scriptable command shell. It manages client state and can produce dry-run plans for guarded live operations without connecting.
 
 Run interactively as a command shell:
@@ -69,6 +76,29 @@ step_percent = 10
 startup_mute_ms = 100
 startup_fade_in_ms = 50
 stop_fade_out_ms = 50
+
+[waterfall]
+# Standalone Kitty viewer defaults; explicit CLI arguments override these.
+center_khz = 5000.0
+zoom = 7
+history_rows = 300
+# Set to 0 to select half the detected terminal height.
+terminal_rows = 30
+render_min_db = -100
+render_max_db = -40
+speed = 4
+refresh_hz = 12
+interp = 13
+label_columns_per_tick = 18
+show_tuned_marker = true
+show_passband = true
+show_cursor = true
+keyboard = true
+# Start SND audio with the viewer; false still allows `a` to toggle it later.
+audio = false
+cursor_step_pair = 0
+low_cut_hz = -5000
+high_cut_hz = 5000
 
 [live]
 # Default is false. Set true only for trusted local interactive use.
@@ -198,7 +228,7 @@ or explicitly disabled for unrestricted receiver addresses:
 restricted = false
 ```
 
-Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed.
+Use unrestricted mode carefully; project live-radio practice still prefers local receivers unless explicitly needed. `kiwi-wf-terminal` uses this same policy: in restricted mode, `--host` plus `--port` must exactly match an entry in `[receivers].allowed`; in unrestricted mode, arbitrary addresses pass the receiver-policy check. The standalone viewer still requires `--allow-live` before making a connection. Its `--dry-run` output reports the resolved restriction and allowlist.
 
 For long-running live playback/record/capture, the client sends periodic SND keepalives after initial setup. If a session still stops unexpectedly, check the TUI operation result/error and confirm both `duration_seconds` and `max_frames` are `0` if you intend no client-side limit.
 
@@ -472,11 +502,66 @@ kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local
 kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
 
-Expected future operations:
+A detailed standalone raster viewer is available for terminals supporting the Kitty graphics protocol. Fixture mode is offline and retains all 1024 source bins in the raster image:
 
-- Show live waterfall inside the TUI or richer UI
-- Tune by cursor or control input
-- Adjust span/zoom if supported
+```bash
+kiwi-wf-terminal \
+  --fixture tests/fixtures/kiwi/local-wf-5000-zoom0.jsonl \
+  --rows 100
+```
+
+Guarded live mode uses the existing local receiver policy and can optionally save its fixture:
+
+```bash
+kiwi-wf-terminal \
+  --allow-live \
+  --host 10.0.0.40 \
+  --center-khz 5000 \
+  --rows 100 \
+  --render-min-db -100 \
+  --render-max-db -40 \
+  --save-fixture tests/fixtures/kiwi/local-wf-terminal.jsonl
+```
+
+The viewer recognizes Kitty, Ghostty, and WezTerm identifiers. By default it reserves a visible image area using the full terminal width and half the terminal height; `--terminal-columns` and `--terminal-rows` override that placement. Live updates remain anchored in this area, and the cursor is restored below it when the viewer exits. Use `--force` only when the current terminal is known to support Kitty graphics but does not advertise that capability. `--dry-run` prints the guarded live plan without connecting. Cursor readout and tuning interaction are not implemented yet.
+
+`--interp` is not a smoothing-strength scale. It selects how multiple FFT values are reduced into each W/F output bin: `0=max`, `1=min`, `2=last`, `3=drop`, and `4=CMA`; values `10..14` select the same methods with CIC compensation. The default `13` is drop+CIC, while `3` is drop without CIC. Values `5..9` are unsupported and rejected. Changing this setting will not disable Kitty's spatial image scaling.
+
+When the receiver supplies `bandwidth`, `wf_fft_size`, and `zoom_max` metadata, the raster viewer shows an adaptive terminal-text frequency ruler above the image. Mapping uses the server-reported frame start and zoom, so at zoom 0 a 30 MHz receiver correctly shows `0..30000 kHz` even if a different center was requested. Major labels use 1/2/5-based intervals, available terminal width controls label density, and overlapping interior labels are omitted. Edge-label precision increases automatically for narrower spans. `[waterfall].label_columns_per_tick` controls target density; larger values produce fewer labels.
+
+The live viewer defaults the tuned marker to `--center-khz`. A white vertical line marks tuned frequency. Orange vertical lines mark passband edges when `--show-passband` is enabled and low/high cuts are configured. A magenta line marks the local cursor at a source-bin center. Override the tuned/passband values with `--tuned-khz`, `--low-cut-hz`, and `--high-cut-hz`; disable overlays with `--no-show-tuned-marker`, `--no-show-passband`, or `--no-show-cursor`. `--cursor-khz` selects an initial cursor frequency. Fixture mode only draws a tuned overlay when a tuned frequency is explicitly supplied or configured, avoiding an unrelated live center marker.
+
+Live keyboard controls are local-only and do not send tuning or zoom commands:
+
+- `h`, left arrow: move cursor down by the active main frequency step.
+- `l`, right arrow: move cursor up by the active main frequency step.
+- `H`, shifted-left arrow: move down by the active small step.
+- `L`, shifted-right arrow: move up by the active small step.
+- `t` / `T`: cycle forward/backward through the mode's configured main/small step pairs.
+- `0`: reset cursor to tuned frequency on the active round step grid.
+- `c`: recenter the current W/F zoom on the exact cursor frequency.
+- `+` / `=`: zoom in one level around the cursor.
+- `-`: zoom out one level around the cursor.
+- `a`: toggle local audio output while keeping the paired SND session alive.
+- Enter: tune active audio to the exact cursor frequency using current mode/passband.
+- `f`: enter a frequency directly in kHz. Decimal digits and one decimal point are accepted; Backspace edits, Esc cancels, and Enter tunes SND plus recenters W/F at the current zoom.
+- `q`: stop W/F and audio cleanly.
+
+The status row reports cursor frequency, offset from tuned frequency, and source-bin width. Disable raw keyboard input with `--no-keyboard`; terminal attributes are restored on every exit path. Keyboard readiness does not alter descriptor blocking flags, avoiding interference with graphics output when shell stdin/stdout share terminal file status.
+
+Cursor movement uses the selected mode's configured round frequency steps from `[tuning.mode_steps.<mode>]`. The exact selected frequency is retained independently and drawn at the nearest available raster column; source-bin width describes display resolution only. `--mode` selects the step table and `--step-pair` selects its initial zero-based pair. Recenter and zoom keys send fixture-tested `SET zoom=<level> cf=<cursor>` W/F commands. Direct `f` entry preserves the entered precision, updates the tuned frequency, sends the matching SND modulation command, recenters W/F, and moves the cursor when the new mapped span arrives.
+
+The combined live viewer always establishes its separately owned SND WebSocket first, then opens paired W/F with the same session timestamp, matching Kiwi browser order. Without `--audio` / `[waterfall].audio = true`, the SND stream remains connected but the lazy local sink is `MUTED`; `a` toggles local output without tearing down the primary SND session. `--null-audio` keeps output device-free even when toggled ON. Enter sends `SET mod=...` for the exact cursor frequency, mode, and passband. CW preserves the project convention that cursor/user frequency is passband center and applies configured `cw_offset_hz` to radio frequency. A primary SND startup failure prevents opening orphan W/F; later audio-device errors are shown in status.
+
+`kiwi-wf-terminal` uses normal config discovery (`--config`, then `./config.toml`, then the user config). Explicit CLI options take precedence over `[waterfall]` values. A configured `terminal_rows = 0` retains automatic half-terminal sizing. Duration and frame limits default to `[live].duration_seconds` / `[live].max_frames`; the root local config uses `0` for both, so explicitly set finite values when a bounded session is desired.
+
+Terminal image encoding/output runs in one background renderer. Incoming frames continue updating numeric history while a terminal is slow or unfocused, and redraw requests are coalesced rather than queued. When focus returns, the display may jump directly to current history; it should not replay an accumulated image-update backlog or starve the Kiwi connection. W/F sessions rely on Kiwi `SET keepalive`, not the Python WebSocket library's ping timeout. A real transport closure is reported as a concise error without automatic reconnect.
+
+The viewer caches bounded RGB rows and uses fast PNG compression so unchanged history is not recolored on every update. `refresh_hz` caps draw starts; it is not a guaranteed presentation rate, and values above the receiver's reported W/F frame rate do not add intermediate data. If rendering remains expensive, reduce `history_rows` first to reduce image generation and transfer size, then reduce `refresh_hz`. `terminal_rows` changes placement scale but does not reduce the 1024-bin source raster width.
+
+Expected future operation:
+
+- Show the live waterfall inside the TUI or a richer native UI.
 
 ## Recording / fixture capture
 

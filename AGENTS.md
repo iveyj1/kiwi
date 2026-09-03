@@ -89,6 +89,15 @@ The detector must be testable from synthetic and captured fixtures.
 
 Do not bury protocol parsing inside UI code.
 
+## Git workflow
+
+Until explicitly changed by the user:
+
+- Treat `main` as closed; do not commit or merge work there.
+- Use short-lived feature branches for implementation work.
+- Merge tested feature branches into `wf1` at sensible integration points.
+- Keep `wf1` as the active integration branch.
+
 ## Development rhythm
 
 For each work slice:

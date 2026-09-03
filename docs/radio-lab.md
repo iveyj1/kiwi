@@ -1,5 +1,14 @@
 # Radio Lab Notes
 
+## 2026-08-28 — User-reported proxy combined W/F + SND validation
+
+- Receiver: `misdr.proxy.kiwisdr.com:8073` (explicitly selected by user; not contacted by the agent).
+- Report time: approximately 2026-08-28 03:07 UTC / 2026-08-27 23:07 local.
+- Working configuration defaults: 5000 kHz, AM, passband -5000..5000 Hz, W/F zoom 7, speed 4, interp 13, `--audio` enabled.
+- Observation: combined waterfall and audible audio work after opening/authenticating SND before paired W/F with one shared session timestamp.
+- Previous failure: W/F-first ordering caused proxy close code 1005 as soon as audio was added, even with a shared timestamp.
+- Fixture: none; this is user-reported external proxy validation. Deterministic fake-runner ordering coverage remains in the harness.
+
 ## Receivers
 
 | Name | Address | Notes |
@@ -153,6 +162,35 @@ Observed behavior:
 Fixture captured: none
 Follow-up:
   Add explicit control-command sent counters/status if we need stronger visibility than queued-command response.
+```
+
+### 2026-08-27 / 2026-08-27 local — zoomed AM waterfall mapping
+
+```text
+Date/time: 2026-08-27T04:43:33.928881Z / 2026-08-27T00:43:33.928884-04:00
+Receiver: 10.0.0.40:8073
+Frequency: requested center 855.000 kHz; mapped center 854.998827 kHz
+Mode/filter: W/F stream only; not applicable
+Stream type: W/F, zoom 7, speed 4, interp 13 (drop+CIC), wf_comp=0
+Purpose: Confirm nonzero-zoom frequency mapping and bin orientation against known 760 and 950 kHz AM signals.
+Commands sent:
+  SET auth t=kiwi p=
+  SET zoom=7 cf=855.000
+  SET maxdb=0 mindb=-110
+  SET wf_speed=4
+  SET wf_comp=0
+  SET interp=13
+  SET keepalive
+Observed behavior:
+  Five 1024-bin frames captured without reconnect or admin commands.
+  Receiver metadata: bandwidth=30000000 Hz, wf_fft_size=1024, zoom_max=14, wf_fps=23, zoom=7, start=412614.
+  Mapped range: 737.811327..972.186327 kHz; span 234.375 kHz; 228.881836 Hz/bin.
+  Averaged strong peaks occurred at about 760.127 and 949.870 kHz, matching the known AM signals and confirming bins increase left-to-right in frequency.
+  Additional plausible AM-channel peaks appeared near 780.040, 799.953, 829.936, 840.007, 859.920, 889.903, and 909.816 kHz.
+Fixture captured: tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl
+Follow-up:
+  Added fixture regression coverage for mapping and known carrier neighborhoods.
+  Keep calibration/color-scale policy separate from frequency-coordinate validation.
 ```
 
 ### YYYY-MM-DD
