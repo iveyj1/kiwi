@@ -489,6 +489,22 @@ Four fake-adapter tests cover deterministic RGB, common lifecycle/timing results
 
 Build a fixture-only PySide6 window against the shared snapshot/raster boundary, then perform an attended local window test before any live-session integration.
 
+## 2026-09-03 — Fixture-only PySide6 GUI prototype
+
+### Decision
+
+Added optional `kiwi-gui` / `src/kiwi_client/gui_app.py`. The first native window is deliberately fixture-only: it replays contextualized W/F fixture rows into `WaterfallSnapshotPublisher`, builds the existing deterministic RGB raster, and presents it directly through `QImage`/`QPixmap`. It shows mapped frequency range and compact frame/bin/history status. `--repeat` fills a diagnostic history from short captures; `--dry-run` validates the complete model without importing Qt or opening a display.
+
+PySide6 imports remain deferred and failure reports `pip install -e '.[gui-pyside]'`. No live receiver, audio, mouse, or control integration was added.
+
+### Test result
+
+Two model/CLI tests cover repeated contextualized fixture publication, 1024×400 direct RGB construction, mapped text/status, and Qt-free dry-run output. Manual dry-run produced 400 frames over 737.8113..972.1863 kHz from the zoom-7 local fixture. Full harness: 325 tests passed in 4.17 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+User-attended static window validation, then add timed snapshot consumption and controls before connecting the paired live session.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -92,9 +92,9 @@ Add paired-session lifecycle and status to `kiwi-tui` without embedding graphics
 
 ## Phase 4 — Graphical frontend decision and prototype
 
-Status: **Renderer-neutral snapshot boundary implemented; toolkit benchmark is next.**
+Status: **PySide6 selected provisionally; fixture-only prototype implemented.**
 
-`WaterfallSnapshotPublisher` retains bounded immutable numeric rows with per-row frequency coordinates and monotonic arrival times. Consumers request the latest generation, so a slow GUI skips superseded display states without creating a queue. The benchmark procedure is in [Native GUI toolkit benchmark plan](native-gui-benchmark.md).
+`WaterfallSnapshotPublisher` retains bounded immutable numeric rows with per-row frequency coordinates and monotonic arrival times. Consumers request the latest generation, so a slow GUI skips superseded display states without creating a queue. Headless comparison found both PySide6 and pygame-ce comfortably exceed the 20 FPS direct-RGB target. PySide6 Essentials is larger but was selected for its mature desktop controls/layout/input support. `kiwi-gui` now displays fixture history through direct `QImage`/`QPixmap` presentation; live session integration remains pending. Benchmark details are in [Native GUI toolkit benchmark plan](native-gui-benchmark.md).
 
 Prefer a native raster prototype over coupling the main product to curses plus terminal graphics.
 

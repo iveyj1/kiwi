@@ -571,6 +571,32 @@ Expected future operation:
 
 - Show the live waterfall inside the TUI or a richer native UI.
 
+## Native GUI prototype
+
+A fixture-only PySide6 waterfall window is available as `kiwi-gui`. It uses direct RGB/QImage presentation and does not connect to a receiver or encode terminal PNG data.
+
+Install the optional prototype dependency:
+
+```bash
+.kiwi-venv/bin/python -m pip install -e '.[gui-pyside]'
+```
+
+Build and inspect the model without opening Qt:
+
+```bash
+kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
+  --rows 400 --repeat 80 --dry-run
+```
+
+Open the attended fixture window:
+
+```bash
+kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
+  --rows 400 --repeat 80
+```
+
+`--repeat` repeats the short captured fixture to fill diagnostic history. This first window is intentionally static: no live receiver, audio, controls, zoom, or mouse tuning are connected yet. Close the window normally to exit.
+
 ## Recording / fixture capture
 
 The first user-visible capture tool is guarded and intended for short local fixture captures, not unattended recording.

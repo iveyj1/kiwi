@@ -1,25 +1,22 @@
 # TODO
 
-## Current slice — PySide6 fixture GUI prototype
+## Current slice — PySide6 fixture-window validation
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Completed comparison:
+Completed:
 
-- Both PySide6 and pygame-ce exceed the 20 FPS direct-RGB target in headless benchmarks.
-- PySide6 Essentials measured roughly 0.41 ms mean / 0.61 ms p95 at 1024×400 versus pygame-ce 0.84/1.11 ms.
-- PySide6 Essentials is much larger (about 226 MB versus 32 MB), but is selected for the first prototype because mature widgets/layout/input avoid building a desktop UI framework inside the project.
-- Both remain optional extras; default installation is unchanged.
+- Benchmarked PySide6 and pygame-ce direct RGB at 1024×200/400/800 and selected PySide6 provisionally.
+- Kept both in isolated optional dependency extras; default installation is unchanged.
+- Added fixture-only `kiwi-gui` using direct `QImage`/`QPixmap` presentation.
+- Added model/dry-run harness coverage requiring no Qt import or display server.
 
-Next goal: add a fixture-only PySide6 window using `WaterfallSnapshotPublisher` and existing raster/overlay code.
+Validation goal:
 
-Done criteria:
-
-- Keep PySide6 imports optional and report a clear installation command.
-- Render captured fixture history via direct `QImage`/`QPixmap`, not PNG/base64.
-- Add basic frequency/status text and clean window close.
-- Harness the model/controller boundary without requiring a display server.
-- Provide an attended fixture demo command; no receiver connection in this slice.
+- Run the attended 1024×400 fixture window on the real desktop.
+- Confirm image orientation, scaling, resize behavior, frequency text, clean close, and acceptable startup/dependency behavior.
+- Record observed CPU/memory if convenient.
+- Do not add live receiver/audio integration until this static window is accepted.
 
 ## Plan
 
