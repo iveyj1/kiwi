@@ -345,6 +345,20 @@ Future zoom rendering should preserve old W/F history like the KiwiSDR web clien
 
 Also consider an optional small bounded W/F jitter/playout buffer. The goal would be steady timed row release despite bursty network arrival, trading a controlled amount of latency for smoothness. Any experiment must measure receive cadence first, keep network ingestion nonblocking, cap queued frames, define underflow/overflow behavior, and remain separate from terminal redraw coalescing.
 
+## 2026-09-03 — Direct waterfall frequency entry
+
+### Decision
+
+Added interactive direct frequency entry to `kiwi-wf-terminal`. Pressing `f` opens a status-row kHz prompt; decimal digits and one decimal point edit the value, Backspace removes a character, Esc cancels, and Enter applies. A valid finite non-negative value updates the tuned frequency, queues an exact mode/passband SND modulation command (including CW offset), and queues W/F recenter at the current zoom. Frequencies outside the old visible span remain pending until a recentered contextual frame can place the magenta cursor exactly. Empty/invalid input sends no receiver commands.
+
+### Test result
+
+Pure decoder/parser/model tests and pseudo-terminal routing tests cover editing, cancellation, exact AM commands, CW offset, pending cursor placement, visible prompt status, invalid input isolation, and terminal restoration. Targeted terminal harness: 47 tests passed. Full harness: 289 tests passed in 3.49 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+User-attended validation of `f` entry after merge.
+
 ## YYYY-MM-DD
 
 ### Finding

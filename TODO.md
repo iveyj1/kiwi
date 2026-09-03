@@ -2,17 +2,18 @@
 
 ## Current slice
 
-Goal: choose the next waterfall/UI work slice after successful redraw-cadence validation.
+Goal: add direct frequency entry to the interactive `kiwi-wf-terminal` viewer.
 
-Validated baseline:
+Done criteria:
 
-- Each received W/F row is color-mapped once into bounded RGB history.
-- Transient PNGs use fast level-1 compression.
-- Refresh scheduling preserves draw-start cadence instead of adding idle time after every completed draw.
-- User evaluation found a broad optimum around `refresh_hz=20`, with more frequent, smaller jumps and noticeably smoother motion.
-- One-bit coalescing, off-event-loop output, overlays, and numeric history remain intact.
-
-Do not add more cadence complexity unless normal use shows a concrete problem. If needed, measure receive/draw/encode/write timing before changing rendering again.
+- `f` enters a visible kHz frequency-entry mode.
+- Accept decimal digits and one decimal point; Backspace edits, Esc cancels, and Enter applies.
+- Applying a valid non-negative finite frequency tunes the primary SND session and recenters W/F at the current zoom.
+- Preserve the exact entered frequency for SND command precision and move the cursor there when the recentered W/F span arrives.
+- Invalid/empty input remains local and does not queue receiver commands.
+- Add pure decoder/model and pseudo-terminal command-routing tests before implementation.
+- Preserve existing cursor/audio/navigation controls and terminal restoration.
+- Update user/rendering docs, run the full harness, and merge into `wf1`; no automatic live connection.
 
 ## Current status
 
