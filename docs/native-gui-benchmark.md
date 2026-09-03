@@ -14,6 +14,29 @@ Benchmark no more than three initial candidates:
 
 Do not add any candidate to default project dependencies during the benchmark.
 
+## Toolkit-independent baseline
+
+Run the common synthetic publisher workload without opening a window:
+
+```bash
+.kiwi-venv/bin/python tools/waterfall_gui_benchmark.py \
+  --history-rows 200,400,800 --width 1024 --frames 1200 \
+  --source-fps 20 --consumer-fps 20
+```
+
+The command emits one JSON result per history depth with produced/presented counts, coalesced generations, virtual duration, elapsed throughput, and mean/p95 publish cost. Set `--consumer-fps` below `--source-fps` to verify deterministic latest-generation coalescing.
+
+Initial no-window run on the development machine:
+
+```text
+Rows | Frames | Mean publish ms | p95 publish ms | Throughput frames/s
+200  | 1200   | 0.140           | 0.171          | 6448
+400  | 1200   | 0.159           | 0.222          | 5801
+800  | 1200   | 0.158           | 0.197          | 6044
+```
+
+These numbers measure snapshot publication only, not color conversion or GUI upload.
+
 ## Fixed workload
 
 Use captured/synthetic data only:

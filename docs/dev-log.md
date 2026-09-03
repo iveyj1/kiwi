@@ -459,6 +459,20 @@ Five pure publisher tests cover bounded immutable history, coalescing, blocking 
 
 Implement the toolkit-independent benchmark workload/result harness before trying candidate GUI dependencies.
 
+## 2026-09-03 — Native GUI benchmark baseline
+
+### Decision
+
+Added toolkit-independent `tools/waterfall_gui_benchmark.py`. It generates deterministic mapped W/F rows, publishes them through `WaterfallSnapshotPublisher`, samples at a configurable virtual consumer rate, and emits JSON metrics for produced/presented snapshots, coalesced generations, elapsed throughput, and mean/p95 publish time. This establishes one workload/result format before any GUI toolkit adapter is added.
+
+### Test result
+
+Four harness tests cover deterministic frame generation, exact slower-consumer coalescing, validation, and multi-depth JSON CLI output. A 1200-frame 1024-bin no-window run produced mean/p95 publish costs of approximately 0.140/0.171 ms at 200 rows, 0.159/0.222 ms at 400 rows, and 0.158/0.197 ms at 800 rows. Snapshot publication is not the expected GUI bottleneck. Tkinter, PySide6, and pygame are not installed in the current environment; no dependency was added. Full harness: 319 tests passed in 4.14 seconds; `compileall` and `git diff --check` passed.
+
+### Follow-up
+
+Choose an isolated optional toolkit benchmark strategy. Compare at least two viable adapters before selecting the production native frontend.
+
 ## YYYY-MM-DD
 
 ### Finding
