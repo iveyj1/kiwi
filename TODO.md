@@ -2,24 +2,26 @@
 
 ## Current slice
 
-Goal: render more intermediate waterfall states without increasing receiver traffic or allowing an unbounded redraw backlog.
+Goal: validate the optimized waterfall redraw cadence in an attended session.
 
-Observed behavior: at `rows=500`, `terminal_rows=40`, `refresh_hz=20`, and receiver `speed=4`, the viewer uses about 40% CPU but visibly redraws only around four times per second. Each update advances enough history to look jarring.
+Implemented baseline:
+
+- Each received W/F row is color-mapped once into bounded RGB history.
+- Transient PNGs use fast level-1 compression.
+- Refresh scheduling preserves draw-start cadence instead of adding idle time after every completed draw.
+- One-bit coalescing, off-event-loop output, overlays, and numeric history remain intact.
 
 Done criteria:
 
-- Add deterministic raster tests before implementation.
-- Avoid rebuilding RGB values for every retained history row on every redraw; convert each received row once and retain a bounded RGB history alongside numeric history.
-- Use a faster deterministic PNG compression level suitable for transient terminal frames.
-- Make the redraw cap apply to draw start cadence rather than adding a full refresh interval after each completed draw.
-- Preserve one-bit coalescing, off-event-loop rendering, overlays, fixture output, and bounded memory.
-- Run targeted waterfall tests and the full harness; do not connect externally automatically.
+- Repeat the prior visual test at `rows=200`, `terminal_rows=20`, `refresh_hz=20`, and `speed=4`.
+- Record CPU, approximate visible updates or bottom-to-top transition count, and whether motion is less jarring.
+- If presentation remains substantially below receiver cadence, add measured receive/draw/encode/write timing diagnostics before another rendering change.
 
 ## Current status
 
-Integration branch: `feature/wf-render-cadence` from `wf1`; `main` remains closed.
+Integration branch: `wf1`; `main` remains closed.
 
-Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio. User validation confirmed proxy W/F+SND operation after using one shared Kiwi session timestamp and opening/authenticating SND before paired W/F.
+Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio, with cached RGB history and fast transient PNG encoding for improved redraw cadence. The full harness passes 283 tests.
 
 Keep `config.toml` unchanged for now: it intentionally has `[live].allow_live = true`, unlimited live caps, `[receivers].restricted = false`, and the MISDR proxy allowlisted.
 
