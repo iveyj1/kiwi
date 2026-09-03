@@ -106,6 +106,54 @@ class WaterfallHistory:
         return len(self._rows)
 
 
+class WaterfallRasterHistory:
+    """Bounded RGB history that converts each received dBm row only once."""
+
+    def __init__(
+        self,
+        *,
+        max_rows: int,
+        min_dbm: int | float,
+        max_dbm: int | float,
+    ) -> None:
+        if max_rows <= 0:
+            raise ValueError("waterfall raster history max_rows must be positive")
+        if max_dbm <= min_dbm:
+            raise ValueError("waterfall raster history max_dbm must be greater than min_dbm")
+        self.max_rows = max_rows
+        self.min_dbm = min_dbm
+        self.max_dbm = max_dbm
+        self.width: int | None = None
+        self._rows: deque[bytes] = deque(maxlen=max_rows)
+
+    def append(self, frame: WaterfallFrame) -> None:
+        row = tuple(frame.dbm)
+        if not row:
+            raise ValueError("waterfall frame contains no dBm bins")
+        if self.width is None:
+            self.width = len(row)
+        if len(row) != self.width:
+            raise ValueError(f"waterfall frame width {len(row)} does not match raster history width {self.width}")
+        rendered = render_dbm_rows((row,), min_dbm=self.min_dbm, max_dbm=self.max_dbm)
+        self._rows.append(rendered.rgb)
+
+    def image(self, *, newest_at_top: bool = False, pad_dbm: int | float = -255) -> RasterImage:
+        if self.width is None or not self._rows:
+            raise ValueError("cannot render an empty waterfall raster history")
+        rows = tuple(self._rows)
+        if newest_at_top:
+            rows = tuple(reversed(rows))
+        if len(rows) < self.max_rows:
+            padding_pixel = bytes(dbm_to_rgb(pad_dbm, min_dbm=self.min_dbm, max_dbm=self.max_dbm))
+            padding_row = padding_pixel * self.width
+            padding = (padding_row,) * (self.max_rows - len(rows))
+            rows = rows + padding if newest_at_top else padding + rows
+        return RasterImage(width=self.width, height=len(rows), rgb=b"".join(rows))
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+
 def dbm_to_rgb(
     dbm: int | float,
     *,
@@ -203,9 +251,12 @@ def _png_chunk(kind: bytes, data: bytes) -> bytes:
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
 
 
-def encode_png(image: RasterImage) -> bytes:
-    """Encode a packed RGB image as a dependency-free PNG."""
+def encode_png(image: RasterImage, *, compression_level: int = 1) -> bytes:
+    """Encode packed RGB as PNG using fast compression for transient frames."""
+    if compression_level < 0 or compression_level > 9:
+        raise ValueError("PNG compression_level must be in range 0..9")
     header = struct.pack(">IIBBBBB", image.width, image.height, 8, 2, 0, 0, 0)
     stride = image.width * 3
     scanlines = b"".join(b"\x00" + image.rgb[offset:offset + stride] for offset in range(0, len(image.rgb), stride))
-    return b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", header) + _png_chunk(b"IDAT", zlib.compress(scanlines)) + _png_chunk(b"IEND", b"")
+    compressed = zlib.compress(scanlines, compression_level)
+    return b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", header) + _png_chunk(b"IDAT", compressed) + _png_chunk(b"IEND", b"")

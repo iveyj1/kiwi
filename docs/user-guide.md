@@ -556,13 +556,11 @@ The combined live viewer always establishes its separately owned SND WebSocket f
 
 Terminal image encoding/output runs in one background renderer. Incoming frames continue updating numeric history while a terminal is slow or unfocused, and redraw requests are coalesced rather than queued. When focus returns, the display may jump directly to current history; it should not replay an accumulated image-update backlog or starve the Kiwi connection. W/F sessions rely on Kiwi `SET keepalive`, not the Python WebSocket library's ping timeout. A real transport closure is reported as a concise error without automatic reconnect.
 
-If background rendering remains visibly expensive, first reduce `refresh_hz` or `history_rows`. Reducing refresh rate usually gives the largest terminal-output reduction; history rows reduce PNG generation and transfer size. `terminal_rows` changes placement scale but does not reduce the 1024-bin source raster transfer.
+The viewer caches bounded RGB rows and uses fast PNG compression so unchanged history is not recolored on every update. `refresh_hz` caps draw starts; it is not a guaranteed presentation rate, and values above the receiver's reported W/F frame rate do not add intermediate data. If rendering remains expensive, reduce `history_rows` first to reduce image generation and transfer size, then reduce `refresh_hz`. `terminal_rows` changes placement scale but does not reduce the 1024-bin source raster width.
 
-Expected future operations:
+Expected future operation:
 
-- Show live waterfall inside the TUI or richer UI
-- Tune by cursor or control input
-- Adjust span/zoom if supported
+- Show the live waterfall inside the TUI or a richer native UI.
 
 ## Recording / fixture capture
 

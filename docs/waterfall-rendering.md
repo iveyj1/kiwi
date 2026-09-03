@@ -24,7 +24,8 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 - `WaterfallCursor` keeps exact selected frequency independently from source bins, snaps movement to zero-anchored configured frequency steps, clamps to the mapped span, and preserves frequency across resolution/context changes. The magenta marker projects selection onto the nearest raster column.
 - The Kitty backend reserves a cursor status row above the adaptive ruler. It reports precise cursor frequency, tuned-frequency offset, and bin-width step; updates are emitted by the existing coalescing renderer.
 - `[waterfall]` config persists standalone center/zoom, history/terminal rows, render range, speed, refresh rate, interpolation, label density, and overlay defaults; explicit CLI options win.
-- Live frame parsing/history updates remain on the asyncio network path, while raster generation, PNG encoding, and terminal writes run through one worker-thread renderer. A one-bit redraw event coalesces requests: if output blocks while the terminal is unfocused, there is at most one current-state redraw pending rather than one encoded image per received frame.
+- Live frame parsing/history updates remain on the asyncio network path, while raster snapshot assembly, PNG encoding, and terminal writes run through one worker-thread renderer. Numeric dBm history is retained for model/inspection use, while a parallel bounded RGB history converts each received row once instead of recoloring the full history on every redraw. Transient terminal PNGs use fast level-1 compression. A one-bit redraw event coalesces requests: if output blocks while the terminal is unfocused, there is at most one current-state redraw pending rather than one encoded image per received frame.
+- The redraw limiter schedules draw starts at the requested cadence. Render time no longer adds another complete refresh interval after every draw; if a draw overruns its deadline, one latest-state redraw may start immediately. `refresh_hz` remains a cap rather than a guarantee, and values above the receiver's reported `wf_fps` do not create intermediate radio frames.
 - Because history continues while output is blocked, returning to a slow terminal can legitimately show one jump to current time. This is frame dropping at the display boundary, not a receive backlog being replayed.
 - Raw intensity mapping `sample - 255` gives plausible uncalibrated values for the fixture: about `-200..-25 dBm`, median near `-87 dBm`, with stable bright bins near the low-bin edge and around bins 529/538.
 - The first bin is `-200 dBm` in both local rows; bin orientation and exact frequency mapping remain open until center/span/start metadata is incorporated.
@@ -33,7 +34,7 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 
 - Confirm bin order and nonzero-zoom mapping with a captured local fixture
 - Color mapping beyond fixed diagnostic scales
-- Timing/update rate
+- Measure achieved draw/presentation cadence separately from requested refresh and receiver frame cadence if visible jumps remain problematic.
 - Zoom/span behavior
 
 ## Design constraints

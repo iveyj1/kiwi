@@ -36,6 +36,7 @@ from kiwi_client.waterfall_terminal import (
     format_frequency_ruler,
     frequency_label_decimals,
     frequency_ticks,
+    next_redraw_deadline,
     main as waterfall_terminal_main,
     preview_terminal_fixture,
     terminal_supports_kitty,
@@ -84,6 +85,11 @@ def test_kitty_encoder_chunks_png_and_reuses_requested_placement():
 def test_default_terminal_placement_uses_full_width_and_half_height():
     assert default_terminal_placement(columns=120, lines=40) == (120, 20)
     assert default_terminal_placement(columns=1, lines=1) == (1, 1)
+
+
+def test_redraw_deadline_preserves_start_cadence_and_catches_up_after_slow_draw():
+    assert next_redraw_deadline(10.0, now=10.02, interval=0.05) == pytest.approx(10.05)
+    assert next_redraw_deadline(10.0, now=10.08, interval=0.05) == pytest.approx(10.08)
 
 
 def test_waterfall_config_applies_defaults_but_cli_overrides(tmp_path: Path):
@@ -498,6 +504,7 @@ def test_live_viewer_uses_guarded_capture_and_parsed_frame_callback(tmp_path: Pa
     assert path.exists()
     assert viewer.history.width == 5
     assert viewer.history.rows() == ((-255, -200, -127, -55, 0),)
+    assert len(viewer.raster_history) == 1
     assert backend.images[-1].height == 3
 
 

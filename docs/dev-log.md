@@ -305,6 +305,42 @@ The first user run exposed `BlockingIOError: [Errno 11] write could not complete
 
 Have the user evaluate local cursor visibility, key feel, and status density from `wf1` after merge. Next add receiver W/F recenter/zoom command transport under fake-WebSocket coverage; keep actual audio tuning as a separate coordinated-session slice.
 
+## 2026-09-03
+
+### Finding
+
+Project review found `wf1` aligned with the handoff notes: the latest completed baseline is the combined Kitty raster W/F viewer with paired primary SND audio. The working tree was clean except for local Pi provider-payload logs. `TODO.md` still contained many completed historical slices, and `MANIFEST.md` referenced a missing `README.md`.
+
+### Decision
+
+Removed the local Pi provider-payload logs, collapsed `TODO.md` to current status plus next slice candidates, and refreshed `MANIFEST.md` without changing `config.toml`.
+
+### Test result
+
+Full harness after cleanup: `.kiwi-venv/bin/python -m pytest -q` passed, 280 tests in 3.48 seconds.
+
+### Follow-up
+
+Run the full harness and then choose the next slice: attended combined-viewer evaluation, compact status/key-help refinement, optional timing diagnostics, or UI direction decision.
+
+## 2026-09-03 — Waterfall redraw cadence
+
+### Finding
+
+User validation confirmed cursor movement, Enter-to-tune, recenter/zoom controls, and live audio all work. The cursor is intentionally magenta. At `rows=500`, `terminal_rows=40`, `refresh_hz=20`, and `speed=4`, the process used about 40% CPU while presenting roughly four visible updates per second. A second test with `rows=200`, `terminal_rows=20`, `refresh_hz=50`, and `speed=4` showed a feature crossing the display in only about 14 visible jumps. Since the receiver reports about 23 W/F frames/sec at speed 4, increasing the redraw cap above source cadence did not solve full-image render/terminal pressure.
+
+### Decision
+
+Added a bounded RGB history parallel to numeric dBm history so each received row is color-mapped once rather than rebuilding every retained row on each redraw. Changed transient PNG compression from zlib default level 6 to level 1 and changed redraw scheduling to preserve draw-start cadence rather than waiting a full refresh interval after each completed draw. One-bit redraw coalescing and off-event-loop terminal output remain unchanged.
+
+### Test result
+
+New deterministic tests cover cached row conversion, padding/orientation, bounded history, width rejection, fast PNG compression, and redraw deadline behavior. Targeted raster/terminal tests passed: 53. Full harness passed: 283 tests in 3.51 seconds. `compileall` and `git diff --check` passed before documentation updates. A synthetic 1024×500 benchmark improved snapshot plus PNG work from about 235 ms (75 ms recoloring + 160 ms level-6 PNG) to about 18 ms (sub-millisecond cached snapshot + 17 ms level-1 PNG), with data-dependent encoded size increasing from about 502 KB to 606 KB.
+
+### Follow-up
+
+Have the user repeat the attended local viewer test at a refresh cap no higher than the receiver cadence, initially `refresh_hz=20`. If visible presentation remains much slower than generated updates, add achieved draw/terminal timing counters before changing transport or adopting Kitty file/shared-memory transfer.
+
 ## YYYY-MM-DD
 
 ### Finding
