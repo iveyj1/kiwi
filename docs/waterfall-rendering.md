@@ -32,10 +32,9 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 
 ## Questions to resolve
 
-- Confirm bin order and nonzero-zoom mapping with a captured local fixture
-- Color mapping beyond fixed diagnostic scales
-- Measure achieved draw/presentation cadence separately from requested refresh and receiver frame cadence if visible jumps remain problematic.
-- Zoom/span behavior
+- Does received W/F cadence decrease as zoom increases, or is the observed slowdown in presented redraw cadence? Leave this unmodified until receive/draw/encode/write timing is measured.
+- Color mapping beyond fixed diagnostic scales.
+- Preserve old history when zoom/span/center changes. Desired behavior follows the KiwiSDR web client: remap existing rows from their original frequency coordinates to the new scale, resample/stretch overlapping data as needed, and fill newly uncovered frequency regions with black instead of immediately discarding or mis-scaling history.
 
 ## Design constraints
 

@@ -339,7 +339,9 @@ New deterministic tests cover cached row conversion, padding/orientation, bounde
 
 ### Follow-up
 
-Post-merge user validation found a broad optimum around `refresh_hz=20`. Motion now has more frequent, smaller jumps, making individual transitions difficult to count and noticeably improving the previous jarring presentation. Treat cadence optimization as successful for now; add achieved draw/terminal timing counters only if remaining jumps become operationally problematic. CPU after optimization was not recorded.
+Post-merge user validation found a broad optimum around `refresh_hz=20`. Motion now has more frequent, smaller jumps, making individual transitions difficult to count and noticeably improving the previous jarring presentation. `rows=400` / `terminal_rows=20` gives a useful approximately one-source-row-per-displayed-pixel presentation at both half and full terminal width. Zooming in appeared to slow vertical travel; leave whether this is receiver or renderer cadence as an open question until measured. Treat cadence optimization as successful for now; add achieved draw/terminal timing counters only if remaining jumps become operationally problematic. CPU after optimization was not recorded.
+
+Future zoom rendering should preserve old W/F history like the KiwiSDR web client: remap prior rows onto the new frequency scale, stretch/resample overlapping data where necessary, and fill frequencies not covered by old rows with black.
 
 ## YYYY-MM-DD
 

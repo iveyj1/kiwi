@@ -71,4 +71,6 @@ Options:
 - Stereo/IQ SND decode.
 - Longer controlled recording/playback with explicit gap/sample-rate policy.
 - Beacon detector: start with synthetic carrier-present/absent, offset, noise, fading, weak-threshold, and false-positive fixtures before live captures.
+- Investigate whether received W/F cadence decreases with zoom or only presented redraw cadence changes.
+- Preserve old waterfall history across zoom/recenter changes by remapping each row onto the new frequency scale, stretching/resampling overlap and filling uncovered frequencies with black, similar to the KiwiSDR web client.
 - Advanced long-integration/correlation analysis after recording and detector harnesses mature.
