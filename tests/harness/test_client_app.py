@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, run_script, main
+from kiwi_client.waterfall import WaterfallFrame
 
 
 class FakeVolumeControl:
@@ -42,9 +43,11 @@ class FakeOperations:
             status_callback({"smeter": 850, "rssi_db": -42.0, "snd_frames": 1})
         return {"frames": 1024, "dry_run": null_sink, "stopped": bool(stop_event and stop_event.is_set()), "commands": commands}
 
-    def paired(self, waterfall_config, snd_config, *, null_sink, stop_event, command_queue, status_callback):
+    def paired(self, waterfall_config, snd_config, *, null_sink, stop_event, command_queue, status_callback, frame_callback=None):
         self.calls.append(("radio", waterfall_config, snd_config, null_sink, stop_event, command_queue, status_callback))
         status_callback({"snd_status": "running", "wf_status": "running", "wf_frames": 1})
+        if frame_callback is not None:
+            frame_callback(WaterfallFrame(sequence=1, bins=(0, 0), dbm=(-100, -90), start_khz=100.0, span_khz=20.0))
         commands = []
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
@@ -361,6 +364,7 @@ def test_radio_background_routes_tune_to_snd_and_reports_both_streams():
     assert radio_call[1].zoom == 7
     assert radio_call[1].speed == 3
     assert radio_call[1].interp == 12
+    assert controller.waterfall_snapshots.latest().rows[-1].sequence == 1
     assert tuned["active_command"] == "SET mod=am low_cut=-5000 high_cut=5000 freq=6000.125"
     commands = finished["operation"]["result"]["commands"]
     assert [(command.stream, command.command) for command in commands] == [

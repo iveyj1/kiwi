@@ -1,26 +1,26 @@
 # TODO
 
-## Current slice — Renderer snapshot boundary
+## Current slice — Native GUI benchmark harness
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
 Completed in this branch:
 
-- Added shared paired coordinator, typed session model, and controller/TUI lifecycle adapters.
-- Added `radio-bg` for headless paired SND/W/F operation, distinct stream command routing, W/F status/metadata metrics, and paired receiver restart.
-- Added `wf-center` and `wf-zoom` controller/TUI commands.
-- Continuous headless and terminal W/F operation no longer accumulates an unbounded in-memory fixture unless saving was requested.
-- Full harness baseline before final documentation: 310 tests passed.
+- Added shared paired coordinator, typed session/controller/TUI lifecycle, and headless `radio-bg` operation.
+- Added bounded immutable `WaterfallSnapshotPublisher` with per-row original frequency mapping and monotonic arrival time.
+- Paired live sessions can publish frames into the controller-owned snapshot boundary.
+- Slow consumers coalesce onto the latest generation without queued snapshot growth.
+- Added `docs/native-gui-benchmark.md`; no GUI dependency has been selected.
 
-Next goal: define a bounded renderer-neutral waterfall snapshot publisher that a native GUI or optional terminal pane can consume without owning transport state.
+Next goal: implement the toolkit-independent fixture workload and result reporting used by native GUI candidates.
 
 Done criteria:
 
-- Publish immutable mapped frame/history snapshots independently from Kitty/curses.
-- Bound producer/consumer memory and coalesce superseded display snapshots.
-- Preserve numeric history needed for future zoom remapping.
-- Add fixture/fake-consumer tests and a small native toolkit benchmark plan before selecting a GUI dependency.
-- Do not embed Kitty graphics into curses in this slice.
+- Generate/replay deterministic 1024-bin snapshots at configurable history depth and source rate.
+- Provide common timing/drop/coalescing/result metrics without importing a GUI toolkit.
+- Add a no-window baseline consumer for 200/400/800-row workloads.
+- Keep benchmark code outside production transport/session paths.
+- Do not add a GUI dependency yet.
 
 ## Plan
 

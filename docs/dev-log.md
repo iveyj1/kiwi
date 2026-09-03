@@ -441,6 +441,24 @@ Fake SND/W/F runners verify SND-first startup, status publication, filtered metr
 
 Define a bounded renderer-neutral snapshot publisher for future native GUI and optional terminal-pane consumers.
 
+## 2026-09-03 — Renderer-neutral waterfall snapshots
+
+### Decision
+
+Added `WaterfallSnapshotPublisher` as the bounded frontend boundary for future native GUI and optional terminal-pane consumers. Each immutable row retains numeric dBm values, sequence, monotonic arrival time, and original start/center/span/bin-width metadata. The latest snapshot contains a bounded tuple of rows and a generation. `wait_for_newer()` returns the newest generation directly, intentionally coalescing superseded display states rather than maintaining a consumer queue; `close()` wakes blocked consumers.
+
+Headless paired sessions now accept a frame callback. `ClientController` owns a configured publisher for `radio-bg`, recreates it per paired run, and closes it after joined shutdown. TUI config supplies history depth. This does not render graphics or add a GUI dependency.
+
+Added `docs/native-gui-benchmark.md` defining fixed 1024-bin, 200/400/800-row, 20-FPS fixture workloads and comparison criteria for Tkinter, PySide6/Qt, and pygame/SDL. No toolkit is selected or installed.
+
+### Test result
+
+Five pure publisher tests cover bounded immutable history, coalescing, blocking wakeup/close, width validation, and preserving different frequency mappings across zoom changes. Existing fake paired/controller tests now prove frame publication through the shared boundary. Targeted snapshot/live/controller/TUI tests: 101 passed. Full harness: 315 tests passed in 4.09 seconds; `compileall` and `git diff --check` passed. No live connection was made.
+
+### Follow-up
+
+Implement the toolkit-independent benchmark workload/result harness before trying candidate GUI dependencies.
+
 ## YYYY-MM-DD
 
 ### Finding

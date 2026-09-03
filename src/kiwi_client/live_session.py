@@ -12,6 +12,7 @@ from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
 from kiwi_client.paired_session import PairedSessionCoordinator, pair_session_configs
 from kiwi_client.playback import AudioSink
+from kiwi_client.waterfall import WaterfallFrame
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,7 @@ async def run_live_paired_session(
     stop_event: Event,
     command_queue: queue.Queue,
     status_callback: Callable[[dict], None] | None = None,
+    frame_callback: Callable[[WaterfallFrame], None] | None = None,
     snd_runner=play_live_snd,
     waterfall_runner=capture_live_waterfall,
 ) -> dict[str, Any]:
@@ -143,6 +145,7 @@ async def run_live_paired_session(
                 allow_live=allow_live,
                 stop_event=paired_stop,
                 status_callback=publish_waterfall_metrics,
+                frame_callback=frame_callback,
                 command_queue=wf_commands,
                 save_events=False,
             )

@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field, replace
 from urllib.parse import urlsplit
 from pathlib import Path
 from threading import Event
-from typing import Any, Iterable, Protocol
+from typing import Any, Callable, Iterable, Protocol
 
 from kiwi_client.commands import AgcSettings, encode_agc, encode_modulation
 from kiwi_client.live_capture import LiveSndCaptureConfig, capture_live_snd
@@ -37,6 +37,7 @@ from kiwi_client.session_manager import (
     ZoomWaterfall,
 )
 from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
+from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 from kiwi_client.system_volume import SystemVolumeControl, VolumeControl
 
 
@@ -228,6 +229,7 @@ class ClientOperations(Protocol):
         stop_event: Event,
         command_queue: queue.Queue,
         status_callback: StatusCallback,
+        frame_callback: Callable[[Any], None] | None = None,
     ) -> dict[str, Any]: ...
 
     def record(
@@ -284,6 +286,7 @@ class LiveClientOperations:
         stop_event: Event,
         command_queue: queue.Queue,
         status_callback: StatusCallback,
+        frame_callback: Callable[[Any], None] | None = None,
     ) -> dict[str, Any]:
         sink = NullAudioSink() if null_sink else SoundDeviceSink()
         return asyncio.run(
@@ -295,6 +298,7 @@ class LiveClientOperations:
                 stop_event=stop_event,
                 command_queue=command_queue,
                 status_callback=status_callback,
+                frame_callback=frame_callback,
             )
         )
 
@@ -349,6 +353,8 @@ class ClientController:
         self._background_session_generation: int | None = None
         self._waterfall_speed = 1
         self._waterfall_interp = 13
+        self._waterfall_history_rows = 100
+        self.waterfall_snapshots = WaterfallSnapshotPublisher(max_rows=self._waterfall_history_rows)
         self.running = True
 
     def configure_waterfall_session(
@@ -358,6 +364,7 @@ class ClientController:
         zoom: int,
         speed: int,
         interp: int,
+        history_rows: int = 100,
     ) -> None:
         """Apply frontend configuration to shared W/F session state."""
         self.paired_session.state = replace(
@@ -367,6 +374,8 @@ class ClientController:
         )
         self._waterfall_speed = int(speed)
         self._waterfall_interp = int(interp)
+        self._waterfall_history_rows = int(history_rows)
+        self.waterfall_snapshots = WaterfallSnapshotPublisher(max_rows=self._waterfall_history_rows)
 
     def execute(self, line: str) -> dict[str, Any] | None:
         """Execute one shell command entry and return a JSON-serializable response."""
@@ -796,6 +805,7 @@ class ClientController:
             allowed_receivers=self.state.allowed_receivers,
         )
         self.last_play_bg_null_sink = null_sink
+        self.waterfall_snapshots = WaterfallSnapshotPublisher(max_rows=self._waterfall_history_rows)
         paired = self.paired_session.dispatch(SetSessionIntent(running=True, receiver=self.state.receiver))
         self._background_session_generation = paired.state.generation
         self.paired_session.state = replace(self.paired_session.state, audio_enabled=not null_sink)
@@ -818,6 +828,7 @@ class ClientController:
                 stop_event=stop_event,
                 command_queue=command_queue,
                 status_callback=status_callback,
+                frame_callback=self.waterfall_snapshots.append,
             ),
         )
         return {"type": "operation-status", "operation": status.as_dict(), "session": self.session_status().as_dict()}
@@ -836,6 +847,8 @@ class ClientController:
                 self.session = replace(self.session, mode="failed", active_receiver=None, error=status.error)
             else:
                 self.session = replace(self.session, mode="idle", active_receiver=None, desired_playback=False, error=None)
+            if status.name == "radio":
+                self.waterfall_snapshots.close()
             if not self.paired_session.state.desired_running:
                 self.paired_session.state = replace(
                     self.paired_session.state,

@@ -7,6 +7,7 @@ from kiwi_client.live_play import LiveSndPlaybackConfig
 from kiwi_client.live_session import RoutedSessionCommand, run_live_paired_session
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.playback import NullAudioSink, PlaybackResult
+from kiwi_client.waterfall import WaterfallFrame
 
 
 def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
@@ -14,6 +15,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     snd_commands = []
     wf_commands = []
     statuses = []
+    frames = []
     external_commands = queue.Queue()
     stop_event = threading.Event()
 
@@ -30,6 +32,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     async def wf_runner(config, **kwargs):
         order.append("wf")
         kwargs["status_callback"]({"wf_frames": 3, "sequence_gaps": 1, "ascii_row": "large"})
+        kwargs["frame_callback"](WaterfallFrame(sequence=1, bins=(0,), dbm=(-100,)))
         while not kwargs["stop_event"].is_set():
             try:
                 wf_commands.append(kwargs["command_queue"].get_nowait())
@@ -47,6 +50,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
                 stop_event=stop_event,
                 command_queue=external_commands,
                 status_callback=statuses.append,
+                frame_callback=frames.append,
                 snd_runner=snd_runner,
                 waterfall_runner=wf_runner,
             )
@@ -69,5 +73,6 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     assert {status.get("wf_status") for status in statuses} >= {"running"}
     assert any(status.get("wf_frames") == 3 and status.get("wf_sequence_gaps") == 1 for status in statuses)
     assert all("ascii_row" not in status for status in statuses)
+    assert [frame.sequence for frame in frames] == [1]
     assert result["waterfall"].endswith("wf.jsonl")
     assert result["snd_error"] is None

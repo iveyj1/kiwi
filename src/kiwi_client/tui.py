@@ -789,6 +789,7 @@ def run_tui(controller: ClientController | None = None, *, config: KiwiClientCon
         zoom=config.waterfall.zoom,
         speed=config.waterfall.speed,
         interp=config.waterfall.interp,
+        history_rows=config.waterfall.history_rows,
     )
     start_startup_playback(controller, config)
     curses.wrapper(_run_curses, controller, config)
