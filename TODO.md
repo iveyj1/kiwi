@@ -2,24 +2,20 @@
 
 ## Current slice
 
-Goal: add direct frequency entry to the interactive `kiwi-wf-terminal` viewer.
+Goal: user-attended validation of direct frequency entry in `kiwi-wf-terminal`.
 
-Done criteria:
+Validation:
 
-- `f` enters a visible kHz frequency-entry mode.
-- Accept decimal digits and one decimal point; Backspace edits, Esc cancels, and Enter applies.
-- Applying a valid non-negative finite frequency tunes the primary SND session and recenters W/F at the current zoom.
-- Preserve the exact entered frequency for SND command precision and move the cursor there when the recentered W/F span arrives.
-- Invalid/empty input remains local and does not queue receiver commands.
-- Add pure decoder/model and pseudo-terminal command-routing tests before implementation.
-- Preserve existing cursor/audio/navigation controls and terminal restoration.
-- Update user/rendering docs, run the full harness, and merge into `wf1`; no automatic live connection.
+- Press `f`, type a frequency in kHz, and use Backspace if needed.
+- Press Esc and confirm no tuning occurs.
+- Repeat entry and press Enter; confirm SND tunes, W/F recenters at the current zoom, and the magenta cursor moves to the exact frequency when the new span arrives.
+- Confirm existing Enter-to-cursor tuning and other navigation controls remain operational.
 
 ## Current status
 
 Integration branch: `wf1`; `main` remains closed.
 
-Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio, with cached RGB history and fast transient PNG encoding for improved redraw cadence. The full harness passes 283 tests.
+Latest completed baseline: combined Kitty raster waterfall plus paired primary SND audio, optimized redraw cadence, and direct `f` frequency entry. The full harness passes 289 tests.
 
 Keep `config.toml` unchanged for now: it intentionally has `[live].allow_live = true`, unlimited live caps, `[receivers].restricted = false`, and the MISDR proxy allowlisted.
 
