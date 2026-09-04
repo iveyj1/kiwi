@@ -553,7 +553,7 @@ Seven GUI harness tests pass, including normal-DPI, high-DPI, screen-cap, and ex
 
 ### Follow-up
 
-Repeat the attended animated fixture at the default scale and confirm effective status reads approximately `1.00 px/frame`; then resume fixture-only overlays and controls.
+User-attended animated fixture validation reported the default one-pixel-per-frame scale looks about right. Resume fixture-only overlays and controls.
 
 ## YYYY-MM-DD
 
