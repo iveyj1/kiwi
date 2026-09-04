@@ -1,21 +1,24 @@
 # TODO
 
-## Current slice — Native fixture-window exit controls
+## Current slice — Timed native fixture playback
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Observed validation:
+Validated baseline:
 
-- Fixture image, orientation, scaling, and general PySide6 window behavior were acceptable.
-- User could not exit using the attempted interaction.
+- Fixture image, orientation, scaling, resize behavior, and PySide6 window are acceptable.
+- `q`/Esc/Ctrl+Q/window-manager close now exit successfully in attended use.
+
+Next goal: animate fixture rows through the native snapshot boundary at a controlled rate.
 
 Done criteria:
 
-- Make `q`, Esc, and Ctrl+Q close the fixture window.
-- Explicitly quit the application when the last window closes.
-- Keep normal window-manager close behavior.
-- Add pure key-policy coverage without requiring Qt/display imports.
-- Document controls, run full harness, and request a short attended retry.
+- Publish fixture rows incrementally at configurable FPS without network access.
+- Consume only the latest snapshot generation on each GUI timer tick.
+- Render direct RGB without PNG/base64.
+- Show source/presentation generation and basic cadence status.
+- Preserve bounded history and clean timer/window shutdown.
+- Add pure timeline/controller tests plus a dry-run demonstration.
 
 ## Plan
 

@@ -521,7 +521,7 @@ Targeted GUI model tests: 3 passed. Full harness: 326 tests passed in 3.78 secon
 
 ### Follow-up
 
-Repeat the attended fixture command and verify all practical close paths. If accepted, move to timed snapshot presentation and basic native controls before live pairing.
+User-attended retry confirmed the added GUI exit controls work. Proceed to timed snapshot presentation and basic native controls while remaining fixture-only before live pairing.
 
 ## YYYY-MM-DD
 
