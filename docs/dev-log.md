@@ -555,6 +555,20 @@ Seven GUI harness tests pass, including normal-DPI, high-DPI, screen-cap, and ex
 
 User-attended animated fixture validation reported the default one-pixel-per-frame scale looks about right. Resume fixture-only overlays and controls.
 
+## 2026-09-03 — Native fixture controls and overlays
+
+### Decision
+
+The native fixture model now initializes `RadioSessionManager` from captured W/F center/zoom metadata and routes selection, tune, direct-frequency, recenter, and zoom actions through it. The raster presentation applies white tuned, orange passband-edge, and magenta selected-frequency overlays after incremental base-image conversion. Keyboard shortcuts and simple native controls expose the actions, but generated SND/W/F commands remain intentionally unsent.
+
+### Test result
+
+Ten GUI harness tests cover session action/command results, overlay columns and precedence, key policy, incremental playback/rasterization, scale policy, and Qt-free dry-run. Full harness: 333 tests passed in 3.87 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Run the attended animated fixture demo and verify overlays, main/small cursor movement, tuning, direct entry, local center/zoom status, exit, and uninterrupted animation.
+
 ## YYYY-MM-DD
 
 ### Finding

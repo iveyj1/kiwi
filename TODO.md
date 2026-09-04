@@ -1,22 +1,22 @@
 # TODO
 
-## Current slice — Native fixture controls
+## Current slice — Validate native fixture controls
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Validated baseline:
+Implemented:
 
-- Timed fixture animation, clean exit, and default one-physical-pixel-per-frame vertical scale work in attended use.
-
-Goal: add fixture-only native frequency/cursor controls before live integration.
+- Tuned, passband-edge, and selected-frequency overlays over incremental direct RGB.
+- Main/small keyboard cursor steps, tune-selected, direct frequency entry, local recenter, and local zoom.
+- All control changes dispatch through `RadioSessionManager`; generated protocol commands are not sent.
+- Default fixture-mapped center/zoom initialization and CLI radio-state overrides.
 
 Done criteria:
 
-- Draw tuned, passband, and selected-frequency overlays using shared state.
-- Support keyboard cursor steps, direct frequency entry, and local recenter/zoom state without sending network commands.
-- Keep control actions routed through `RadioSessionManager`.
-- Preserve incremental direct-RGB rendering and one-pixel-per-frame scale.
-- Add pure model/action tests and an attended animated fixture demo.
+- Full harness, compile, and diff checks pass.
+- Attended animation confirms overlay visibility and keyboard/widget behavior.
+- Confirm controls do not interfere with exit or timed presentation.
+- Record any scaling/input corrections before starting paired live integration.
 - Do not connect to a receiver.
 
 ## Plan

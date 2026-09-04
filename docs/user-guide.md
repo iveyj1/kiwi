@@ -595,7 +595,17 @@ kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
   --rows 400 --repeat 200 --animate --fps 20
 ```
 
-`--repeat` repeats the short captured fixture to provide a longer diagnostic timeline. `--animate --fps <rate>` publishes one fixture row per timer tick through the same bounded snapshot boundary intended for live frames. Native vertical scale defaults to `--row-pixels 1`, meaning one physical display-pixel row per W/F frame after accounting for Qt device-pixel ratio. If the requested history cannot fit, height is capped to available screen space and the effective scale is shown in status. Horizontal resizing remains independent. Use `--row-pixels 2` or another positive value to override. The status also shows source and presented generations, bin/history dimensions, requested cadence, and completion. Rendering remains direct RGB with incremental row color conversion; no PNG/base64 path is used. This prototype still has no live receiver, audio, zoom, or mouse tuning. Exit with `q`, Esc, Ctrl+Q, or the window manager's close control.
+`--repeat` repeats the short captured fixture to provide a longer diagnostic timeline. `--animate --fps <rate>` publishes one fixture row per timer tick through the same bounded snapshot boundary intended for live frames. Native vertical scale defaults to `--row-pixels 1`, meaning one physical display-pixel row per W/F frame after accounting for Qt device-pixel ratio. If the requested history cannot fit, height is capped to available screen space and the effective scale is shown in status. Horizontal resizing remains independent. Use `--row-pixels 2` or another positive value to override. The status also shows source and presented generations, bin/history dimensions, requested cadence, and completion. Rendering remains direct RGB with incremental row color conversion; no PNG/base64 path is used. This prototype still has no live receiver or audio; all generated SND/W/F commands remain local model output. White marks tuned frequency, orange marks passband edges, and magenta marks selected frequency. Controls:
+
+- `h`/`l` or Left/Right: move selected frequency by `--main-step-hz`.
+- `H`/`L` or Shift+Left/Right: move by `--small-step-hz`.
+- Enter or **Tune selected**: update local tuned state.
+- `f`: focus direct kHz entry; **Set frequency** updates tuned/selected/center state.
+- `c` or **Center**: update local W/F center state.
+- `+`/`-` or zoom buttons: change bounded local zoom state.
+- `q`, Esc, Ctrl+Q, or window close: exit.
+
+Use `--tuned-khz`, `--mode`, `--low-cut-hz`, and `--high-cut-hz` to set initial overlay/radio state. Recenter and zoom do not rescale fixture history yet.
 
 ## Recording / fixture capture
 

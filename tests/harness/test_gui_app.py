@@ -1,14 +1,20 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from kiwi_client.gui_app import (
     FixtureWaterfallTimeline,
     SnapshotRasterizer,
     WaterfallGuiModel,
     gui_close_key,
+    gui_control_action,
     logical_display_height,
     main,
 )
+
+
+from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, PASSBAND_MARKER_RGB, TUNED_MARKER_RGB
 
 
 FIXTURE = Path("tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl")
@@ -32,6 +38,66 @@ def test_fixture_gui_model_publishes_mapped_rows_and_direct_rgb():
     assert len(image.rgb) == 1024 * 12 * 3
     assert model.frequency_text().endswith("kHz")
     assert "source 10 | presented 10" in model.status_text()
+
+
+def test_gui_model_routes_local_frequency_actions_through_shared_session():
+    model = WaterfallGuiModel(
+        history_rows=5,
+        tuned_khz=855.0,
+        low_cut_hz=-5000,
+        high_cut_hz=5000,
+        main_step_hz=1000,
+        small_step_hz=100,
+    )
+    model.load_fixture(FIXTURE)
+
+    moved = model.move_selection(1)
+    tuned = model.tune_selected()
+    recentered = model.recenter()
+    zoomed = model.zoom(1)
+    direct = model.set_direct_frequency(860.125)
+
+    assert moved.state.selected_khz == pytest.approx(856.0)
+    assert tuned.commands.snd == ("SET mod=am low_cut=-5000 high_cut=5000 freq=856.000",)
+    assert recentered.commands.waterfall == ("SET zoom=7 cf=856.000",)
+    assert zoomed.commands.waterfall == ("SET zoom=8 cf=856.000",)
+    assert direct.state.frequency_khz == direct.state.selected_khz == pytest.approx(860.125)
+    assert direct.state.waterfall_center_khz == pytest.approx(860.125)
+
+
+def test_gui_model_draws_tuned_passband_and_cursor_overlays():
+    model = WaterfallGuiModel(
+        history_rows=5,
+        tuned_khz=855.0,
+        selected_khz=860.0,
+        low_cut_hz=-5000,
+        high_cut_hz=5000,
+    )
+    model.load_fixture(FIXTURE)
+
+    image = model.image()
+    snapshot = model.publisher.latest()
+    start = snapshot.current_start_khz
+    end = start + snapshot.current_span_khz
+
+    def pixel(frequency_khz):
+        column = round((frequency_khz - start) / (end - start) * (image.width - 1))
+        offset = ((image.height - 1) * image.width + column) * 3
+        return tuple(image.rgb[offset:offset + 3])
+
+    assert pixel(855.0) == TUNED_MARKER_RGB
+    assert pixel(850.0) == PASSBAND_MARKER_RGB
+    assert pixel(860.0) == CURSOR_MARKER_RGB  # cursor wins at high passband edge
+
+
+def test_gui_control_key_policy_maps_cursor_tune_recenter_and_zoom():
+    assert gui_control_action("left") == ("move", -1, False)
+    assert gui_control_action("right", shift=True) == ("move", 1, True)
+    assert gui_control_action("enter") == ("tune", 0, False)
+    assert gui_control_action("c") == ("recenter", 0, False)
+    assert gui_control_action("+") == ("zoom", 1, False)
+    assert gui_control_action("-") == ("zoom", -1, False)
+    assert gui_control_action("x") is None
 
 
 def test_display_height_defaults_to_one_physical_pixel_per_source_row():

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from kiwi_client.fixtures import load_jsonl_events
@@ -16,7 +16,21 @@ from kiwi_client.waterfall import (
     contextualize_waterfall_frame,
     parse_waterfall_uncompressed,
 )
-from kiwi_client.waterfall_raster import RasterImage, render_dbm_rows
+from kiwi_client.session_manager import (
+    DirectFrequency,
+    RadioSessionManager,
+    RadioSessionSnapshot,
+    RecenterWaterfall,
+    SelectFrequency,
+    TuneSelected,
+    ZoomWaterfall,
+)
+from kiwi_client.waterfall_raster import (
+    RasterImage,
+    WaterfallOverlay,
+    apply_frequency_overlay,
+    render_dbm_rows,
+)
 from kiwi_client.waterfall_snapshots import WaterfallSnapshot, WaterfallSnapshotPublisher
 
 
@@ -36,6 +50,24 @@ def logical_display_height(
             raise ValueError("available logical height must be positive")
         height = min(height, available_logical_height)
     return height
+
+
+def gui_control_action(key: str, *, shift: bool = False) -> tuple[str, int, bool] | None:
+    """Map toolkit-neutral keys to local fixture control actions."""
+    normalized = key.lower()
+    if normalized in ("left", "h"):
+        return ("move", -1, shift or key == "H")
+    if normalized in ("right", "l"):
+        return ("move", 1, shift or key == "L")
+    if normalized in ("enter", "return"):
+        return ("tune", 0, False)
+    if normalized == "c":
+        return ("recenter", 0, False)
+    if normalized in ("+", "="):
+        return ("zoom", 1, False)
+    if normalized == "-":
+        return ("zoom", -1, False)
+    return None
 
 
 def gui_close_key(key: str, *, control: bool = False) -> bool:
@@ -153,12 +185,36 @@ class WaterfallGuiModel:
     history_rows: int = 400
     render_min_db: float = -100
     render_max_db: float = -40
+    tuned_khz: float | None = None
+    selected_khz: float | None = None
+    mode: str = "am"
+    low_cut_hz: int = -5000
+    high_cut_hz: int = 5000
+    main_step_hz: float = 1000
+    small_step_hz: float = 100
+    frequency_decimals: int = 3
 
     def __post_init__(self) -> None:
         if self.render_max_db <= self.render_min_db:
             raise ValueError("render_max_db must be greater than render_min_db")
+        if self.main_step_hz <= 0 or self.small_step_hz <= 0:
+            raise ValueError("GUI frequency steps must be positive")
+        frequency = 5000.0 if self.tuned_khz is None else self.tuned_khz
+        selected = frequency if self.selected_khz is None else self.selected_khz
         self.publisher = WaterfallSnapshotPublisher(max_rows=self.history_rows)
         self.rasterizer = SnapshotRasterizer(min_dbm=self.render_min_db, max_dbm=self.render_max_db)
+        self.session = RadioSessionManager(
+            RadioSessionSnapshot(
+                frequency_khz=frequency,
+                selected_khz=selected,
+                mode=self.mode,
+                low_cut_hz=self.low_cut_hz,
+                high_cut_hz=self.high_cut_hz,
+                frequency_decimals=self.frequency_decimals,
+                waterfall_center_khz=frequency,
+            )
+        )
+        self._session_mapped = False
 
     def load_fixture(self, path: Path, *, repeat: int = 1) -> int:
         timeline = FixtureWaterfallTimeline.from_fixture(path, repeat=repeat)
@@ -166,11 +222,74 @@ class WaterfallGuiModel:
             pass
         return timeline.total_frames
 
-    def image(self) -> RasterImage:
+    def _mapped_snapshot(self) -> WaterfallSnapshot:
         snapshot = self.publisher.latest()
         if snapshot is None:
             raise ValueError("waterfall GUI model has no frames")
-        return self.rasterizer.update(snapshot)
+        if not self._session_mapped:
+            center = snapshot.current_center_khz
+            if center is None and snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
+                center = snapshot.current_start_khz + snapshot.current_span_khz / 2.0
+            zoom = 0
+            if snapshot.rows and snapshot.rows[-1].flags_x_zoom_server is not None:
+                zoom = snapshot.rows[-1].flags_x_zoom_server & 0xFFFF
+            state = self.session.state
+            frequency = center if self.tuned_khz is None and center is not None else state.frequency_khz
+            selected = frequency if self.selected_khz is None else state.selected_khz
+            self.session.state = replace(
+                state,
+                frequency_khz=frequency,
+                selected_khz=selected,
+                waterfall_center_khz=center if center is not None else frequency,
+                waterfall_zoom=zoom,
+            )
+            self._session_mapped = True
+        return snapshot
+
+    def image(self) -> RasterImage:
+        snapshot = self._mapped_snapshot()
+        image = self.rasterizer.update(snapshot)
+        if snapshot.current_start_khz is None or snapshot.current_span_khz is None:
+            return image
+        state = self.session.state
+        return apply_frequency_overlay(
+            image,
+            WaterfallOverlay(
+                start_khz=snapshot.current_start_khz,
+                end_khz=snapshot.current_start_khz + snapshot.current_span_khz,
+                tuned_khz=state.frequency_khz,
+                low_cut_hz=state.low_cut_hz,
+                high_cut_hz=state.high_cut_hz,
+                cursor_khz=state.selected_khz,
+            ),
+        )
+
+    def move_selection(self, delta: int, *, small: bool = False):
+        snapshot = self._mapped_snapshot()
+        step_hz = self.small_step_hz if small else self.main_step_hz
+        frequency = self.session.state.selected_khz + delta * step_hz / 1000.0
+        if snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
+            frequency = min(
+                max(frequency, snapshot.current_start_khz),
+                snapshot.current_start_khz + snapshot.current_span_khz,
+            )
+        return self.session.dispatch(SelectFrequency(frequency))
+
+    def tune_selected(self):
+        self._mapped_snapshot()
+        return self.session.dispatch(TuneSelected())
+
+    def set_direct_frequency(self, frequency_khz: float):
+        self._mapped_snapshot()
+        return self.session.dispatch(DirectFrequency(frequency_khz))
+
+    def recenter(self):
+        self._mapped_snapshot()
+        return self.session.dispatch(RecenterWaterfall())
+
+    def zoom(self, delta: int):
+        self._mapped_snapshot()
+        return self.session.dispatch(ZoomWaterfall(delta))
 
     def frequency_text(self) -> str:
         snapshot = self.publisher.latest()
@@ -183,11 +302,15 @@ class WaterfallGuiModel:
         snapshot = self.publisher.latest()
         if snapshot is None:
             return "source 0 | presented 0"
+        state = self.session.state
         parts = [
             f"source {snapshot.generation}",
             f"presented {self.rasterizer.presented_generation}",
             f"{snapshot.width} bins",
             f"history {snapshot.max_rows} rows",
+            f"tuned {state.frequency_khz:.4f} kHz",
+            f"selected {state.selected_khz:.4f} kHz",
+            f"zoom {state.waterfall_zoom}",
         ]
         if requested_fps is not None:
             parts.append(f"requested {requested_fps:g} FPS")
@@ -215,6 +338,7 @@ class WaterfallGuiModel:
             "animated": animated,
             "requested_fps": requested_fps,
             "requested_row_pixels": requested_row_pixels,
+            "session": self.session.state.as_dict(),
         }
 
 
@@ -229,7 +353,17 @@ def show_pyside_window(
     try:
         from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut
-        from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QSizePolicy, QVBoxLayout, QWidget
+        from PySide6.QtWidgets import (
+            QApplication,
+            QHBoxLayout,
+            QLabel,
+            QLineEdit,
+            QMainWindow,
+            QPushButton,
+            QSizePolicy,
+            QVBoxLayout,
+            QWidget,
+        )
     except ImportError as exc:
         raise RuntimeError("native GUI requires: pip install -e '.[gui-pyside]'") from exc
 
@@ -265,6 +399,17 @@ def show_pyside_window(
     effective_row_pixels = display_height * device_pixel_ratio / model.history_rows
     status = QLabel()
     status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    controls = QHBoxLayout()
+    frequency_entry = QLineEdit()
+    frequency_entry.setPlaceholderText("Frequency kHz")
+    apply_frequency = QPushButton("Set frequency")
+    tune_button = QPushButton("Tune selected")
+    center_button = QPushButton("Center")
+    zoom_out_button = QPushButton("Zoom -")
+    zoom_in_button = QPushButton("Zoom +")
+    controls.addWidget(frequency_entry, 1)
+    for button in (apply_frequency, tune_button, center_button, zoom_out_button, zoom_in_button):
+        controls.addWidget(button)
 
     def update_display(*, ended: bool = False) -> None:
         image = model.image()
@@ -280,9 +425,29 @@ def show_pyside_window(
         base_status = model.status_text(requested_fps=fps if timeline is not None else None, ended=ended)
         status.setText(f"{base_status} | display {effective_row_pixels:.2f} px/frame")
 
+    def apply_direct_frequency() -> None:
+        try:
+            model.set_direct_frequency(float(frequency_entry.text()))
+        except ValueError as exc:
+            status.setText(f"Frequency error: {exc}")
+            return
+        update_display()
+
+    def run_action(action) -> None:
+        action()
+        update_display()
+
+    apply_frequency.clicked.connect(apply_direct_frequency)
+    frequency_entry.returnPressed.connect(apply_direct_frequency)
+    tune_button.clicked.connect(lambda: run_action(model.tune_selected))
+    center_button.clicked.connect(lambda: run_action(model.recenter))
+    zoom_out_button.clicked.connect(lambda: run_action(lambda: model.zoom(-1)))
+    zoom_in_button.clicked.connect(lambda: run_action(lambda: model.zoom(1)))
+
     update_display()
     layout.addWidget(frequency)
     layout.addWidget(display, 1)
+    layout.addLayout(controls)
     layout.addWidget(status)
     window.setCentralWidget(central)
     window.resize(1200, display_height + 120)
@@ -291,6 +456,26 @@ def show_pyside_window(
         shortcut = QShortcut(QKeySequence(sequence), window)
         shortcut.activated.connect(window.close)
         window._close_shortcuts.append(shortcut)
+    window._control_shortcuts = []
+    shortcut_actions = (
+        ("H", lambda: run_action(lambda: model.move_selection(-1))),
+        ("L", lambda: run_action(lambda: model.move_selection(1))),
+        ("Shift+H", lambda: run_action(lambda: model.move_selection(-1, small=True))),
+        ("Shift+L", lambda: run_action(lambda: model.move_selection(1, small=True))),
+        ("Left", lambda: run_action(lambda: model.move_selection(-1))),
+        ("Right", lambda: run_action(lambda: model.move_selection(1))),
+        ("Shift+Left", lambda: run_action(lambda: model.move_selection(-1, small=True))),
+        ("Shift+Right", lambda: run_action(lambda: model.move_selection(1, small=True))),
+        ("C", lambda: run_action(model.recenter)),
+        ("+", lambda: run_action(lambda: model.zoom(1))),
+        ("-", lambda: run_action(lambda: model.zoom(-1))),
+        ("Return", lambda: run_action(model.tune_selected)),
+        ("F", lambda: (frequency_entry.setFocus(), frequency_entry.selectAll())),
+    )
+    for sequence, action in shortcut_actions:
+        shortcut = QShortcut(QKeySequence(sequence), window)
+        shortcut.activated.connect(action)
+        window._control_shortcuts.append(shortcut)
 
     timer = None
     if timeline is not None:
@@ -320,6 +505,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--animate", action="store_true", help="publish fixture rows incrementally")
     parser.add_argument("--fps", type=float, default=20.0, help="animated fixture publication rate")
     parser.add_argument("--row-pixels", type=float, default=1.0, help="requested physical display pixels per W/F frame")
+    parser.add_argument("--tuned-khz", type=float)
+    parser.add_argument("--mode", default="am")
+    parser.add_argument("--low-cut-hz", type=int, default=-5000)
+    parser.add_argument("--high-cut-hz", type=int, default=5000)
+    parser.add_argument("--main-step-hz", type=float, default=1000)
+    parser.add_argument("--small-step-hz", type=float, default=100)
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
     parser.add_argument("--dry-run", action="store_true", help="build model and print summary without importing Qt")
@@ -337,6 +528,12 @@ def main(argv: list[str] | None = None) -> int:
             history_rows=args.rows,
             render_min_db=args.render_min_db,
             render_max_db=args.render_max_db,
+            tuned_khz=args.tuned_khz,
+            mode=args.mode,
+            low_cut_hz=args.low_cut_hz,
+            high_cut_hz=args.high_cut_hz,
+            main_step_hz=args.main_step_hz,
+            small_step_hz=args.small_step_hz,
         )
         timeline = FixtureWaterfallTimeline.from_fixture(args.fixture, repeat=args.repeat)
         if args.animate:
