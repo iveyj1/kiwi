@@ -1,23 +1,22 @@
 # TODO
 
-## Current slice — Integrated Kitty waterfall/TUI fixture shell
+## Current slice — Validate integrated Kitty fixture shell
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Direction:
+Implemented:
 
-- Use Kitty as the initial supported terminal for the primary integrated interface.
-- Retain PySide6 only as an optional prototype and preserve the standalone terminal/TUI fallbacks.
-- Prefer one terminal process and one shared paired session over duplicate coordinated windows.
+- `kiwi-console` fixture-only curses shell with a reserved upper Kitty image.
+- Adaptive frequency ruler, visible-preset ruler, compact status/controls, and direct-entry prompt.
+- Main/fine selection, tune, center, zoom, direct-frequency, and preset actions through shared session state.
+- Absolute saved-cursor Kitty placement, generation coalescing, resize invalidation, and explicit image deletion.
+- Pure layout/ruler/presenter tests and Qt-free/network-free dry-run.
 
 Done criteria:
 
-- Define a curses-owned layout with a reserved Kitty waterfall rectangle above status, preset/frequency rulers, controls, and command/log regions.
-- Add a fixture-only integrated shell before any live receiver work.
-- Keep all terminal writes on the UI thread and coalesce raster updates.
-- Route input through the shared session manager and existing TUI key/action policies.
-- Handle resize, alternate-screen cleanup, image deletion, and terminal restoration deterministically.
-- Add fake-terminal/fixture harnesses before an attended Kitty test.
+- Full harness, compile, and diff checks pass.
+- Attended Kitty run confirms image placement above text, ruler alignment, controls, resize, and clean exit/restoration.
+- Correct any curses/Kitty interaction before integrating paired live session.
 - Do not connect to a receiver.
 
 ## Plan

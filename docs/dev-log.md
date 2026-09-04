@@ -601,6 +601,20 @@ Build one integrated process first: curses owns input and layout, a reserved upp
 
 Create a fixture-only integrated layout and fake-terminal harness covering placement, rulers/presets, redraw coalescing, resize, deletion, and restoration before attended Kitty testing.
 
+## 2026-09-03 — Integrated Kitty fixture shell
+
+### Decision
+
+Added `kiwi-console`, a fixture-only single-process shell. Curses owns the alternate-screen layout and keyboard input; a Kitty presenter writes a replaceable image at an absolute saved-cursor position in the reserved upper half. Adaptive frequency and visible-preset rulers sit below the image, followed by compact status, controls, direct entry, and local preset recall. Source publication and image refresh rates are separate, duplicate generations coalesce, resize invalidates placement, and shutdown explicitly deletes the image.
+
+### Test result
+
+Six focused tests cover layout bounds, small-terminal rejection, preset ruler filtering/placement, Kitty placement/save/restore/deletion bytes, generation coalescing, and network-free dry-run. Full harness: 343 tests passed in 4.14 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Run the fixture shell inside Kitty and validate image/text placement, ruler alignment, key controls, resize, and terminal restoration before paired live integration.
+
 ## YYYY-MM-DD
 
 ### Finding

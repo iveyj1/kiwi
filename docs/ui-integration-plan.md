@@ -111,7 +111,7 @@ Toolkit comparison is complete; no further native integration is planned before 
 
 ## Phase 5 — Integrated curses-aware Kitty pane
 
-Status: **Selected as the primary next UI slice; fixture shell pending.**
+Status: **Fixture-only integrated shell implemented; attended Kitty validation pending.**
 
 Requirements:
 

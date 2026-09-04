@@ -567,9 +567,28 @@ Terminal image encoding/output runs in one background renderer. Incoming frames 
 
 The viewer caches bounded RGB rows and uses fast PNG compression so unchanged history is not recolored on every update. `refresh_hz` caps draw starts; it is not a guaranteed presentation rate, and values above the receiver's reported W/F frame rate do not add intermediate data. If rendering remains expensive, reduce `history_rows` first to reduce image generation and transfer size, then reduce `refresh_hz`. `terminal_rows` changes placement scale but does not reduce the 1024-bin source raster width.
 
-Expected future operation:
+## Integrated Kitty terminal prototype
 
-- Show the live waterfall inside the TUI or a richer native UI.
+`kiwi-console` is the fixture-only primary UI prototype. It places a Kitty image in the upper half of one curses alternate screen, followed by adaptive frequency and visible-preset rulers and a compact control/status area. It never connects to a receiver.
+
+Install/update the editable command, then inspect its plan without opening curses:
+
+```bash
+.kiwi-venv/bin/python -m pip install -e .
+kiwi-console --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl --dry-run
+```
+
+Run it from Kitty:
+
+```bash
+kiwi-console \
+  --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
+  --presets presets.toml --rows 400 --repeat 200 --fps 20 --refresh-hz 5
+```
+
+The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` and duplicate generations are coalesced. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
+
+Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent.
 
 ## Native GUI prototype
 
