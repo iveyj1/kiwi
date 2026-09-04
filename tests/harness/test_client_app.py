@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, run_script, main
+from kiwi_client.session_manager import SelectFrequency, TuneSelected
 from kiwi_client.waterfall import WaterfallFrame
 
 
@@ -342,6 +343,17 @@ def test_background_playback_maps_to_generation_aware_shared_lifecycle():
     assert stopped.snd_status == "stopped"
     assert stopped.wf_status == "stopped"
     assert stopped.active_receiver is None
+
+
+def test_public_session_tune_keeps_legacy_frequency_synchronized():
+    controller = ClientController(state=ClientState(frequency_khz=5000.0))
+    controller.paired_session.dispatch(SelectFrequency(5001.25))
+
+    controller.dispatch_session_action(TuneSelected())
+    controller.paired_session_status()
+
+    assert controller.state.frequency_khz == pytest.approx(5001.25)
+    assert controller.paired_session.state.frequency_khz == pytest.approx(5001.25)
 
 
 def test_radio_background_routes_tune_to_snd_and_reports_both_streams():

@@ -647,6 +647,24 @@ Fake-controller and fake-operation tests cover startup command selection, option
 
 Replace the compact lower panel with existing TUI dashboard/keymap/command-mode components where they fit, then add audio toggle/status and preset persistence through the controller.
 
+## 2026-09-04 — Live console tuning indicator correction
+
+### Finding
+
+User testing found `c` moved the live viewport, but `f` and `h`/`l` followed by Enter did not move the receiver indicator. Controller status polling was adapting stale legacy `ClientState.frequency_khz` back over the shared manager after typed tune actions. Direct entry also recentered implicitly, leaving the bracket centered and visually unchanged. Terminal-cell brackets additionally lack resolution for configured 100 Hz steps across a 234 kHz span.
+
+### Decision
+
+Public typed Tune/Direct actions now synchronize tuned frequency back into legacy controller state before subsequent status adaptation. Console `f` and preset recall use Select+Tune without recentering; `c` remains explicitly responsible for W/F center. Added an 8-pixel high-resolution black tuning strip beneath raster data with a two-pixel green passband bracket/center and magenta selection pointer, while retaining the text scale as fallback.
+
+### Test result
+
+Harness coverage proves controller frequency survives status synchronization, console direct tune preserves center, and exact 1024-bin strip columns/colors. Full harness: 353 tests passed in 3.95 seconds; `compileall` and `git diff --check` passed. No additional receiver connection was made for this correction.
+
+### Follow-up
+
+Repeat live `f` and selection+Enter testing, then continue existing-TUI lower-panel reuse.
+
 ## YYYY-MM-DD
 
 ### Finding

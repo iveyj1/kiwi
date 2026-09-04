@@ -7,16 +7,18 @@ import pytest
 
 from kiwi_client.client_app import ClientController, ClientState
 from kiwi_client.integrated_terminal import (
+    PASSBAND_SCALE_RGB,
     ControllerConsoleSource,
     IntegratedTerminalLayout,
     KittyPanePresenter,
+    append_tuning_strip,
     format_passband_scale,
     format_preset_ruler,
     main,
 )
 from kiwi_client.session_manager import RadioSessionManager
 from kiwi_client.waterfall import WaterfallFrame
-from kiwi_client.waterfall_raster import RasterImage
+from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage
 from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 
 
@@ -39,6 +41,44 @@ def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
 def test_integrated_layout_rejects_terminal_too_small():
     with pytest.raises(ValueError, match="at least"):
         IntegratedTerminalLayout.compute(columns=30, lines=8)
+
+
+def test_console_frequency_entry_tunes_without_implicit_recenter():
+    model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(history_rows=5)
+    timeline = __import__("kiwi_client.gui_app", fromlist=["FixtureWaterfallTimeline"]).FixtureWaterfallTimeline.from_fixture(FIXTURE)
+    timeline.advance(model.publisher)
+    model.display_frequency_range()
+    original_center = model.session.state.waterfall_center_khz
+
+    model.set_tuned_frequency(860.0)
+
+    assert model.session.state.frequency_khz == pytest.approx(860.0)
+    assert model.session.state.selected_khz == pytest.approx(860.0)
+    assert model.session.state.waterfall_center_khz == pytest.approx(original_center)
+
+
+def test_high_resolution_tuning_strip_draws_passband_center_and_selection():
+    image = RasterImage(width=101, height=2, rgb=b"\x00" * 101 * 2 * 3)
+    rendered = append_tuning_strip(
+        image,
+        100.0,
+        200.0,
+        tuned_khz=150.0,
+        selected_khz=170.0,
+        low_cut_hz=-10_000,
+        high_cut_hz=10_000,
+    )
+
+    def pixel(column, strip_row):
+        row = image.height + strip_row
+        offset = (row * rendered.width + column) * 3
+        return tuple(rendered.rgb[offset:offset + 3])
+
+    assert rendered.height == 10
+    assert pixel(40, 2) == PASSBAND_SCALE_RGB
+    assert pixel(50, 6) == PASSBAND_SCALE_RGB
+    assert pixel(60, 2) == PASSBAND_SCALE_RGB
+    assert pixel(70, 7) == CURSOR_MARKER_RGB
 
 
 def test_passband_scale_uses_bracket_center_and_separate_selection_pointer():

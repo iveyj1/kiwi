@@ -597,7 +597,7 @@ kiwi-console --allow-live --receiver 10.0.0.40:8073 \
 
 The controller opens SND before W/F, publishes bounded latest snapshots, routes typed tune/view actions to the active stream queues, and stops/joins both streams on console exit. `--dry-run` reports the intended command without connecting.
 
-Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent. The console intentionally omits full-height tuned/passband/cursor lines from the image: a green bracket below the waterfall shows tuned passband and center, while `▼` shows a distinct selected frequency. This follows the general KiwiSDR visual language without duplicating the browser UI.
+Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent. Direct frequency entry and Enter tune SND without implicitly recentering W/F; use `c` explicitly to center on the selection. The console intentionally omits full-height tuned/passband/cursor lines from the data: a high-resolution black strip attached below the waterfall carries a two-pixel green passband bracket/center marker and magenta selection pointer. A terminal-text version remains below it as a fallback. This follows the general KiwiSDR visual language without duplicating the browser UI.
 
 Automated fixture capture used for local visual regression:
 

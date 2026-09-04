@@ -14,7 +14,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.state_store import load_presets_file
-from kiwi_client.waterfall_raster import RasterImage, encode_png
+from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage, encode_png
 from kiwi_client.waterfall_terminal import encode_kitty_image, format_frequency_ruler, terminal_supports_kitty
 
 
@@ -55,6 +55,61 @@ class IntegratedTerminalLayout:
             tui_top=tui_top,
             tui_rows=lines - tui_top,
         )
+
+
+PASSBAND_SCALE_RGB = (0, 255, 0)
+
+
+def append_tuning_strip(
+    image: RasterImage,
+    start_khz: float,
+    end_khz: float,
+    *,
+    tuned_khz: float,
+    selected_khz: float,
+    low_cut_hz: int,
+    high_cut_hz: int,
+    height: int = 8,
+) -> RasterImage:
+    """Append a high-resolution Kiwi-style passband/selection strip below W/F data."""
+    if height < 6 or end_khz <= start_khz:
+        raise ValueError("tuning strip requires height >= 6 and a positive frequency span")
+    strip = bytearray(image.width * height * 3)
+
+    def column(frequency_khz: float) -> int | None:
+        if not start_khz <= frequency_khz <= end_khz:
+            return None
+        return round((frequency_khz - start_khz) / (end_khz - start_khz) * (image.width - 1))
+
+    def pixel(x: int, y: int, color: tuple[int, int, int]) -> None:
+        offset = (y * image.width + x) * 3
+        strip[offset:offset + 3] = bytes(color)
+
+    low = column(tuned_khz + low_cut_hz / 1000.0)
+    center = column(tuned_khz)
+    high = column(tuned_khz + high_cut_hz / 1000.0)
+    if low is not None and high is not None:
+        low, high = sorted((low, high))
+        for x in range(low, high + 1):
+            for y in (2, 3):
+                pixel(x, y, PASSBAND_SCALE_RGB)
+        for x in range(low, min(image.width, low + 2)):
+            for y in range(0, 4):
+                pixel(x, y, PASSBAND_SCALE_RGB)
+        for x in range(max(0, high - 1), high + 1):
+            for y in range(0, 4):
+                pixel(x, y, PASSBAND_SCALE_RGB)
+    if center is not None:
+        for x in range(center, min(image.width, center + 2)):
+            for y in range(2, height - 1):
+                pixel(x, y, PASSBAND_SCALE_RGB)
+    selected = column(selected_khz)
+    if selected is not None and selected != center:
+        for radius in range(3):
+            y = height - 1 - radius
+            for x in range(max(0, selected - radius), min(image.width, selected + radius + 1)):
+                pixel(x, y, CURSOR_MARKER_RGB)
+    return RasterImage(image.width, image.height + height, image.rgb + bytes(strip))
 
 
 def format_passband_scale(
@@ -239,7 +294,7 @@ def _safe_line(screen, row: int, text: str, columns: int, attributes: int = 0) -
 
 
 def _apply_preset(model: WaterfallGuiModel, preset: Mapping[str, Any]) -> None:
-    model.set_direct_frequency(float(preset["frequency_khz"]))
+    model.set_tuned_frequency(float(preset["frequency_khz"]))
     state = model.session.state
     changes: dict[str, Any] = {}
     for name in ("mode", "low_cut_hz", "high_cut_hz"):
@@ -313,7 +368,7 @@ def run_fixture_shell(
             elif entry is not None and key is not None:
                 if key in ("\n", "\r"):
                     try:
-                        model.set_direct_frequency(float(entry))
+                        model.set_tuned_frequency(float(entry))
                         message = f"frequency {entry} kHz (local fixture state)"
                     except ValueError as exc:
                         message = str(exc)
@@ -411,6 +466,15 @@ def run_fixture_shell(
                 else:
                     image = model.image()
                     start_khz, end_khz = model.display_frequency_range()
+                    image = append_tuning_strip(
+                        image,
+                        start_khz,
+                        end_khz,
+                        tuned_khz=state.frequency_khz,
+                        selected_khz=state.selected_khz,
+                        low_cut_hz=state.low_cut_hz,
+                        high_cut_hz=state.high_cut_hz,
+                    )
                     _safe_line(
                         screen,
                         layout.passband_row,

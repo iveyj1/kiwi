@@ -28,12 +28,14 @@ from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
 from kiwi_client.playback import NullAudioSink, SoundDeviceSink
 from kiwi_client.session_manager import (
+    DirectFrequency,
     RadioSessionManager,
     RadioSessionSnapshot,
     RecenterWaterfall,
     SelectFrequency,
     SetSessionIntent,
     TransportUpdate,
+    TuneSelected,
     ZoomWaterfall,
 )
 from kiwi_client.state_store import apply_preset, full_preset, minimal_preset
@@ -895,8 +897,11 @@ class ClientController:
         return response
 
     def dispatch_session_action(self, action) -> dict[str, Any]:
-        """Dispatch one typed shared-session action and route live commands."""
-        return self._session_action_response(action)
+        """Dispatch one typed shared-session action and keep legacy state synchronized."""
+        response = self._session_action_response(action)
+        if isinstance(action, (TuneSelected, DirectFrequency)):
+            self.state = replace(self.state, frequency_khz=self.paired_session.state.frequency_khz)
+        return response
 
     def _session_action_response(self, action) -> dict[str, Any]:
         result = self.paired_session.dispatch(action)

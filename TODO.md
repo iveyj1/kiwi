@@ -6,6 +6,9 @@ Branch: `feature/shared-radio-session`, based on the newly updated `main` integr
 
 Completed and validated:
 
+- Fixed live tune state being overwritten during legacy/shared status synchronization.
+- `f` and selection+Enter now tune without implicit recenter; `c` remains explicit center.
+- Added a high-resolution Kiwi-style raster tuning strip so sub-cell indicator movement remains visible.
 - Controller-backed `--allow-live --receiver <local>` mode uses one paired SND/W/F worker and bounded snapshots.
 - Typed session commands route through a public controller API; shutdown stops and joins the worker.
 - Fake-operation coverage includes frame delivery, command routing, failure, null/audio startup, and idempotent cleanup.

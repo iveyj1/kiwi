@@ -372,6 +372,12 @@ class WaterfallGuiModel:
         self._mapped_snapshot()
         return self._dispatch(DirectFrequency(frequency_khz))
 
+    def set_tuned_frequency(self, frequency_khz: float):
+        """Tune an entered frequency without implicitly recentering W/F."""
+        self._mapped_snapshot()
+        self._dispatch(SelectFrequency(frequency_khz))
+        return self._dispatch(TuneSelected())
+
     def recenter(self):
         self._mapped_snapshot()
         return self._dispatch(RecenterWaterfall())
