@@ -132,6 +132,45 @@ def format_preset_ruler(
     return "".join(ruler)
 
 
+class ControllerConsoleSource:
+    """Bind the console display to one controller-owned paired live session."""
+
+    def __init__(self, controller, *, model: WaterfallGuiModel, audio: bool = False) -> None:
+        self.controller = controller
+        self.model = model
+        self.audio = audio
+        self.started = False
+        self._last_generation = 0
+
+    def start(self) -> None:
+        if self.started:
+            return
+        command = "radio-bg --allow-live" + ("" if self.audio else " --null-sink")
+        self.controller.execute(command)
+        self.model.publisher = self.controller.waterfall_snapshots
+        self.model.session = self.controller.paired_session
+        self.model.action_dispatch = self.controller.dispatch_session_action
+        self.model._session_mapped = True
+        self.started = True
+
+    def poll_generation(self) -> int:
+        sync_status = getattr(self.controller, "paired_session_status", None)
+        if sync_status is not None:
+            sync_status()
+        snapshot = self.model.publisher.latest()
+        generation = 0 if snapshot is None else snapshot.generation
+        changed = generation != self._last_generation
+        self._last_generation = generation
+        return generation if changed else 0
+
+    def stop(self) -> None:
+        if not self.started:
+            return
+        self.started = False
+        self.controller.execute("stop")
+        self.controller.execute("wait 5")
+
+
 class KittyPanePresenter:
     """Place one replaceable Kitty image at an absolute curses-owned region."""
 
@@ -214,7 +253,8 @@ def run_fixture_shell(
     screen,
     *,
     model: WaterfallGuiModel,
-    timeline: FixtureWaterfallTimeline,
+    timeline: FixtureWaterfallTimeline | None,
+    live_source: ControllerConsoleSource | None,
     presets: Mapping[str, Mapping[str, Any]],
     presenter: KittyPanePresenter,
     source_fps: float,
@@ -237,24 +277,31 @@ def run_fixture_shell(
         curses.init_pair(2, curses.COLOR_CYAN, -1)
         passband_attributes = curses.color_pair(1) | curses.A_BOLD
         preset_attributes = curses.color_pair(2)
-    timeline.advance(model.publisher)
+    if (timeline is None) == (live_source is None):
+        raise ValueError("console requires exactly one fixture or live source")
+    if timeline is not None:
+        timeline.advance(model.publisher)
     started = time.monotonic()
     next_source = started
     next_refresh = 0.0
     dirty = True
     entry: str | None = None
     pending_preset = False
-    message = "fixture-only; no receiver connection"
+    message = "live paired session starting" if live_source is not None else "fixture-only; no receiver connection"
 
     try:
         while True:
             now = time.monotonic()
             if demo_seconds is not None and now - started >= demo_seconds:
                 break
-            if now >= next_source and not timeline.done:
+            if timeline is not None and now >= next_source and not timeline.done:
                 timeline.advance(model.publisher)
                 next_source = now + 1.0 / source_fps
                 dirty = True
+            elif live_source is not None:
+                if live_source.poll_generation() or now >= next_source:
+                    next_source = now + 0.25
+                    dirty = True
 
             try:
                 key = screen.get_wch()
@@ -349,42 +396,53 @@ def run_fixture_shell(
                     screen.refresh()
                     time.sleep(0.03)
                     continue
-                image = model.image()
-                start_khz, end_khz = model.display_frequency_range()
+                snapshot = model.publisher.latest()
                 screen.erase()
                 state = model.session.state
-                _safe_line(
-                    screen,
-                    layout.passband_row,
-                    format_passband_scale(
-                        start_khz,
-                        end_khz,
-                        tuned_khz=state.frequency_khz,
-                        selected_khz=state.selected_khz,
-                        low_cut_hz=state.low_cut_hz,
-                        high_cut_hz=state.high_cut_hz,
-                        columns=columns,
-                    ),
-                    columns,
-                    passband_attributes,
-                )
-                _safe_line(
-                    screen,
-                    layout.frequency_row,
-                    format_frequency_ruler(start_khz, end_khz, columns=columns),
-                    columns,
-                )
-                _safe_line(
-                    screen,
-                    layout.preset_row,
-                    format_preset_ruler(presets, start_khz, end_khz, columns=columns),
-                    columns,
-                    preset_attributes,
-                )
+                if live_source is not None:
+                    message = f"live SND {state.snd_status} / W/F {state.wf_status}"
+                    if state.error is not None:
+                        message += f" | {state.error.stream}: {state.error.message}"
+                image = None
+                if snapshot is None:
+                    _safe_line(screen, layout.passband_row, "Waiting for first W/F frame...", columns)
+                    _safe_line(screen, layout.frequency_row, "", columns)
+                    _safe_line(screen, layout.preset_row, "", columns)
+                else:
+                    image = model.image()
+                    start_khz, end_khz = model.display_frequency_range()
+                    _safe_line(
+                        screen,
+                        layout.passband_row,
+                        format_passband_scale(
+                            start_khz,
+                            end_khz,
+                            tuned_khz=state.frequency_khz,
+                            selected_khz=state.selected_khz,
+                            low_cut_hz=state.low_cut_hz,
+                            high_cut_hz=state.high_cut_hz,
+                            columns=columns,
+                        ),
+                        columns,
+                        passband_attributes,
+                    )
+                    _safe_line(
+                        screen,
+                        layout.frequency_row,
+                        format_frequency_ruler(start_khz, end_khz, columns=columns),
+                        columns,
+                    )
+                    _safe_line(
+                        screen,
+                        layout.preset_row,
+                        format_preset_ruler(presets, start_khz, end_khz, columns=columns),
+                        columns,
+                        preset_attributes,
+                    )
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
-                    f"W/F source {model.publisher.latest().generation} presented {model.rasterizer.presented_generation} | {message}",
+                    f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {message}",
                     "h/l select  H/L fine  Enter tune  c center  +/- zoom  f frequency  p preset  q quit",
                     f"frequency kHz: {entry}_" if entry is not None else ("preset register: _" if pending_preset else ":"),
                 ]
@@ -392,17 +450,24 @@ def run_fixture_shell(
                     _safe_line(screen, layout.tui_top + offset, text, columns)
                 screen.noutrefresh()
                 curses.doupdate()
-                presenter.draw(image, layout, generation=model.publisher.latest().generation)
+                if image is not None and snapshot is not None:
+                    presenter.draw(image, layout, generation=snapshot.generation)
                 next_refresh = now + 1.0 / refresh_hz
                 dirty = False
             time.sleep(0.005)
     finally:
+        if live_source is not None:
+            live_source.stop()
         presenter.finish()
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fixture-first integrated Kitty waterfall and terminal UI")
-    parser.add_argument("--fixture", type=Path, required=True)
+    parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--allow-live", action="store_true")
+    parser.add_argument("--receiver", help="live receiver host[:port]; local receivers only by policy")
+    parser.add_argument("--audio", action="store_true", help="enable local audio instead of a null sink")
     parser.add_argument("--presets", type=Path, default=Path("presets.toml"))
     parser.add_argument("--rows", type=int, default=400)
     parser.add_argument("--repeat", type=int, default=200)
@@ -423,38 +488,109 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("FPS and refresh rate must be positive")
         if args.demo_seconds is not None and args.demo_seconds <= 0:
             raise ValueError("demo seconds must be positive")
+        if args.fixture is not None and args.allow_live:
+            raise ValueError("choose either --fixture or --allow-live")
+        if args.fixture is None and not args.allow_live:
+            raise ValueError("provide --fixture or explicit --allow-live")
+        presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
+        if args.fixture is not None:
+            model = WaterfallGuiModel(
+                history_rows=args.rows,
+                show_frequency_lines=False,
+                render_min_db=args.render_min_db,
+                render_max_db=args.render_max_db,
+            )
+            timeline = FixtureWaterfallTimeline.from_fixture(args.fixture, repeat=args.repeat)
+            presets = load_presets_file(args.presets)["presets"]
+            if args.dry_run:
+                timeline.advance(model.publisher)
+                start_khz, end_khz = model.display_frequency_range()
+                print(json.dumps({
+                    "backend": "kitty+curses",
+                    "fixture_frames": timeline.total_frames,
+                    "frequency": [start_khz, end_khz],
+                    "presets_visible": format_preset_ruler(presets, start_khz, end_khz, columns=120).strip(),
+                    "network": False,
+                }, indent=2, sort_keys=True))
+                return 0
+            curses.wrapper(
+                lambda screen: run_fixture_shell(
+                    screen,
+                    model=model,
+                    timeline=timeline,
+                    live_source=None,
+                    presets=presets,
+                    presenter=presenter,
+                    source_fps=args.fps,
+                    refresh_hz=args.refresh_hz,
+                    demo_seconds=args.demo_seconds,
+                )
+            )
+            return 0
+
+        from kiwi_client.client_app import ClientController, normalize_receiver_address
+        from kiwi_client.config import discover_config_path, load_config
+        from kiwi_client.tui import startup_receiver_presets, startup_state_and_presets
+
+        config = load_config(discover_config_path(args.config))
+        state, presets = startup_state_and_presets(config)
+        if args.receiver:
+            host, port = normalize_receiver_address(args.receiver, default_port=state.port)
+            state = replace(state, host=host, port=port)
+        controller = ClientController(
+            state=state,
+            allow_live_default=config.live.allow_live,
+            presets=presets,
+            receiver_presets=startup_receiver_presets(config),
+        )
+        controller.configure_waterfall_session(
+            center_khz=config.waterfall.center_khz,
+            zoom=config.waterfall.zoom,
+            speed=config.waterfall.speed,
+            interp=config.waterfall.interp,
+            history_rows=args.rows,
+        )
         model = WaterfallGuiModel(
             history_rows=args.rows,
             show_frequency_lines=False,
             render_min_db=args.render_min_db,
             render_max_db=args.render_max_db,
+            tuned_khz=state.frequency_khz,
+            selected_khz=state.frequency_khz,
+            mode=state.mode,
+            low_cut_hz=state.low_cut_hz,
+            high_cut_hz=state.high_cut_hz,
+            main_step_hz=state.current_step_hz,
+            small_step_hz=state.current_small_step_hz,
+            frequency_decimals=config.display.frequency_decimals,
         )
-        timeline = FixtureWaterfallTimeline.from_fixture(args.fixture, repeat=args.repeat)
-        presets = load_presets_file(args.presets)["presets"]
+        source = ControllerConsoleSource(controller, model=model, audio=args.audio)
         if args.dry_run:
-            timeline.advance(model.publisher)
-            start_khz, end_khz = model.display_frequency_range()
             print(json.dumps({
                 "backend": "kitty+curses",
-                "fixture_frames": timeline.total_frames,
-                "frequency": [start_khz, end_khz],
-                "presets_visible": format_preset_ruler(presets, start_khz, end_khz, columns=120).strip(),
+                "receiver": state.receiver,
+                "audio": args.audio,
                 "network": False,
+                "would_start": "radio-bg --allow-live" + ("" if args.audio else " --null-sink"),
             }, indent=2, sort_keys=True))
             return 0
-        presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
-        curses.wrapper(
-            lambda screen: run_fixture_shell(
-                screen,
-                model=model,
-                timeline=timeline,
-                presets=presets,
-                presenter=presenter,
-                source_fps=args.fps,
-                refresh_hz=args.refresh_hz,
-                demo_seconds=args.demo_seconds,
+        source.start()
+        try:
+            curses.wrapper(
+                lambda screen: run_fixture_shell(
+                    screen,
+                    model=model,
+                    timeline=None,
+                    live_source=source,
+                    presets=controller.presets,
+                    presenter=presenter,
+                    source_fps=args.fps,
+                    refresh_hz=args.refresh_hz,
+                    demo_seconds=args.demo_seconds,
+                )
             )
-        )
+        finally:
+            source.stop()
         return 0
     except (OSError, RuntimeError, ValueError) as exc:
         raise SystemExit(f"kiwi-console: error: {exc}") from exc

@@ -7,6 +7,7 @@ import json
 from collections import deque
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any, Callable
 
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.protocol import parse_msg
@@ -253,6 +254,7 @@ class WaterfallGuiModel:
     small_step_hz: float = 100
     frequency_decimals: int = 3
     show_frequency_lines: bool = True
+    action_dispatch: Callable[[Any], Any] | None = None
 
     def __post_init__(self) -> None:
         if self.render_max_db <= self.render_min_db:
@@ -348,6 +350,11 @@ class WaterfallGuiModel:
             ),
         )
 
+    def _dispatch(self, action):
+        if self.action_dispatch is not None:
+            return self.action_dispatch(action)
+        return self.session.dispatch(action)
+
     def move_selection(self, delta: int, *, small: bool = False):
         snapshot = self._mapped_snapshot()
         step_hz = self.small_step_hz if small else self.main_step_hz
@@ -355,23 +362,23 @@ class WaterfallGuiModel:
         if snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
             start_khz, end_khz = self.display_frequency_range()
             frequency = min(max(frequency, start_khz), end_khz)
-        return self.session.dispatch(SelectFrequency(frequency))
+        return self._dispatch(SelectFrequency(frequency))
 
     def tune_selected(self):
         self._mapped_snapshot()
-        return self.session.dispatch(TuneSelected())
+        return self._dispatch(TuneSelected())
 
     def set_direct_frequency(self, frequency_khz: float):
         self._mapped_snapshot()
-        return self.session.dispatch(DirectFrequency(frequency_khz))
+        return self._dispatch(DirectFrequency(frequency_khz))
 
     def recenter(self):
         self._mapped_snapshot()
-        return self.session.dispatch(RecenterWaterfall())
+        return self._dispatch(RecenterWaterfall())
 
     def zoom(self, delta: int):
         self._mapped_snapshot()
-        return self.session.dispatch(ZoomWaterfall(delta))
+        return self._dispatch(ZoomWaterfall(delta))
 
     def frequency_text(self) -> str:
         try:

@@ -894,6 +894,10 @@ class ClientController:
         response["operation"] = status.as_dict()
         return response
 
+    def dispatch_session_action(self, action) -> dict[str, Any]:
+        """Dispatch one typed shared-session action and route live commands."""
+        return self._session_action_response(action)
+
     def _session_action_response(self, action) -> dict[str, Any]:
         result = self.paired_session.dispatch(action)
         response: dict[str, Any] = {

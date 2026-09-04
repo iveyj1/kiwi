@@ -44,6 +44,28 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-04 — integrated Kitty console paired W/F
+
+```text
+Date/time: 2026-09-04T04:48:36Z..04:48:49Z and 04:49:14Z..04:49:23Z / approximately 00:48..00:49 local
+Receiver: 10.0.0.40:8073
+Frequency: 5000.000 kHz
+Mode: AM
+Filter: -5000..5000 Hz
+W/F settings: zoom 7, speed 4, interp 13, 300-row history, 5 Hz presentation cap
+Stream type: paired primary SND + W/F; null audio sink
+Purpose: Validate controller-backed live snapshots in the integrated curses/Kitty console and automated screenshot capture.
+Commands sent: normal paired SND/W/F authentication, setup, keepalive, AM tune, and zoom/center commands only; no admin commands.
+Observed behavior:
+  Both bounded runs exited normally with no reconnect loop.
+  First run displayed live frames but stale starting/waiting status.
+  Harness-first status synchronization fix called the controller paired-session synchronizer during polling.
+  Second run displayed SND running / W/F running and 85 source/presented generations at screenshot time.
+  Waterfall image, 4882.8..5117.2 kHz ruler, green 10 kHz passband bracket, and clean lower TUI reservation rendered correctly in Kitty under DWM.
+Fixture/artifact: docs/screenshots/kiwi-console-live-local.png; fake paired-operation regression in tests/harness/test_integrated_terminal.py. Existing protocol behavior did not change.
+Follow-up: Expand the lower console with existing TUI command/keymap/dashboard behavior and add audio toggle/status controls.
+```
+
 ### 2026-06-14 / 2026-06-13 local
 
 ```text

@@ -1,26 +1,27 @@
 # TODO
 
-## Current slice — Controller-backed live Kitty waterfall harness
+## Current slice — Existing TUI behavior in integrated console
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Validated/implemented:
+Completed and validated:
 
-- Integrated Kitty fixture shell looks good in attended use.
-- Removed superimposed image markers from the console and added a green Kiwi-style external passband bracket with a separate selection pointer.
-- Captured `docs/screenshots/kiwi-console-fixture.png` from an automated Kitty fixture run.
+- Controller-backed `--allow-live --receiver <local>` mode uses one paired SND/W/F worker and bounded snapshots.
+- Typed session commands route through a public controller API; shutdown stops and joins the worker.
+- Fake-operation coverage includes frame delivery, command routing, failure, null/audio startup, and idempotent cleanup.
+- Two bounded local `10.0.0.40:8073` runs displayed actual 5000 kHz W/F data with synchronized running status.
+- Automated live screenshot: `docs/screenshots/kiwi-console-live-local.png`.
 
-Goal: feed the integrated console from the existing controller-owned paired session without duplicating TUI behavior or receiver connections.
+Next goal: model the lower console on the existing TUI where it fits.
 
 Done criteria:
 
-- Reuse TUI startup state, presets, command mode, dashboard/status concepts, and keymaps where they fit the waterfall layout.
-- Add an explicit `--allow-live` path using `ClientController` `radio-bg` and its bounded waterfall publisher.
-- Keep curses/Kitty rendering on the UI thread while paired network/audio workers stay off-thread.
-- Route tune/recenter/zoom/audio/preset operations through public controller APIs.
-- Stop and join paired work deterministically on every console exit path.
-- Cover live startup, latest-snapshot rendering, command routing, failure, and cleanup with fake operations before radio use.
-- Then perform one short attended test on a local receiver only and record a fixture/observations.
+- Reuse existing dashboard/status rendering and configurable keymap dispatch rather than maintaining console-only equivalents.
+- Add command mode with existing parsing, history, hints, and error reporting.
+- Recall/store presets and receiver registers through `ClientController`, preserving persistence semantics.
+- Add audio toggle/state and volume controls.
+- Keep waterfall selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
+- Add pure/fake-operation tests before another attended local session.
 
 ## Plan
 

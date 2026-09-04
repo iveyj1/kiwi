@@ -588,11 +588,24 @@ kiwi-console \
 
 The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` and duplicate generations are coalesced. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
 
+Guarded live mode uses the controller-owned paired SND/W/F worker and requires an explicit local receiver. Audio remains on a null sink unless `--audio` is supplied:
+
+```bash
+kiwi-console --allow-live --receiver 10.0.0.40:8073 \
+  --config config.toml --rows 300 --refresh-hz 5
+```
+
+The controller opens SND before W/F, publishes bounded latest snapshots, routes typed tune/view actions to the active stream queues, and stops/joins both streams on console exit. `--dry-run` reports the intended command without connecting.
+
 Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent. The console intentionally omits full-height tuned/passband/cursor lines from the image: a green bracket below the waterfall shows tuned passband and center, while `▼` shows a distinct selected frequency. This follows the general KiwiSDR visual language without duplicating the browser UI.
 
 Automated fixture capture used for local visual regression:
 
 ![Integrated Kitty fixture console](screenshots/kiwi-console-fixture.png)
+
+Short local paired-session validation:
+
+![Integrated Kitty live local console](screenshots/kiwi-console-live-local.png)
 
 ## Native GUI prototype
 

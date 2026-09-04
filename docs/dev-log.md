@@ -633,6 +633,20 @@ Launched a real Kitty window on local X11/DWM with fixture-only input and captur
 
 Add controller-backed live mode using the existing `radio-bg` paired session and bounded snapshots. Reuse existing TUI startup, command/keymap, status, presets, and persistence concepts where appropriate. Validate startup, commands, failure, and cleanup with fake operations before one short attended local-radio test.
 
+## 2026-09-04 — Controller-backed live integrated waterfall
+
+### Decision
+
+Added `ControllerConsoleSource`, which starts the existing controller `radio-bg` paired operation, binds its bounded waterfall publisher and shared session manager to the console display, routes typed session actions through a public controller API, polls synchronized stream state, and idempotently stops/joins the worker. `kiwi-console --allow-live --receiver <local>` now selects this path; audio defaults to a null sink and `--audio` opts into local output. Fixture and live modes are mutually exclusive, and live dry-run does not connect.
+
+### Harness and live result
+
+Fake-controller and fake-operation tests cover startup command selection, optional audio, frame publication, routed SND commands, synthetic failure, and repeated cleanup. Full harness: 350 tests passed in 4.35 seconds; `compileall` and `git diff --check` passed. Two bounded local `10.0.0.40:8073` checks at 5000 kHz AM/zoom 7 succeeded; the second confirmed synchronized `SND running / W/F running`, 85 displayed generations, normal timed shutdown, and automated screenshot capture at `docs/screenshots/kiwi-console-live-local.png`. No admin commands or reconnect loop were used.
+
+### Follow-up
+
+Replace the compact lower panel with existing TUI dashboard/keymap/command-mode components where they fit, then add audio toggle/status and preset persistence through the controller.
+
 ## YYYY-MM-DD
 
 ### Finding

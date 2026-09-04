@@ -41,6 +41,26 @@ def test_fixture_gui_model_publishes_mapped_rows_and_direct_rgb():
     assert "source 10 | presented 10" in model.status_text()
 
 
+def test_gui_model_can_delegate_session_actions_to_controller_router():
+    routed = []
+    model = WaterfallGuiModel(history_rows=5, action_dispatch=lambda action: routed.append(action))
+    model.load_fixture(FIXTURE)
+
+    model.move_selection(1)
+    model.tune_selected()
+    model.recenter()
+    model.zoom(1)
+    model.set_direct_frequency(860.0)
+
+    assert [type(action).__name__ for action in routed] == [
+        "SelectFrequency",
+        "TuneSelected",
+        "RecenterWaterfall",
+        "ZoomWaterfall",
+        "DirectFrequency",
+    ]
+
+
 def test_gui_model_routes_local_frequency_actions_through_shared_session():
     model = WaterfallGuiModel(
         history_rows=5,

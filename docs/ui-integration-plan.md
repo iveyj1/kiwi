@@ -111,7 +111,7 @@ Toolkit comparison is complete; no further native integration is planned before 
 
 ## Phase 5 — Integrated curses-aware Kitty pane
 
-Status: **Fixture-only integrated shell implemented; attended Kitty validation pending.**
+Status: **Fixture and controller-backed live waterfall implemented and validated locally; TUI feature reuse pending.**
 
 Requirements:
 
@@ -124,7 +124,7 @@ Requirements:
 - resize and alternate-screen cleanup are deterministic,
 - unsupported terminals retain a text/status fallback.
 
-The first fixture shell and an automated Kitty screenshot are complete. Next, add a fake-operations harness around controller-backed live startup and snapshot consumption; only after it passes should the console connect briefly to a local receiver.
+The fixture shell and controller-backed live source are complete. Fake-operation coverage preceded two bounded local receiver tests; automated fixture and live Kitty screenshots are retained under `docs/screenshots/`. Next, replace console-only lower-panel behavior with existing TUI dashboard, configurable keymap, command/history/hints, presets, receiver switching, audio, and persistence components where appropriate.
 
 ## Later — SND consumer fan-out
 
