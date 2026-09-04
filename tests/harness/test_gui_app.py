@@ -6,6 +6,7 @@ from kiwi_client.gui_app import (
     SnapshotRasterizer,
     WaterfallGuiModel,
     gui_close_key,
+    logical_display_height,
     main,
 )
 
@@ -31,6 +32,18 @@ def test_fixture_gui_model_publishes_mapped_rows_and_direct_rgb():
     assert len(image.rgb) == 1024 * 12 * 3
     assert model.frequency_text().endswith("kHz")
     assert "source 10 | presented 10" in model.status_text()
+
+
+def test_display_height_defaults_to_one_physical_pixel_per_source_row():
+    assert logical_display_height(400, row_pixels=1.0, device_pixel_ratio=1.0) == 400
+    assert logical_display_height(400, row_pixels=1.0, device_pixel_ratio=2.0) == 200
+    assert logical_display_height(
+        800,
+        row_pixels=1.0,
+        device_pixel_ratio=1.0,
+        available_logical_height=600,
+    ) == 600
+    assert logical_display_height(400, row_pixels=2.0, device_pixel_ratio=1.0) == 800
 
 
 def test_gui_close_key_policy_supports_q_escape_and_control_q():
@@ -111,3 +124,4 @@ def test_fixture_gui_dry_run_does_not_import_or_open_qt(capsys):
     assert result["image_width"] == 1024
     assert result["image_height"] == 20
     assert result["backend"] == "PySide6"
+    assert result["requested_row_pixels"] == 1.0

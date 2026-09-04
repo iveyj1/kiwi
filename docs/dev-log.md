@@ -537,6 +537,24 @@ Six GUI harness tests cover mapped static output, finite repeated timeline progr
 
 Run the attended animated fixture command, then add shared-state overlays and local controls before live pairing.
 
+## 2026-09-03 — Native one-pixel-per-frame scale
+
+### Finding
+
+User validation confirmed native fixture animation works and requested one displayed pixel row per W/F frame as the default where feasible.
+
+### Decision
+
+Added a pure DPI-aware vertical sizing policy and `--row-pixels` control, defaulting to `1.0`. The Qt raster label has fixed vertical height derived from source history rows divided by device-pixel ratio, while width remains independently resizable. If exact scale exceeds available screen height, it is capped and status reports the effective physical pixels per frame.
+
+### Test result
+
+Seven GUI harness tests pass, including normal-DPI, high-DPI, screen-cap, and explicit 2× vertical-scale policy cases. Animated dry-run reports the requested row scale. Full harness: 330 tests passed in 3.81 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat the attended animated fixture at the default scale and confirm effective status reads approximately `1.00 px/frame`; then resume fixture-only overlays and controls.
+
 ## YYYY-MM-DD
 
 ### Finding

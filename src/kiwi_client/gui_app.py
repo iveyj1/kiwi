@@ -20,6 +20,24 @@ from kiwi_client.waterfall_raster import RasterImage, render_dbm_rows
 from kiwi_client.waterfall_snapshots import WaterfallSnapshot, WaterfallSnapshotPublisher
 
 
+def logical_display_height(
+    source_rows: int,
+    *,
+    row_pixels: float = 1.0,
+    device_pixel_ratio: float = 1.0,
+    available_logical_height: int | None = None,
+) -> int:
+    """Map source rows to DPI-aware logical height, capped by screen space."""
+    if source_rows <= 0 or row_pixels <= 0 or device_pixel_ratio <= 0:
+        raise ValueError("source rows, row pixels and device pixel ratio must be positive")
+    height = max(1, round(source_rows * row_pixels / device_pixel_ratio))
+    if available_logical_height is not None:
+        if available_logical_height <= 0:
+            raise ValueError("available logical height must be positive")
+        height = min(height, available_logical_height)
+    return height
+
+
 def gui_close_key(key: str, *, control: bool = False) -> bool:
     """Return whether a toolkit-neutral key description closes the GUI."""
     normalized = key.lower()
@@ -177,7 +195,13 @@ class WaterfallGuiModel:
             parts.append("ended")
         return " | ".join(parts)
 
-    def summary(self, *, animated: bool = False, requested_fps: float | None = None) -> dict:
+    def summary(
+        self,
+        *,
+        animated: bool = False,
+        requested_fps: float | None = None,
+        requested_row_pixels: float = 1.0,
+    ) -> dict:
         image = self.image()
         snapshot = self.publisher.latest()
         return {
@@ -190,6 +214,7 @@ class WaterfallGuiModel:
             "status": self.status_text(requested_fps=requested_fps),
             "animated": animated,
             "requested_fps": requested_fps,
+            "requested_row_pixels": requested_row_pixels,
         }
 
 
@@ -198,17 +223,20 @@ def show_pyside_window(
     *,
     timeline: FixtureWaterfallTimeline | None = None,
     fps: float = 20.0,
+    row_pixels: float = 1.0,
 ) -> int:
     """Display direct-RGB fixture history, optionally publishing it on a timer."""
     try:
         from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut
-        from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
+        from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QSizePolicy, QVBoxLayout, QWidget
     except ImportError as exc:
         raise RuntimeError("native GUI requires: pip install -e '.[gui-pyside]'") from exc
 
     if fps <= 0:
         raise ValueError("GUI playback FPS must be positive")
+    if row_pixels <= 0:
+        raise ValueError("GUI row pixels must be positive")
     if timeline is not None and model.publisher.latest() is None:
         timeline.advance(model.publisher)
 
@@ -221,8 +249,20 @@ def show_pyside_window(
     frequency = QLabel()
     frequency.setAlignment(Qt.AlignmentFlag.AlignCenter)
     display = QLabel()
-    display.setMinimumSize(640, 200)
+    display.setMinimumWidth(640)
     display.setScaledContents(True)
+    display.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    screen = app.primaryScreen()
+    device_pixel_ratio = screen.devicePixelRatio() if screen is not None else 1.0
+    available_height = max(1, screen.availableGeometry().height() - 140) if screen is not None else None
+    display_height = logical_display_height(
+        model.history_rows,
+        row_pixels=row_pixels,
+        device_pixel_ratio=device_pixel_ratio,
+        available_logical_height=available_height,
+    )
+    display.setFixedHeight(display_height)
+    effective_row_pixels = display_height * device_pixel_ratio / model.history_rows
     status = QLabel()
     status.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -237,14 +277,15 @@ def show_pyside_window(
         )
         display.setPixmap(QPixmap.fromImage(qimage))
         frequency.setText(model.frequency_text())
-        status.setText(model.status_text(requested_fps=fps if timeline is not None else None, ended=ended))
+        base_status = model.status_text(requested_fps=fps if timeline is not None else None, ended=ended)
+        status.setText(f"{base_status} | display {effective_row_pixels:.2f} px/frame")
 
     update_display()
     layout.addWidget(frequency)
     layout.addWidget(display, 1)
     layout.addWidget(status)
     window.setCentralWidget(central)
-    window.resize(1200, 600)
+    window.resize(1200, display_height + 120)
     window._close_shortcuts = []
     for sequence in ("Q", "Escape", "Ctrl+Q"):
         shortcut = QShortcut(QKeySequence(sequence), window)
@@ -278,6 +319,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repeat", type=int, default=1, help="repeat fixture frames to fill diagnostic history")
     parser.add_argument("--animate", action="store_true", help="publish fixture rows incrementally")
     parser.add_argument("--fps", type=float, default=20.0, help="animated fixture publication rate")
+    parser.add_argument("--row-pixels", type=float, default=1.0, help="requested physical display pixels per W/F frame")
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
     parser.add_argument("--dry-run", action="store_true", help="build model and print summary without importing Qt")
@@ -289,6 +331,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.fps <= 0:
             raise ValueError("GUI playback FPS must be positive")
+        if args.row_pixels <= 0:
+            raise ValueError("GUI row pixels must be positive")
         model = WaterfallGuiModel(
             history_rows=args.rows,
             render_min_db=args.render_min_db,
@@ -300,14 +344,18 @@ def main(argv: list[str] | None = None) -> int:
                 while timeline.advance(model.publisher):
                     model.image()
             else:
-                return show_pyside_window(model, timeline=timeline, fps=args.fps)
+                return show_pyside_window(model, timeline=timeline, fps=args.fps, row_pixels=args.row_pixels)
         else:
             while timeline.advance(model.publisher):
                 pass
         if args.dry_run:
-            print(json.dumps(model.summary(animated=args.animate, requested_fps=args.fps if args.animate else None), indent=2, sort_keys=True))
+            print(json.dumps(model.summary(
+                animated=args.animate,
+                requested_fps=args.fps if args.animate else None,
+                requested_row_pixels=args.row_pixels,
+            ), indent=2, sort_keys=True))
             return 0
-        return show_pyside_window(model)
+        return show_pyside_window(model, row_pixels=args.row_pixels)
     except (OSError, RuntimeError, ValueError) as exc:
         raise SystemExit(f"kiwi-gui: error: {exc}") from exc
 

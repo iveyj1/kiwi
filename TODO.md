@@ -1,25 +1,23 @@
 # TODO
 
-## Current slice — Native fixture controls
+## Current slice — Native one-pixel-per-frame vertical scale
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Completed:
+Validated:
 
-- Added static and timed fixture playback through `WaterfallSnapshotPublisher`.
-- Added incremental native rasterization that colors only newly presented rows.
-- Added `--animate --fps`, source/presented generation status, bounded history, and clean timer shutdown.
-- Preserved direct RGB/QImage presentation without PNG/base64.
+- Timed fixture animation works in the attended PySide6 window.
 
-Next goal: add basic fixture-only native frequency/cursor controls before live integration.
+Goal: make one physical display-pixel row per W/F frame the default when the requested history fits the available screen.
 
 Done criteria:
 
-- Draw tuned, passband, and selected-frequency overlays using shared state.
-- Support keyboard cursor steps, direct frequency entry, recenter/zoom state, and visible control status without sending network commands.
-- Keep control actions routed through `RadioSessionManager`.
-- Add pure model/action tests and an attended animated fixture demo.
-- Do not connect to a receiver.
+- Add a pure DPI-aware source-row-to-logical-height policy.
+- Default to 1.0 physical pixel per W/F frame.
+- Cap display height to available screen space when exact 1:1 cannot fit.
+- Keep horizontal resizing independent from vertical row scale.
+- Add an explicit CLI override and report effective scale in status/dry-run output.
+- Add harness coverage and an attended retry command; no receiver connection.
 
 ## Plan
 
