@@ -1,22 +1,21 @@
 # TODO
 
-## Current slice — PySide6 fixture-window validation
+## Current slice — Native fixture-window exit controls
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Completed:
+Observed validation:
 
-- Benchmarked PySide6 and pygame-ce direct RGB at 1024×200/400/800 and selected PySide6 provisionally.
-- Kept both in isolated optional dependency extras; default installation is unchanged.
-- Added fixture-only `kiwi-gui` using direct `QImage`/`QPixmap` presentation.
-- Added model/dry-run harness coverage requiring no Qt import or display server.
+- Fixture image, orientation, scaling, and general PySide6 window behavior were acceptable.
+- User could not exit using the attempted interaction.
 
-Validation goal:
+Done criteria:
 
-- Run the attended 1024×400 fixture window on the real desktop.
-- Confirm image orientation, scaling, resize behavior, frequency text, clean close, and acceptable startup/dependency behavior.
-- Record observed CPU/memory if convenient.
-- Do not add live receiver/audio integration until this static window is accepted.
+- Make `q`, Esc, and Ctrl+Q close the fixture window.
+- Explicitly quit the application when the last window closes.
+- Keep normal window-manager close behavior.
+- Add pure key-policy coverage without requiring Qt/display imports.
+- Document controls, run full harness, and request a short attended retry.
 
 ## Plan
 

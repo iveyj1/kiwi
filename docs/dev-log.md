@@ -505,6 +505,24 @@ Two model/CLI tests cover repeated contextualized fixture publication, 1024×400
 
 User-attended static window validation, then add timed snapshot consumption and controls before connecting the paired live session.
 
+## 2026-09-03 — Native fixture-window exit controls
+
+### Finding
+
+The first attended `kiwi-gui` fixture test found the image/window acceptable, but the attempted exit interaction did not close the application.
+
+### Decision
+
+Added explicit application quit-on-last-window policy and window-scoped `q`, Esc, and Ctrl+Q shortcuts while retaining normal window-manager close behavior. The close-key policy is toolkit-neutral and testable without importing Qt.
+
+### Test result
+
+Targeted GUI model tests: 3 passed. Full harness: 326 tests passed in 3.78 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat the attended fixture command and verify all practical close paths. If accepted, move to timed snapshot presentation and basic native controls before live pairing.
+
 ## YYYY-MM-DD
 
 ### Finding

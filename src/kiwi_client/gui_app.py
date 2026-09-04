@@ -18,6 +18,12 @@ from kiwi_client.waterfall_raster import RasterImage, render_dbm_rows
 from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 
 
+def gui_close_key(key: str, *, control: bool = False) -> bool:
+    """Return whether a toolkit-neutral key description closes the GUI."""
+    normalized = key.lower()
+    return normalized == "escape" or normalized == "q"
+
+
 @dataclass
 class WaterfallGuiModel:
     """Renderer-neutral fixture model consumed by the first native window."""
@@ -92,13 +98,14 @@ def show_pyside_window(model: WaterfallGuiModel) -> int:
     """Display one direct-RGB fixture image, importing Qt only when requested."""
     try:
         from PySide6.QtCore import Qt
-        from PySide6.QtGui import QImage, QPixmap
+        from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut
         from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
     except ImportError as exc:
         raise RuntimeError("native GUI requires: pip install -e '.[gui-pyside]'") from exc
 
     image = model.image()
     app = QApplication.instance() or QApplication([])
+    app.setQuitOnLastWindowClosed(True)
     window = QMainWindow()
     window.setWindowTitle("KiwiSDR Waterfall Prototype")
     central = QWidget()
@@ -123,6 +130,12 @@ def show_pyside_window(model: WaterfallGuiModel) -> int:
     layout.addWidget(status)
     window.setCentralWidget(central)
     window.resize(1200, 600)
+    window._close_shortcuts = []
+    for sequence in ("Q", "Escape", "Ctrl+Q"):
+        shortcut = QShortcut(QKeySequence(sequence), window)
+        shortcut.activated.connect(window.close)
+        window._close_shortcuts.append(shortcut)
+    app.lastWindowClosed.connect(app.quit)
     window.show()
     return app.exec()
 

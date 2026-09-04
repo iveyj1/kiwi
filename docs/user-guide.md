@@ -595,7 +595,7 @@ kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
   --rows 400 --repeat 80
 ```
 
-`--repeat` repeats the short captured fixture to fill diagnostic history. This first window is intentionally static: no live receiver, audio, controls, zoom, or mouse tuning are connected yet. Close the window normally to exit.
+`--repeat` repeats the short captured fixture to fill diagnostic history. This first window is intentionally static: no live receiver, audio, zoom, or mouse tuning are connected yet. Exit with `q`, Esc, Ctrl+Q, or the window manager's close control.
 
 ## Recording / fixture capture
 

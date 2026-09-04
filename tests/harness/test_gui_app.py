@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from kiwi_client.gui_app import WaterfallGuiModel, main
+from kiwi_client.gui_app import WaterfallGuiModel, gui_close_key, main
 
 
 FIXTURE = Path("tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl")
@@ -25,6 +25,14 @@ def test_fixture_gui_model_publishes_mapped_rows_and_direct_rgb():
     assert len(image.rgb) == 1024 * 12 * 3
     assert model.frequency_text().endswith("kHz")
     assert "10 frames" in model.status_text()
+
+
+def test_gui_close_key_policy_supports_q_escape_and_control_q():
+    assert gui_close_key("q") is True
+    assert gui_close_key("Q") is True
+    assert gui_close_key("escape") is True
+    assert gui_close_key("q", control=True) is True
+    assert gui_close_key("enter") is False
 
 
 def test_fixture_gui_dry_run_does_not_import_or_open_qt(capsys):
