@@ -1,23 +1,23 @@
 # TODO
 
-## Current slice — Correct native fixture controls
+## Current slice — Integrated Kitty waterfall/TUI fixture shell
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Attended findings:
+Direction:
 
-- Marker lines need two-pixel width.
-- Tune, center, and zoom lacked visible raster behavior; zoom below 1 appeared to freeze.
-- Initial focus lands in frequency entry and blocks global keymaps.
+- Use Kitty as the initial supported terminal for the primary integrated interface.
+- Retain PySide6 only as an optional prototype and preserve the standalone terminal/TUI fallbacks.
+- Prefer one terminal process and one shared paired session over duplicate coordinated windows.
 
 Done criteria:
 
-- Draw two-pixel tuned, passband-edge, and selection markers.
-- Make fixture zoom/recenter visibly remap the captured raster, with black fill outside captured coverage.
-- Show tuned marker after tune rather than hiding it under coincident selection.
-- Keep bounded zoom responsive at zero and preserve timed presentation.
-- Start with display focus; `f` focuses entry and accepted direct entry returns focus to display.
-- Add remap/control/focus policy tests and request an attended retry.
+- Define a curses-owned layout with a reserved Kitty waterfall rectangle above status, preset/frequency rulers, controls, and command/log regions.
+- Add a fixture-only integrated shell before any live receiver work.
+- Keep all terminal writes on the UI thread and coalesce raster updates.
+- Route input through the shared session manager and existing TUI key/action policies.
+- Handle resize, alternate-screen cleanup, image deletion, and terminal restoration deterministically.
+- Add fake-terminal/fixture harnesses before an attended Kitty test.
 - Do not connect to a receiver.
 
 ## Plan

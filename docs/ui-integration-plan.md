@@ -2,9 +2,9 @@
 
 ## Decision
 
-Retain `kiwi-tui` as a lightweight control, diagnostics, and fallback interface. Keep `kiwi-wf-terminal` as the current terminal raster viewer. Do not make curses the primary graphical architecture.
+Use an integrated Kitty terminal interface as the primary near-term UI: a reserved waterfall region above curses-owned rulers, presets, status, controls, command entry, and logs. Retain standalone `kiwi-tui` and `kiwi-wf-terminal` as lightweight diagnostics/fallbacks, and retain PySide6 only as an optional prototype.
 
-Move receiver lifecycle and command ownership below both interfaces, then add a native graphical frontend that consumes the same controller/session APIs. A curses-aware Kitty pane remains optional after shared session ownership is complete; it must not drive protocol or lifecycle design.
+Kitty is the initial attended target because it is installed and provides the canonical graphics-protocol implementation. Keep the graphics boundary compatible with Ghostty/WezTerm where practical. Receiver lifecycle and command ownership remain below every frontend; curses owns integrated input/layout while terminal image generation stays renderer-neutral.
 
 ## Target architecture
 
@@ -22,9 +22,10 @@ ClientController
                 +-- frame/state snapshots
 
 Frontends
+    +-- integrated Kitty UI: primary waterfall, rulers, presets, controls, status
     +-- kiwi-tui: controls, status, diagnostics, fallback
-    +-- kiwi-wf-terminal: Kitty raster frontend
-    +-- future native GUI: primary integrated audio/waterfall frontend
+    +-- kiwi-wf-terminal: standalone Kitty raster fallback
+    +-- kiwi-gui: optional native prototype
 ```
 
 ## Invariants
@@ -92,11 +93,11 @@ Add paired-session lifecycle and status to `kiwi-tui` without embedding graphics
 
 ## Phase 4 — Graphical frontend decision and prototype
 
-Status: **PySide6 selected provisionally; fixture-only prototype implemented.**
+Status: **PySide6 fixture prototype implemented and evaluated; deprioritized after attended use.**
 
 `WaterfallSnapshotPublisher` retains bounded immutable numeric rows with per-row frequency coordinates and monotonic arrival times. Consumers request the latest generation, so a slow GUI skips superseded display states without creating a queue. Headless comparison found both PySide6 and pygame-ce comfortably exceed the 20 FPS direct-RGB target. PySide6 Essentials is larger but was selected for its mature desktop controls/layout/input support. `kiwi-gui` now displays static or timer-driven fixture history through direct `QImage`/`QPixmap` presentation. Its incremental rasterizer colors only newly presented rows, consumes the latest snapshot generation, and reports source/presentation generations. Fixture-only tuned/passband/selection overlays and keyboard/widget controls dispatch through `RadioSessionManager`; generated commands are intentionally not sent. Live session integration remains pending. Benchmark details are in [Native GUI toolkit benchmark plan](native-gui-benchmark.md).
 
-Prefer a native raster prototype over coupling the main product to curses plus terminal graphics.
+The prototype validated snapshot/raster/input boundaries but did not provide a convincing primary workflow. Those reusable boundaries now feed the integrated terminal direction.
 
 Prototype requirements:
 
@@ -106,11 +107,13 @@ Prototype requirements:
 - support resize, mouse selection, direct frequency entry, zoom, overlays, and audio controls,
 - preserve fixture/fake-session operation without network access.
 
-Choose a toolkit only after a small benchmark/prototype compares dependency size, image update cost, input handling, packaging, and Linux desktop behavior.
+Toolkit comparison is complete; no further native integration is planned before the Kitty terminal slice is evaluated.
 
-## Optional phase — Curses-aware Kitty pane
+## Phase 5 — Integrated curses-aware Kitty pane
 
-Only if terminal integration remains valuable after the native direction is evaluated:
+Status: **Selected as the primary next UI slice; fixture shell pending.**
+
+Requirements:
 
 - curses owns layout and keyboard input,
 - an integrated backend places Kitty graphics inside a curses-reserved rectangle,

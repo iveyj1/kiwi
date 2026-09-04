@@ -587,6 +587,20 @@ Targeted GUI/raster harness: 26 tests passed. Added coverage for marker width, v
 
 Repeat attended animation and verify two-pixel markers, visible local remapping, tune marker change, zero-zoom responsiveness, focus/keymaps, and timer continuity.
 
+## 2026-09-03 — Primary UI pivot to integrated Kitty terminal
+
+### Finding
+
+Attended PySide6 evaluation did not produce a convincing workflow. The desired layout is a waterfall and frequency/preset ruler above terminal controls, potentially as coordinated windows. Kitty is installed and selected as the initial terminal target.
+
+### Decision
+
+Build one integrated process first: curses owns input and layout, a reserved upper rectangle hosts Kitty graphics, and the shared manager/coordinator owns one paired SND/W/F session. This avoids duplicated controls, IPC, and duplicate receiver connections. Keep standalone TUI/W/F commands as fallbacks and PySide6 as an optional prototype. DWM can manage the resulting terminal normally; a later two-window mode would require explicit IPC/session ownership.
+
+### Follow-up
+
+Create a fixture-only integrated layout and fake-terminal harness covering placement, rulers/presets, redraw coalescing, resize, deletion, and restoration before attended Kitty testing.
+
 ## YYYY-MM-DD
 
 ### Finding
