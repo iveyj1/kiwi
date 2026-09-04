@@ -588,14 +588,14 @@ kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
   --rows 400 --repeat 80 --dry-run
 ```
 
-Open the attended fixture window:
+Open an animated attended fixture window:
 
 ```bash
 kiwi-gui --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
-  --rows 400 --repeat 80
+  --rows 400 --repeat 200 --animate --fps 20
 ```
 
-`--repeat` repeats the short captured fixture to fill diagnostic history. This first window is intentionally static: no live receiver, audio, zoom, or mouse tuning are connected yet. Exit with `q`, Esc, Ctrl+Q, or the window manager's close control.
+`--repeat` repeats the short captured fixture to provide a longer diagnostic timeline. `--animate --fps <rate>` publishes one fixture row per timer tick through the same bounded snapshot boundary intended for live frames. The status shows source and presented generations, bin/history dimensions, requested cadence, and completion. Rendering remains direct RGB with incremental row color conversion; no PNG/base64 path is used. This prototype still has no live receiver, audio, zoom, or mouse tuning. Exit with `q`, Esc, Ctrl+Q, or the window manager's close control.
 
 ## Recording / fixture capture
 

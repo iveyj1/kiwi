@@ -523,6 +523,20 @@ Targeted GUI model tests: 3 passed. Full harness: 326 tests passed in 3.78 secon
 
 User-attended retry confirmed the added GUI exit controls work. Proceed to timed snapshot presentation and basic native controls while remaining fixture-only before live pairing.
 
+## 2026-09-03 — Timed native fixture playback
+
+### Decision
+
+Added `FixtureWaterfallTimeline` to publish contextualized fixture rows incrementally at configurable cadence. Added `SnapshotRasterizer`, which tracks presented generation and converts only new numeric rows to RGB; if a consumer falls behind beyond retained history it rebuilds from the latest bounded snapshot. `kiwi-gui --animate --fps <rate>` drives publication with a Qt timer, consumes the latest snapshot, and reports source/presented generations, requested FPS, and ended state. Static fixture mode remains available.
+
+### Test result
+
+Six GUI harness tests cover mapped static output, finite repeated timeline progression, incremental/padded rasterization, animated dry-run summary, close-key policy, and Qt-free dry-run behavior. Animated dry-run at 20 FPS configuration produced 10/10 source/presented generations for the two-repeat local zoom-7 fixture. Full harness: 329 tests passed in 3.84 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Run the attended animated fixture command, then add shared-state overlays and local controls before live pairing.
+
 ## YYYY-MM-DD
 
 ### Finding

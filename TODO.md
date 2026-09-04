@@ -1,24 +1,25 @@
 # TODO
 
-## Current slice — Timed native fixture playback
+## Current slice — Native fixture controls
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Validated baseline:
+Completed:
 
-- Fixture image, orientation, scaling, resize behavior, and PySide6 window are acceptable.
-- `q`/Esc/Ctrl+Q/window-manager close now exit successfully in attended use.
+- Added static and timed fixture playback through `WaterfallSnapshotPublisher`.
+- Added incremental native rasterization that colors only newly presented rows.
+- Added `--animate --fps`, source/presented generation status, bounded history, and clean timer shutdown.
+- Preserved direct RGB/QImage presentation without PNG/base64.
 
-Next goal: animate fixture rows through the native snapshot boundary at a controlled rate.
+Next goal: add basic fixture-only native frequency/cursor controls before live integration.
 
 Done criteria:
 
-- Publish fixture rows incrementally at configurable FPS without network access.
-- Consume only the latest snapshot generation on each GUI timer tick.
-- Render direct RGB without PNG/base64.
-- Show source/presentation generation and basic cadence status.
-- Preserve bounded history and clean timer/window shutdown.
-- Add pure timeline/controller tests plus a dry-run demonstration.
+- Draw tuned, passband, and selected-frequency overlays using shared state.
+- Support keyboard cursor steps, direct frequency entry, recenter/zoom state, and visible control status without sending network commands.
+- Keep control actions routed through `RadioSessionManager`.
+- Add pure model/action tests and an attended animated fixture demo.
+- Do not connect to a receiver.
 
 ## Plan
 
