@@ -35,10 +35,13 @@ class WaterfallOverlay:
     high_cut_hz: int | None = None
     show_tuned_marker: bool = True
     cursor_khz: float | None = None
+    marker_width: int = 1
 
     def __post_init__(self) -> None:
         if self.end_khz <= self.start_khz:
             raise ValueError("overlay end_khz must be greater than start_khz")
+        if self.marker_width <= 0:
+            raise ValueError("overlay marker_width must be positive")
         if (
             self.low_cut_hz is not None
             and self.high_cut_hz is not None
@@ -242,8 +245,9 @@ def apply_frequency_overlay(image: RasterImage, overlay: WaterfallOverlay) -> Ra
     rgb = bytearray(image.rgb)
     for row in range(image.height):
         for column, color in markers:
-            offset = (row * image.width + column) * 3
-            rgb[offset:offset + 3] = bytes(color)
+            for marker_column in range(column, min(image.width, column + overlay.marker_width)):
+                offset = (row * image.width + marker_column) * 3
+                rgb[offset:offset + 3] = bytes(color)
     return RasterImage(width=image.width, height=image.height, rgb=bytes(rgb))
 
 

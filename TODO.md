@@ -1,22 +1,23 @@
 # TODO
 
-## Current slice — Validate native fixture controls
+## Current slice — Correct native fixture controls
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Implemented:
+Attended findings:
 
-- Tuned, passband-edge, and selected-frequency overlays over incremental direct RGB.
-- Main/small keyboard cursor steps, tune-selected, direct frequency entry, local recenter, and local zoom.
-- All control changes dispatch through `RadioSessionManager`; generated protocol commands are not sent.
-- Default fixture-mapped center/zoom initialization and CLI radio-state overrides.
+- Marker lines need two-pixel width.
+- Tune, center, and zoom lacked visible raster behavior; zoom below 1 appeared to freeze.
+- Initial focus lands in frequency entry and blocks global keymaps.
 
 Done criteria:
 
-- Full harness, compile, and diff checks pass.
-- Attended animation confirms overlay visibility and keyboard/widget behavior.
-- Confirm controls do not interfere with exit or timed presentation.
-- Record any scaling/input corrections before starting paired live integration.
+- Draw two-pixel tuned, passband-edge, and selection markers.
+- Make fixture zoom/recenter visibly remap the captured raster, with black fill outside captured coverage.
+- Show tuned marker after tune rather than hiding it under coincident selection.
+- Keep bounded zoom responsive at zero and preserve timed presentation.
+- Start with display focus; `f` focuses entry and accepted direct entry returns focus to display.
+- Add remap/control/focus policy tests and request an attended retry.
 - Do not connect to a receiver.
 
 ## Plan

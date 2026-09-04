@@ -52,6 +52,15 @@ def logical_display_height(
     return height
 
 
+def gui_focus_target(event: str) -> str:
+    """Return the intended focus owner for a GUI lifecycle/input event."""
+    if event == "frequency_requested":
+        return "frequency"
+    if event in ("startup", "frequency_accepted"):
+        return "display"
+    raise ValueError(f"unknown GUI focus event: {event}")
+
+
 def gui_control_action(key: str, *, shift: bool = False) -> tuple[str, int, bool] | None:
     """Map toolkit-neutral keys to local fixture control actions."""
     normalized = key.lower()
@@ -142,15 +151,54 @@ class SnapshotRasterizer:
         self._max_rows: int | None = None
         self._rgb_rows: deque[bytes] = deque()
         self._padding_rows: dict[int, bytes] = {}
+        self._view: tuple[float, float, float, float] | None = None
 
-    def update(self, snapshot: WaterfallSnapshot) -> RasterImage:
-        if snapshot.generation > self.presented_generation:
+    @staticmethod
+    def _remap_row(
+        row: bytes,
+        width: int,
+        *,
+        source_start_khz: float,
+        source_end_khz: float,
+        target_start_khz: float,
+        target_end_khz: float,
+    ) -> bytes:
+        if source_start_khz == target_start_khz and source_end_khz == target_end_khz:
+            return row
+        output = bytearray(width * 3)
+        source_span = source_end_khz - source_start_khz
+        target_span = target_end_khz - target_start_khz
+        for column in range(width):
+            frequency = target_start_khz + target_span * column / max(1, width - 1)
+            source_column = round((frequency - source_start_khz) / source_span * (width - 1))
+            if 0 <= source_column < width:
+                source_offset = source_column * 3
+                target_offset = column * 3
+                output[target_offset:target_offset + 3] = row[source_offset:source_offset + 3]
+        return bytes(output)
+
+    def update(
+        self,
+        snapshot: WaterfallSnapshot,
+        *,
+        target_start_khz: float | None = None,
+        target_end_khz: float | None = None,
+    ) -> RasterImage:
+        source_start = snapshot.current_start_khz
+        source_end = None if source_start is None or snapshot.current_span_khz is None else source_start + snapshot.current_span_khz
+        if target_start_khz is None or target_end_khz is None or source_start is None or source_end is None:
+            view = None
+        else:
+            view = (source_start, source_end, target_start_khz, target_end_khz)
+        view_changed = view != self._view
+        if snapshot.generation > self.presented_generation or view_changed:
             delta = snapshot.generation - self.presented_generation
             rebuild = (
                 self._width != snapshot.width
                 or self._max_rows != snapshot.max_rows
                 or delta > len(snapshot.rows)
                 or not self._rgb_rows
+                or view_changed
             )
             if rebuild:
                 self._rgb_rows = deque(maxlen=snapshot.max_rows)
@@ -161,8 +209,19 @@ class SnapshotRasterizer:
             self._max_rows = snapshot.max_rows
             for row in new_rows:
                 rendered = render_dbm_rows((row.dbm,), min_dbm=self.min_dbm, max_dbm=self.max_dbm)
-                self._rgb_rows.append(rendered.rgb)
+                rgb_row = rendered.rgb
+                if view is not None:
+                    rgb_row = self._remap_row(
+                        rgb_row,
+                        snapshot.width,
+                        source_start_khz=view[0],
+                        source_end_khz=view[1],
+                        target_start_khz=view[2],
+                        target_end_khz=view[3],
+                    )
+                self._rgb_rows.append(rgb_row)
             self.presented_generation = snapshot.generation
+            self._view = view
 
         if self._width is None or self._max_rows is None or not self._rgb_rows:
             raise ValueError("snapshot rasterizer has no rows")
@@ -246,21 +305,43 @@ class WaterfallGuiModel:
             self._session_mapped = True
         return snapshot
 
+    def display_frequency_range(self) -> tuple[float, float]:
+        snapshot = self._mapped_snapshot()
+        if snapshot.current_start_khz is None or snapshot.current_span_khz is None:
+            raise ValueError("waterfall fixture has no frequency mapping")
+        captured_zoom = 0
+        if snapshot.rows and snapshot.rows[-1].flags_x_zoom_server is not None:
+            captured_zoom = snapshot.rows[-1].flags_x_zoom_server & 0xFFFF
+        state = self.session.state
+        span_khz = snapshot.current_span_khz * (2.0 ** (captured_zoom - state.waterfall_zoom))
+        center_khz = state.waterfall_center_khz
+        return center_khz - span_khz / 2.0, center_khz + span_khz / 2.0
+
     def image(self) -> RasterImage:
         snapshot = self._mapped_snapshot()
-        image = self.rasterizer.update(snapshot)
-        if snapshot.current_start_khz is None or snapshot.current_span_khz is None:
-            return image
+        try:
+            start_khz, end_khz = self.display_frequency_range()
+        except ValueError:
+            return self.rasterizer.update(snapshot)
+        image = self.rasterizer.update(
+            snapshot,
+            target_start_khz=start_khz,
+            target_end_khz=end_khz,
+        )
         state = self.session.state
+        cursor_khz = state.selected_khz
+        if abs(cursor_khz - state.frequency_khz) < 0.0000005:
+            cursor_khz = None
         return apply_frequency_overlay(
             image,
             WaterfallOverlay(
-                start_khz=snapshot.current_start_khz,
-                end_khz=snapshot.current_start_khz + snapshot.current_span_khz,
+                start_khz=start_khz,
+                end_khz=end_khz,
                 tuned_khz=state.frequency_khz,
                 low_cut_hz=state.low_cut_hz,
                 high_cut_hz=state.high_cut_hz,
-                cursor_khz=state.selected_khz,
+                cursor_khz=cursor_khz,
+                marker_width=2,
             ),
         )
 
@@ -269,10 +350,8 @@ class WaterfallGuiModel:
         step_hz = self.small_step_hz if small else self.main_step_hz
         frequency = self.session.state.selected_khz + delta * step_hz / 1000.0
         if snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
-            frequency = min(
-                max(frequency, snapshot.current_start_khz),
-                snapshot.current_start_khz + snapshot.current_span_khz,
-            )
+            start_khz, end_khz = self.display_frequency_range()
+            frequency = min(max(frequency, start_khz), end_khz)
         return self.session.dispatch(SelectFrequency(frequency))
 
     def tune_selected(self):
@@ -292,11 +371,11 @@ class WaterfallGuiModel:
         return self.session.dispatch(ZoomWaterfall(delta))
 
     def frequency_text(self) -> str:
-        snapshot = self.publisher.latest()
-        if snapshot is None or snapshot.current_start_khz is None or snapshot.current_span_khz is None:
+        try:
+            start_khz, end_khz = self.display_frequency_range()
+        except ValueError:
             return "Frequency mapping unavailable"
-        end_khz = snapshot.current_start_khz + snapshot.current_span_khz
-        return f"{snapshot.current_start_khz:.4f} .. {end_khz:.4f} kHz"
+        return f"{start_khz:.4f} .. {end_khz:.4f} kHz"
 
     def status_text(self, *, requested_fps: float | None = None, ended: bool = False) -> str:
         snapshot = self.publisher.latest()
@@ -385,6 +464,7 @@ def show_pyside_window(
     display = QLabel()
     display.setMinimumWidth(640)
     display.setScaledContents(True)
+    display.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     display.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     screen = app.primaryScreen()
     device_pixel_ratio = screen.devicePixelRatio() if screen is not None else 1.0
@@ -432,6 +512,7 @@ def show_pyside_window(
             status.setText(f"Frequency error: {exc}")
             return
         update_display()
+        display.setFocus()
 
     def run_action(action) -> None:
         action()
@@ -494,6 +575,7 @@ def show_pyside_window(
 
     app.lastWindowClosed.connect(app.quit)
     window.show()
+    display.setFocus()
     return app.exec()
 
 

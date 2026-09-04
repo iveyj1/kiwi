@@ -9,6 +9,7 @@ from kiwi_client.gui_app import (
     WaterfallGuiModel,
     gui_close_key,
     gui_control_action,
+    gui_focus_target,
     logical_display_height,
     main,
 )
@@ -88,6 +89,48 @@ def test_gui_model_draws_tuned_passband_and_cursor_overlays():
     assert pixel(855.0) == TUNED_MARKER_RGB
     assert pixel(850.0) == PASSBAND_MARKER_RGB
     assert pixel(860.0) == CURSOR_MARKER_RGB  # cursor wins at high passband edge
+
+
+def test_gui_fixture_zoom_and_recenter_change_visible_frequency_range():
+    model = WaterfallGuiModel(history_rows=5)
+    model.load_fixture(FIXTURE)
+    initial_start, initial_end = model.display_frequency_range()
+
+    model.zoom(-1)
+    wider_start, wider_end = model.display_frequency_range()
+    assert wider_end - wider_start == pytest.approx(2 * (initial_end - initial_start))
+
+    model.set_direct_frequency(900.0)
+    centered_start, centered_end = model.display_frequency_range()
+    assert (centered_start + centered_end) / 2 == pytest.approx(900.0)
+
+    for _ in range(20):
+        model.zoom(-1)
+    assert model.session.state.waterfall_zoom == 0
+    image = model.image()
+    assert image.width == 1024
+    bottom_left = (image.height - 1) * image.width * 3
+    assert tuple(image.rgb[bottom_left:bottom_left + 3]) == (0, 0, 0)
+
+
+def test_tune_selected_reveals_tuned_marker_when_selection_coincides():
+    model = WaterfallGuiModel(history_rows=5)
+    model.load_fixture(FIXTURE)
+    model.move_selection(1)
+    model.tune_selected()
+    image = model.image()
+    start, end = model.display_frequency_range()
+    column = round((model.session.state.frequency_khz - start) / (end - start) * (image.width - 1))
+    offset = ((image.height - 1) * image.width + column) * 3
+
+    assert tuple(image.rgb[offset:offset + 3]) == TUNED_MARKER_RGB
+    assert tuple(image.rgb[offset + 3:offset + 6]) == TUNED_MARKER_RGB
+
+
+def test_gui_focus_policy_starts_and_returns_to_display():
+    assert gui_focus_target("startup") == "display"
+    assert gui_focus_target("frequency_requested") == "frequency"
+    assert gui_focus_target("frequency_accepted") == "display"
 
 
 def test_gui_control_key_policy_maps_cursor_tune_recenter_and_zoom():

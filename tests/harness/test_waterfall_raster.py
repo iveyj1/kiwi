@@ -130,6 +130,18 @@ def test_render_rows_and_dependency_free_png_encoding(monkeypatch):
         encode_png(image, compression_level=10)
 
 
+def test_frequency_overlay_supports_two_pixel_markers():
+    image = RasterImage(width=11, height=2, rgb=bytes((0, 0, 0)) * 22)
+    rendered = apply_frequency_overlay(
+        image,
+        WaterfallOverlay(start_khz=0, end_khz=10, tuned_khz=5, marker_width=2),
+    )
+
+    for column in (5, 6):
+        assert tuple(rendered.rgb[column * 3:(column + 1) * 3]) == TUNED_MARKER_RGB
+    assert tuple(rendered.rgb[12:15]) == (0, 0, 0)
+
+
 def test_frequency_overlay_draws_tuned_and_passband_columns():
     image = RasterImage(width=5, height=2, rgb=b"\x00" * 5 * 2 * 3)
     overlay = WaterfallOverlay(

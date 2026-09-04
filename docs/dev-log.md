@@ -569,6 +569,24 @@ Ten GUI harness tests cover session action/command results, overlay columns and 
 
 Run the attended animated fixture demo and verify overlays, main/small cursor movement, tuning, direct entry, local center/zoom status, exit, and uninterrupted animation.
 
+## 2026-09-03 — Native control visibility and focus corrections
+
+### Finding
+
+Attended control validation found one-pixel markers too thin, tune/center/zoom changes visually unclear, zoom below one apparently frozen, and initial focus trapped in direct-frequency entry so global keys did not work.
+
+### Decision
+
+Markers are now two pixels. Fixture rendering derives a local viewport from shared center/zoom state and incrementally remaps captured rows, using black outside captured frequency coverage. Coincident selection is omitted after tuning so the white tuned marker becomes visible. Zoom remains bounded and responsive at zero. Startup focus now explicitly targets the waterfall; `f` opens frequency entry and accepted input returns focus to the waterfall.
+
+### Test result
+
+Targeted GUI/raster harness: 26 tests passed. Added coverage for marker width, visible zoom/recenter ranges, bounded zero zoom, tuned-marker precedence, and focus policy. Full harness: 337 tests passed in 3.91 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat attended animation and verify two-pixel markers, visible local remapping, tune marker change, zero-zoom responsiveness, focus/keymaps, and timer continuity.
+
 ## YYYY-MM-DD
 
 ### Finding
