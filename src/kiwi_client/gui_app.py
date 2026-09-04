@@ -252,6 +252,7 @@ class WaterfallGuiModel:
     main_step_hz: float = 1000
     small_step_hz: float = 100
     frequency_decimals: int = 3
+    show_frequency_lines: bool = True
 
     def __post_init__(self) -> None:
         if self.render_max_db <= self.render_min_db:
@@ -328,6 +329,8 @@ class WaterfallGuiModel:
             target_start_khz=start_khz,
             target_end_khz=end_khz,
         )
+        if not self.show_frequency_lines:
+            return image
         state = self.session.state
         cursor_khz = state.selected_khz
         if abs(cursor_khz - state.frequency_khz) < 0.0000005:

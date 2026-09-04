@@ -26,6 +26,7 @@ class IntegratedTerminalLayout:
     lines: int
     waterfall_top: int
     waterfall_rows: int
+    passband_row: int
     frequency_row: int
     preset_row: int
     divider_row: int
@@ -37,7 +38,8 @@ class IntegratedTerminalLayout:
         if columns < 40 or lines < 12:
             raise ValueError("integrated terminal requires at least 40 columns and 12 lines")
         waterfall_rows = lines // 2
-        frequency_row = waterfall_rows
+        passband_row = waterfall_rows
+        frequency_row = passband_row + 1
         preset_row = frequency_row + 1
         divider_row = preset_row + 1
         tui_top = divider_row + 1
@@ -46,12 +48,53 @@ class IntegratedTerminalLayout:
             lines=lines,
             waterfall_top=0,
             waterfall_rows=waterfall_rows,
+            passband_row=passband_row,
             frequency_row=frequency_row,
             preset_row=preset_row,
             divider_row=divider_row,
             tui_top=tui_top,
             tui_rows=lines - tui_top,
         )
+
+
+def format_passband_scale(
+    start_khz: float,
+    end_khz: float,
+    *,
+    tuned_khz: float,
+    selected_khz: float,
+    low_cut_hz: int,
+    high_cut_hz: int,
+    columns: int,
+) -> str:
+    """Render a Kiwi-style passband bracket and selection pointer outside the raster."""
+    if columns <= 0 or end_khz <= start_khz:
+        raise ValueError("passband scale requires positive columns and frequency span")
+    scale = [" "] * columns
+
+    def position(frequency_khz: float) -> int | None:
+        if not start_khz <= frequency_khz <= end_khz:
+            return None
+        return round((frequency_khz - start_khz) / (end_khz - start_khz) * (columns - 1))
+
+    low = position(tuned_khz + low_cut_hz / 1000.0)
+    center = position(tuned_khz)
+    high = position(tuned_khz + high_cut_hz / 1000.0)
+    if low is not None and high is not None:
+        low, high = sorted((low, high))
+        if high > low:
+            for column in range(low + 1, high):
+                scale[column] = "─"
+            scale[low] = "└"
+            scale[high] = "┘"
+            if center is not None and low < center < high:
+                scale[center] = "┴"
+    elif center is not None:
+        scale[center] = "┴"
+    selected = position(selected_khz)
+    if selected is not None and (center is None or selected != center):
+        scale[selected] = "▼"
+    return "".join(scale)
 
 
 def format_preset_ruler(
@@ -149,9 +192,9 @@ class KittyPanePresenter:
         self._finished = True
 
 
-def _safe_line(screen, row: int, text: str, columns: int) -> None:
+def _safe_line(screen, row: int, text: str, columns: int, attributes: int = 0) -> None:
     try:
-        screen.addnstr(row, 0, text.ljust(columns), max(0, columns - 1))
+        screen.addnstr(row, 0, text.ljust(columns), max(0, columns - 1), attributes)
     except curses.error:
         pass
 
@@ -176,6 +219,7 @@ def run_fixture_shell(
     presenter: KittyPanePresenter,
     source_fps: float,
     refresh_hz: float,
+    demo_seconds: float | None = None,
 ) -> None:
     """Run fixture publication, curses text, and Kitty presentation in one thread."""
     screen.nodelay(True)
@@ -184,8 +228,18 @@ def run_fixture_shell(
         curses.curs_set(0)
     except curses.error:
         pass
+    passband_attributes = 0
+    preset_attributes = 0
+    if curses.has_colors():
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_GREEN, -1)
+        curses.init_pair(2, curses.COLOR_CYAN, -1)
+        passband_attributes = curses.color_pair(1) | curses.A_BOLD
+        preset_attributes = curses.color_pair(2)
     timeline.advance(model.publisher)
-    next_source = time.monotonic()
+    started = time.monotonic()
+    next_source = started
     next_refresh = 0.0
     dirty = True
     entry: str | None = None
@@ -195,6 +249,8 @@ def run_fixture_shell(
     try:
         while True:
             now = time.monotonic()
+            if demo_seconds is not None and now - started >= demo_seconds:
+                break
             if now >= next_source and not timeline.done:
                 timeline.advance(model.publisher)
                 next_source = now + 1.0 / source_fps
@@ -296,6 +352,22 @@ def run_fixture_shell(
                 image = model.image()
                 start_khz, end_khz = model.display_frequency_range()
                 screen.erase()
+                state = model.session.state
+                _safe_line(
+                    screen,
+                    layout.passband_row,
+                    format_passband_scale(
+                        start_khz,
+                        end_khz,
+                        tuned_khz=state.frequency_khz,
+                        selected_khz=state.selected_khz,
+                        low_cut_hz=state.low_cut_hz,
+                        high_cut_hz=state.high_cut_hz,
+                        columns=columns,
+                    ),
+                    columns,
+                    passband_attributes,
+                )
                 _safe_line(
                     screen,
                     layout.frequency_row,
@@ -307,9 +379,9 @@ def run_fixture_shell(
                     layout.preset_row,
                     format_preset_ruler(presets, start_khz, end_khz, columns=columns),
                     columns,
+                    preset_attributes,
                 )
-                _safe_line(screen, layout.divider_row, "─" * columns, columns)
-                state = model.session.state
+                _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
                     f"W/F source {model.publisher.latest().generation} presented {model.rasterizer.presented_generation} | {message}",
@@ -339,6 +411,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--demo-seconds", type=float, help="exit cleanly after a fixture demonstration interval")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -348,8 +421,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.fps <= 0 or args.refresh_hz <= 0:
             raise ValueError("FPS and refresh rate must be positive")
+        if args.demo_seconds is not None and args.demo_seconds <= 0:
+            raise ValueError("demo seconds must be positive")
         model = WaterfallGuiModel(
             history_rows=args.rows,
+            show_frequency_lines=False,
             render_min_db=args.render_min_db,
             render_max_db=args.render_max_db,
         )
@@ -376,6 +452,7 @@ def main(argv: list[str] | None = None) -> int:
                 presenter=presenter,
                 source_fps=args.fps,
                 refresh_hz=args.refresh_hz,
+                demo_seconds=args.demo_seconds,
             )
         )
         return 0

@@ -615,6 +615,24 @@ Six focused tests cover layout bounds, small-terminal rejection, preset ruler fi
 
 Run the fixture shell inside Kitty and validate image/text placement, ruler alignment, key controls, resize, and terminal restoration before paired live integration.
 
+## 2026-09-04 — Kiwi-style console scale and automated Kitty capture
+
+### Finding
+
+The integrated Kitty shell was accepted. Full-height line cursors were difficult to distinguish over waterfall energy. The supplied KiwiSDR reference uses an external bright passband bracket/center indicator above its waterfall and dedicates the lower area to controls.
+
+### Decision
+
+The console no longer overlays tuned/passband/selection lines on raster data. It renders a green external passband bracket with center notch and a separate selection pointer, followed by frequency and preset rulers. The bottom terminal half remains available for a controller/TUI modeled after the existing curses interface. Added a clean timed demo exit so automated desktop capture exercises normal image deletion and terminal restoration.
+
+### Validation
+
+Launched a real Kitty window on local X11/DWM with fixture-only input and captured `docs/screenshots/kiwi-console-fixture.png` after the 400-row history filled. Placement, ruler alignment, passband bracket, preset marker, and lower UI reservation are visible in the captured artifact. Kitty emitted a non-fatal local `libsystemd.so` warning; console execution and capture succeeded. Full harness: 344 tests passed in 4.09 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Add controller-backed live mode using the existing `radio-bg` paired session and bounded snapshots. Reuse existing TUI startup, command/keymap, status, presets, and persistence concepts where appropriate. Validate startup, commands, failure, and cleanup with fake operations before one short attended local-radio test.
+
 ## YYYY-MM-DD
 
 ### Finding

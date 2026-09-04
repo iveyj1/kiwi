@@ -7,6 +7,7 @@ import pytest
 from kiwi_client.integrated_terminal import (
     IntegratedTerminalLayout,
     KittyPanePresenter,
+    format_passband_scale,
     format_preset_ruler,
     main,
 )
@@ -21,16 +22,34 @@ def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
 
     assert layout.waterfall_top == 0
     assert layout.waterfall_rows == 20
-    assert layout.frequency_row == 20
-    assert layout.preset_row == 21
-    assert layout.tui_top == 23
-    assert layout.tui_rows == 17
+    assert layout.passband_row == 20
+    assert layout.frequency_row == 21
+    assert layout.preset_row == 22
+    assert layout.tui_top == 24
+    assert layout.tui_rows == 16
     assert layout.columns == 120
 
 
 def test_integrated_layout_rejects_terminal_too_small():
     with pytest.raises(ValueError, match="at least"):
         IntegratedTerminalLayout.compute(columns=30, lines=8)
+
+
+def test_passband_scale_uses_bracket_center_and_separate_selection_pointer():
+    scale = format_passband_scale(
+        737.0,
+        972.0,
+        tuned_khz=760.0,
+        selected_khz=800.0,
+        low_cut_hz=-5000,
+        high_cut_hz=5000,
+        columns=80,
+    )
+
+    assert len(scale) == 80
+    assert "└" in scale and "┴" in scale and "┘" in scale
+    assert "▼" in scale
+    assert scale.index("▼") > scale.index("┘")
 
 
 def test_preset_ruler_places_only_visible_non_overlapping_presets():

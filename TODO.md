@@ -1,23 +1,26 @@
 # TODO
 
-## Current slice — Validate integrated Kitty fixture shell
+## Current slice — Controller-backed live Kitty waterfall harness
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
-Implemented:
+Validated/implemented:
 
-- `kiwi-console` fixture-only curses shell with a reserved upper Kitty image.
-- Adaptive frequency ruler, visible-preset ruler, compact status/controls, and direct-entry prompt.
-- Main/fine selection, tune, center, zoom, direct-frequency, and preset actions through shared session state.
-- Absolute saved-cursor Kitty placement, generation coalescing, resize invalidation, and explicit image deletion.
-- Pure layout/ruler/presenter tests and Qt-free/network-free dry-run.
+- Integrated Kitty fixture shell looks good in attended use.
+- Removed superimposed image markers from the console and added a green Kiwi-style external passband bracket with a separate selection pointer.
+- Captured `docs/screenshots/kiwi-console-fixture.png` from an automated Kitty fixture run.
+
+Goal: feed the integrated console from the existing controller-owned paired session without duplicating TUI behavior or receiver connections.
 
 Done criteria:
 
-- Full harness, compile, and diff checks pass.
-- Attended Kitty run confirms image placement above text, ruler alignment, controls, resize, and clean exit/restoration.
-- Correct any curses/Kitty interaction before integrating paired live session.
-- Do not connect to a receiver.
+- Reuse TUI startup state, presets, command mode, dashboard/status concepts, and keymaps where they fit the waterfall layout.
+- Add an explicit `--allow-live` path using `ClientController` `radio-bg` and its bounded waterfall publisher.
+- Keep curses/Kitty rendering on the UI thread while paired network/audio workers stay off-thread.
+- Route tune/recenter/zoom/audio/preset operations through public controller APIs.
+- Stop and join paired work deterministically on every console exit path.
+- Cover live startup, latest-snapshot rendering, command routing, failure, and cleanup with fake operations before radio use.
+- Then perform one short attended test on a local receiver only and record a fixture/observations.
 
 ## Plan
 

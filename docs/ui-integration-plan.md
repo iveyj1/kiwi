@@ -117,9 +117,14 @@ Requirements:
 
 - curses owns layout and keyboard input,
 - an integrated backend places Kitty graphics inside a curses-reserved rectangle,
-- PNG work stays off-thread but terminal writes occur on the UI thread,
+- use a Kiwi-style passband bracket and selection pointer outside the raster instead of low-contrast full-height marker lines,
+- reuse the existing TUI startup state, controller, presets, keymap/command modes, dashboard/status data, and persistence where they fit,
+- network/audio workers publish bounded state while all curses/Kitty terminal writes remain on the UI thread,
+- live mode starts through controller-owned `radio-bg`, requires `--allow-live`, and stops/joins on all exit paths,
 - resize and alternate-screen cleanup are deterministic,
 - unsupported terminals retain a text/status fallback.
+
+The first fixture shell and an automated Kitty screenshot are complete. Next, add a fake-operations harness around controller-backed live startup and snapshot consumption; only after it passes should the console connect briefly to a local receiver.
 
 ## Later — SND consumer fan-out
 
