@@ -761,6 +761,20 @@ Pure tests cover independent manual adjustment, auto-mode cancellation, percenti
 
 Evaluate default percentile/padding values during attended use, then proceed with existing-TUI lower-panel reuse.
 
+## 2026-09-04 — Integrated default steps and TUI input reuse
+
+### Decision
+
+The integrated console now defaults selection to 1.0/0.1 kHz regardless of the first configured per-mode step pair; `--main-step-khz` and `--small-step-khz` override it without changing `config.toml`. In controller-backed live mode, the lower panel delegates command mode, editing/history, contextual hints, configured non-waterfall keys, preset/store/receiver prefixes, command parsing, errors, and persistence paths to existing TUI functions. Waterfall selection, Enter tune, center/zoom, direct entry, and display-level keys remain intentional console-specific intercepts.
+
+### Test result
+
+Dry-run coverage records 1.0/0.1 kHz defaults. Existing TUI key/command harness remains shared with the integrated path; focused integrated/TUI/level tests: 67 passed. Full harness: 362 tests passed in 4.00 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Refine compact dashboard/status reuse and add explicit runtime audio state/toggle behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

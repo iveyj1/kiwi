@@ -18,6 +18,8 @@ Completed and validated:
 
 Completed:
 
+- Set integrated-console selection defaults to 1.0/0.1 kHz with explicit CLI overrides, independent of local config step-pair ordering.
+- Reused existing live TUI key dispatch, command editing/history, contextual hints, preset/store/receiver prefixes, configured non-waterfall actions, and error handling in the lower panel.
 - Added runtime manual min/max dB adjustment and percentile-based automatic scaling with bounded cadence, smoothing, padding, and minimum range.
 - Replaced the prototype 5x7 scale font with anti-aliased Pillow/FreeType DejaVu Sans Mono; retained deterministic bitmap fallback and explicit backend/font options.
 - Composed W/F history, passband/selection strip, frequency ticks/labels, and preset stems/labels into one 1024-bin Kitty image.
@@ -27,8 +29,8 @@ Completed:
 
 Next goal:
 
-- Reuse existing dashboard/status rendering and configurable keymap dispatch in the lower panel.
-- Add command mode with existing parsing, history, hints, errors, preset/receiver persistence, and audio/volume controls.
+- Refine compact dashboard/status presentation using existing TUI model data.
+- Verify preset/receiver persistence and add explicit audio toggle/state controls; command/history/hints and configurable dispatch are now integrated for live mode.
 - Keep waterfall-specific selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
 - Add pure/fake-operation tests before another attended local session.
 

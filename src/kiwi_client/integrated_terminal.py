@@ -14,6 +14,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.state_store import load_presets_file
+from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
 from kiwi_client.waterfall_raster import RasterImage, encode_png
 from kiwi_client.waterfall_scale import compose_waterfall_scale
@@ -246,6 +247,8 @@ def run_fixture_shell(
     presets: Mapping[str, Mapping[str, Any]],
     presenter: KittyPanePresenter,
     levels: WaterfallLevelController,
+    tui_controller,
+    tui_config,
     source_fps: float,
     refresh_hz: float,
     scale_font_backend: str = "auto",
@@ -272,7 +275,27 @@ def run_fixture_shell(
     dirty = True
     entry: str | None = None
     pending_preset = False
+    tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
+    last_response = None
     message = "live paired session starting" if live_source is not None else "fixture-only; no receiver connection"
+
+    def dispatch_tui_key(key) -> None:
+        nonlocal last_response, message
+        if tui_input is None or tui_controller is None:
+            return
+        if isinstance(key, str):
+            if len(key) != 1:
+                return
+            ch = ord(key)
+        elif isinstance(key, int):
+            ch = key
+        else:
+            return
+        response, new_message = handle_tui_key(ch, tui_input, tui_controller, tui_config)
+        if response is not None:
+            last_response = response
+        if new_message is not None:
+            message = new_message
 
     try:
         while True:
@@ -318,6 +341,13 @@ def run_fixture_shell(
                 elif isinstance(key, str) and (key.isdigit() or (key == "." and "." not in entry)):
                     entry += key
                     dirty = True
+            elif tui_input is not None and (
+                tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
+            ) and key is not None:
+                dispatch_tui_key(key)
+                dirty = True
+                if tui_controller is not None and not tui_controller.running:
+                    break
             elif pending_preset and key is not None:
                 pending_preset = False
                 register = str(key)
@@ -330,11 +360,13 @@ def run_fixture_shell(
                     presenter.invalidate()
                 dirty = True
             elif key in ("q", "Q"):
+                if tui_input is not None:
+                    dispatch_tui_key("q")
                 break
             elif key == "f":
                 entry = ""
                 dirty = True
-            elif key == "p":
+            elif key == "p" and tui_input is None:
                 pending_preset = True
                 message = "preset register?"
                 dirty = True
@@ -393,6 +425,11 @@ def run_fixture_shell(
                 model.set_render_scale(levels.min_dbm, levels.max_dbm)
                 presenter.invalidate()
                 dirty = True
+            elif tui_input is not None and key is not None:
+                dispatch_tui_key(key)
+                dirty = True
+                if tui_controller is not None and not tui_controller.running:
+                    break
 
             if dirty and now >= next_refresh:
                 lines, columns = screen.getmaxyx()
@@ -433,12 +470,22 @@ def run_fixture_shell(
                         font_name=scale_font_name,
                     ).image
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
+                if entry is not None:
+                    prompt = f"frequency kHz: {entry}_"
+                elif pending_preset:
+                    prompt = "preset register: _"
+                elif tui_input is not None and tui_input.mode == InputMode.COMMAND:
+                    prompt = f":{tui_input.command}_"
+                else:
+                    prompt = ":"
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
                     f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {levels.status_text()} | {message}",
                     "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
-                    f"frequency kHz: {entry}_" if entry is not None else ("preset register: _" if pending_preset else ":"),
+                    prompt,
                 ]
+                if tui_input is not None and tui_config is not None:
+                    rows.extend(render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 for offset, text in enumerate(rows[:layout.tui_rows]):
                     _safe_line(screen, layout.tui_top + offset, text, columns)
                 screen.noutrefresh()
@@ -466,6 +513,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repeat", type=int, default=200)
     parser.add_argument("--fps", type=float, default=20.0)
     parser.add_argument("--refresh-hz", type=float, default=5.0)
+    parser.add_argument("--main-step-khz", type=float, default=1.0)
+    parser.add_argument("--small-step-khz", type=float, default=0.1)
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
     parser.add_argument("--auto-scale", action="store_true", help="percentile-based smoothed display levels")
@@ -482,6 +531,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.fps <= 0 or args.refresh_hz <= 0:
             raise ValueError("FPS and refresh rate must be positive")
+        if args.main_step_khz <= 0 or args.small_step_khz <= 0:
+            raise ValueError("frequency steps must be positive")
         if args.demo_seconds is not None and args.demo_seconds <= 0:
             raise ValueError("demo seconds must be positive")
         if args.fixture is not None and args.allow_live:
@@ -500,6 +551,8 @@ def main(argv: list[str] | None = None) -> int:
                 show_frequency_lines=False,
                 render_min_db=args.render_min_db,
                 render_max_db=args.render_max_db,
+                main_step_hz=args.main_step_khz * 1000.0,
+                small_step_hz=args.small_step_khz * 1000.0,
             )
             timeline = FixtureWaterfallTimeline.from_fixture(args.fixture, repeat=args.repeat)
             presets = load_presets_file(args.presets)["presets"]
@@ -512,6 +565,7 @@ def main(argv: list[str] | None = None) -> int:
                     "frequency": [start_khz, end_khz],
                     "presets_visible": format_preset_ruler(presets, start_khz, end_khz, columns=120).strip(),
                     "network": False,
+                    "steps_khz": [args.main_step_khz, args.small_step_khz],
                 }, indent=2, sort_keys=True))
                 return 0
             curses.wrapper(
@@ -523,6 +577,8 @@ def main(argv: list[str] | None = None) -> int:
                     presets=presets,
                     presenter=presenter,
                     levels=levels,
+                    tui_controller=None,
+                    tui_config=None,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,
@@ -564,8 +620,8 @@ def main(argv: list[str] | None = None) -> int:
             mode=state.mode,
             low_cut_hz=state.low_cut_hz,
             high_cut_hz=state.high_cut_hz,
-            main_step_hz=state.current_step_hz,
-            small_step_hz=state.current_small_step_hz,
+            main_step_hz=args.main_step_khz * 1000.0,
+            small_step_hz=args.small_step_khz * 1000.0,
             frequency_decimals=config.display.frequency_decimals,
         )
         source = ControllerConsoleSource(controller, model=model, audio=args.audio)
@@ -575,6 +631,7 @@ def main(argv: list[str] | None = None) -> int:
                 "receiver": state.receiver,
                 "audio": args.audio,
                 "network": False,
+                "steps_khz": [args.main_step_khz, args.small_step_khz],
                 "would_start": "radio-bg --allow-live" + ("" if args.audio else " --null-sink"),
             }, indent=2, sort_keys=True))
             return 0
@@ -589,6 +646,8 @@ def main(argv: list[str] | None = None) -> int:
                     presets=controller.presets,
                     presenter=presenter,
                     levels=levels,
+                    tui_controller=controller,
+                    tui_config=config,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,

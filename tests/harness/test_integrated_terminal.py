@@ -236,6 +236,7 @@ def test_integrated_live_dry_run_requires_flag_but_does_not_connect(capsys):
     result = json.loads(capsys.readouterr().out)
     assert result["network"] is False
     assert result["receiver"] == "10.0.0.40:8073"
+    assert result["steps_khz"] == [1.0, 0.1]
     assert result["would_start"] == "radio-bg --allow-live --null-sink"
 
 
@@ -252,6 +253,7 @@ def test_integrated_fixture_dry_run_has_no_network_or_terminal_dependency(capsys
     assert result["backend"] == "kitty+curses"
     assert result["fixture_frames"] == 10
     assert result["network"] is False
+    assert result["steps_khz"] == [1.0, 0.1]
     assert "a 760.000" in result["presets_visible"]
 
 
