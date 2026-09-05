@@ -18,7 +18,8 @@ Completed and validated:
 
 Completed:
 
-- Added live RSSI dB, conventional HF S-unit estimate, and bounded signal-strength bar from controller SND metrics.
+- Made RSSI numeric/S-unit fields fixed width, corrected units to dBm, and retained the bounded signal-strength bar.
+- Detect controller publisher replacement after receiver switch, clear old Kitty history/placement, and bind/display new receiver frames.
 - Synchronized `t`/`T` configured step-pair cycling into console selection and exposed current main/fine steps in status.
 - Clipped partially visible passbands at viewport boundaries instead of dropping the entire bracket.
 - Stopped routine curses refreshes from erasing the Kitty image region; full-screen clearing is now limited to startup/resize to prevent transient black frames.
@@ -46,7 +47,7 @@ See `docs/ui-integration-plan.md`.
 2. Controller-owned `RadioSessionManager` and typed actions.
 3. TUI lifecycle/status integration without embedded graphics first.
 4. Native graphical frontend benchmark/prototype.
-5. Optional curses-aware Kitty pane if still valuable.
+5. Integrated curses-aware Kitty console (active primary UI direction).
 6. One-stream SND consumer fan-out for playback/recording/detection.
 
 ## Deferred waterfall questions

@@ -134,11 +134,11 @@ def format_rssi_indicator(rssi_db: float | None, *, width: int = 18) -> str:
     if width <= 0:
         raise ValueError("RSSI indicator width must be positive")
     if rssi_db is None:
-        return f"RSSI unavailable [{'-' * width}]"
+        return f"RSSI ------ dBm ----- [{'-' * width}]"
     fraction = min(1.0, max(0.0, (rssi_db + 130.0) / 110.0))
     filled = round(fraction * width)
     bar = "#" * filled + "-" * (width - filled)
-    return f"RSSI {rssi_db:.1f} dB {rssi_s_unit(rssi_db)} [{bar}]"
+    return f"RSSI {rssi_db:6.1f} dBm {rssi_s_unit(rssi_db):<5} [{bar}]"
 
 
 def nearest_step_pair_index(
@@ -171,7 +171,7 @@ class ControllerConsoleSource:
             return
         command = "radio-bg --allow-live" + ("" if self.audio else " --null-sink")
         self.controller.execute(command)
-        self.model.publisher = self.controller.waterfall_snapshots
+        self.model.bind_publisher(self.controller.waterfall_snapshots, preserve_session_view=True)
         self.model.session = self.controller.paired_session
         self.model.action_dispatch = self.controller.dispatch_session_action
         self.model._session_mapped = True
@@ -181,6 +181,10 @@ class ControllerConsoleSource:
         sync_status = getattr(self.controller, "paired_session_status", None)
         if sync_status is not None:
             sync_status()
+        if self.model.publisher is not self.controller.waterfall_snapshots:
+            self.model.bind_publisher(self.controller.waterfall_snapshots, preserve_session_view=True)
+            self._last_generation = 0
+            return -1
         snapshot = self.model.publisher.latest()
         generation = 0 if snapshot is None else snapshot.generation
         changed = generation != self._last_generation
@@ -213,6 +217,7 @@ class KittyPanePresenter:
         self.force = force
         self.environ = os.environ if environ is None else environ
         self._last_key: tuple[int, int, int] | None = None
+        self._visible = False
         self._finished = False
 
     def draw(
@@ -240,18 +245,28 @@ class KittyPanePresenter:
         if flush is not None:
             flush()
         self._last_key = key
+        self._visible = True
         return True
 
     def invalidate(self) -> None:
         self._last_key = None
 
-    def finish(self) -> None:
-        if self._finished:
-            return
+    def clear(self) -> bool:
+        """Delete the current placement without finishing the reusable presenter."""
+        if not self._visible:
+            return False
         self.output.write(f"\x1b_Ga=d,d=i,i={self.image_id},q=2;\x1b\\".encode("ascii"))
         flush = getattr(self.output, "flush", None)
         if flush is not None:
             flush()
+        self._visible = False
+        self._last_key = None
+        return True
+
+    def finish(self) -> None:
+        if self._finished:
+            return
+        self.clear()
         self._finished = True
 
 
@@ -497,6 +512,7 @@ def run_fixture_shell(
                         message += f" | {state.error.stream}: {state.error.message}"
                 image = None
                 if snapshot is None:
+                    presenter.clear()
                     message = f"{message} | waiting for first W/F frame"
                 else:
                     if levels.observe(snapshot):

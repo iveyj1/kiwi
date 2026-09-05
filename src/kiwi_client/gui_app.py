@@ -276,6 +276,12 @@ class WaterfallGuiModel:
         )
         self._session_mapped = False
 
+    def bind_publisher(self, publisher: WaterfallSnapshotPublisher, *, preserve_session_view: bool = False) -> None:
+        """Bind a replacement source and discard RGB history from the previous session."""
+        self.publisher = publisher
+        self.rasterizer = SnapshotRasterizer(min_dbm=self.render_min_db, max_dbm=self.render_max_db)
+        self._session_mapped = preserve_session_view
+
     def set_render_scale(self, min_dbm: float, max_dbm: float) -> bool:
         """Change local display levels and invalidate cached RGB history."""
         if max_dbm <= min_dbm:

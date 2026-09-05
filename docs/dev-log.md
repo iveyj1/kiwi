@@ -807,6 +807,24 @@ Pure coverage verifies S1, S9, and S9+ labels plus weak/strong/unavailable bound
 
 Evaluate readability during the next attended live run and later add peak/decay behavior only if instantaneous RSSI is too noisy.
 
+## 2026-09-04 — Receiver-switch publisher rebinding and stable RSSI
+
+### Finding
+
+RSSI/S-unit text changed width as values varied and used dB rather than dBm. More importantly, receiver switching restarted paired audio successfully but permanently stopped console W/F display: `ClientController` correctly replaced its bounded publisher for the new paired operation, while `ControllerConsoleSource` retained the closed previous publisher.
+
+### Decision
+
+RSSI now uses fixed-width numeric and five-character S-unit fields with dBm units. The live source polls controller publisher identity as well as generation. On replacement it binds the new publisher, resets RGB history while preserving shared session view, reports a source transition, and clears the old Kitty placement while waiting for the new receiver's first frame. The presenter now supports reusable idempotent clear separately from final shutdown.
+
+### Test result
+
+Harness coverage replaces the publisher directly and also performs a complete fake paired receiver switch from `10.0.0.40` to `.41`, proving a new publisher, new frame, command routing, and final cleanup. Fixed-width RSSI tests cover weak/strong/unavailable formatting and dBm/S-unit output. Full harness: 366 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat a live receiver-register switch and verify audio plus W/F resume together with a fresh history.
+
 ## YYYY-MM-DD
 
 ### Finding

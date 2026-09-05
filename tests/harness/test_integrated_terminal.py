@@ -45,9 +45,10 @@ def test_rssi_indicator_formats_hf_s_units_and_bounded_bar():
 
     weak = format_rssi_indicator(-120.0, width=10)
     strong = format_rssi_indicator(-40.0, width=10)
-    assert weak == "RSSI -120.0 dB S1 [#---------]"
-    assert strong == "RSSI -40.0 dB S9+33 [########--]"
-    assert format_rssi_indicator(None, width=10) == "RSSI unavailable [----------]"
+    assert weak == "RSSI -120.0 dBm S1    [#---------]"
+    assert strong == "RSSI  -40.0 dBm S9+33 [########--]"
+    assert len(weak) == len(strong)
+    assert format_rssi_indicator(None, width=10) == "RSSI ------ dBm ----- [----------]"
 
 
 def test_console_default_step_selects_matching_configured_pair():
@@ -112,6 +113,7 @@ def test_kitty_pane_presenter_uses_absolute_saved_cursor_and_deletes_image():
     image = RasterImage(width=2, height=1, rgb=bytes((0, 0, 0, 255, 255, 255)))
 
     presenter.draw(image, layout)
+    presenter.clear()
     presenter.finish()
     payload = output.getvalue()
 
@@ -119,7 +121,7 @@ def test_kitty_pane_presenter_uses_absolute_saved_cursor_and_deletes_image():
     assert b"c=80" in payload
     assert f"r={layout.waterfall_rows}".encode() in payload
     assert b"\x1b8" in payload
-    assert b"a=d,d=i,i=41,q=2" in payload
+    assert payload.count(b"a=d,d=i,i=41,q=2") == 1
 
 
 def test_controller_console_source_binds_shared_state_starts_and_stops_pair():
@@ -193,6 +195,21 @@ def test_controller_console_source_with_fake_operations_publishes_and_routes_cle
     assert model.publisher.latest().generation == 1
     assert model.image().width == 2
 
+    previous_publisher = model.publisher
+    _response, switch_message = controller.switch_receiver(
+        "10.0.0.41:8073",
+        preserve_playback=True,
+        join_timeout=1,
+        startup_grace_seconds=0.01,
+    )
+    assert "restarted" in switch_message
+    assert controller.waterfall_snapshots is not previous_publisher
+    assert source.poll_generation() == -1
+    deadline = time.monotonic() + 1
+    while source.poll_generation() == 0 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert model.publisher.latest().generation == 1
+
     model.move_selection(1)
     model.tune_selected()
     source.stop()
@@ -222,6 +239,37 @@ def test_controller_console_source_exposes_failed_background_without_hanging_cle
     source.stop()
 
     assert "synthetic W/F failure" in controller.background.status().error
+
+
+def test_controller_console_source_rebinds_replacement_publisher_after_receiver_switch():
+    class Controller:
+        def __init__(self):
+            self.commands = []
+            self.waterfall_snapshots = WaterfallSnapshotPublisher(max_rows=4)
+            self.paired_session = RadioSessionManager()
+
+        def execute(self, command):
+            self.commands.append(command)
+            return {}
+
+        def dispatch_session_action(self, action):
+            return self.paired_session.dispatch(action)
+
+    controller = Controller()
+    model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(history_rows=4)
+    source = ControllerConsoleSource(controller, model=model)
+    source.start()
+    old_rasterizer = model.rasterizer
+
+    replacement = WaterfallSnapshotPublisher(max_rows=4)
+    controller.waterfall_snapshots = replacement
+    assert source.poll_generation() == -1
+
+    assert model.publisher is replacement
+    assert model.rasterizer is not old_rasterizer
+    replacement.append(WaterfallFrame(sequence=2, bins=(0, 0), dbm=(-90, -80), start_khz=100, span_khz=20))
+    assert source.poll_generation() == 1
+    source.stop()
 
 
 def test_controller_console_source_audio_mode_omits_null_sink():
