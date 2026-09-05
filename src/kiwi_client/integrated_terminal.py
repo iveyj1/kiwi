@@ -14,6 +14,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.state_store import load_presets_file
+from kiwi_client.waterfall_levels import WaterfallLevelController
 from kiwi_client.waterfall_raster import RasterImage, encode_png
 from kiwi_client.waterfall_scale import compose_waterfall_scale
 from kiwi_client.waterfall_terminal import (
@@ -244,6 +245,7 @@ def run_fixture_shell(
     live_source: ControllerConsoleSource | None,
     presets: Mapping[str, Mapping[str, Any]],
     presenter: KittyPanePresenter,
+    levels: WaterfallLevelController,
     source_fps: float,
     refresh_hz: float,
     scale_font_backend: str = "auto",
@@ -368,6 +370,29 @@ def run_fixture_shell(
                 model.zoom(-1)
                 presenter.invalidate()
                 dirty = True
+            elif key == "u":
+                levels.set_automatic(not levels.automatic)
+                dirty = True
+            elif key == "[":
+                levels.adjust_min(-5)
+                model.set_render_scale(levels.min_dbm, levels.max_dbm)
+                presenter.invalidate()
+                dirty = True
+            elif key == "]":
+                levels.adjust_min(5)
+                model.set_render_scale(levels.min_dbm, levels.max_dbm)
+                presenter.invalidate()
+                dirty = True
+            elif key == "{":
+                levels.adjust_max(-5)
+                model.set_render_scale(levels.min_dbm, levels.max_dbm)
+                presenter.invalidate()
+                dirty = True
+            elif key == "}":
+                levels.adjust_max(5)
+                model.set_render_scale(levels.min_dbm, levels.max_dbm)
+                presenter.invalidate()
+                dirty = True
 
             if dirty and now >= next_refresh:
                 lines, columns = screen.getmaxyx()
@@ -390,6 +415,9 @@ def run_fixture_shell(
                 if snapshot is None:
                     message = f"{message} | waiting for first W/F frame"
                 else:
+                    if levels.observe(snapshot):
+                        model.set_render_scale(levels.min_dbm, levels.max_dbm)
+                        presenter.invalidate()
                     image = model.image()
                     start_khz, end_khz = model.display_frequency_range()
                     image = compose_waterfall_scale(
@@ -407,8 +435,8 @@ def run_fixture_shell(
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
-                    f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {message}",
-                    "h/l select  H/L fine  Enter tune  c center  +/- zoom  f frequency  p preset  q quit",
+                    f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {levels.status_text()} | {message}",
+                    "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
                     f"frequency kHz: {entry}_" if entry is not None else ("preset register: _" if pending_preset else ":"),
                 ]
                 for offset, text in enumerate(rows[:layout.tui_rows]):
@@ -440,6 +468,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--refresh-hz", type=float, default=5.0)
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
+    parser.add_argument("--auto-scale", action="store_true", help="percentile-based smoothed display levels")
     parser.add_argument("--scale-font", choices=("auto", "pillow", "bitmap"), default="auto")
     parser.add_argument("--scale-font-name", default="DejaVuSansMono.ttf")
     parser.add_argument("--force", action="store_true")
@@ -460,6 +489,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.fixture is None and not args.allow_live:
             raise ValueError("provide --fixture or explicit --allow-live")
         presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
+        levels = WaterfallLevelController(
+            min_dbm=args.render_min_db,
+            max_dbm=args.render_max_db,
+            automatic=args.auto_scale,
+        )
         if args.fixture is not None:
             model = WaterfallGuiModel(
                 history_rows=args.rows,
@@ -488,6 +522,7 @@ def main(argv: list[str] | None = None) -> int:
                     live_source=None,
                     presets=presets,
                     presenter=presenter,
+                    levels=levels,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,
@@ -553,6 +588,7 @@ def main(argv: list[str] | None = None) -> int:
                     live_source=source,
                     presets=controller.presets,
                     presenter=presenter,
+                    levels=levels,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,

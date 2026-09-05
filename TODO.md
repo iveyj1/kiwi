@@ -1,6 +1,6 @@
 # TODO
 
-## Current slice — Existing TUI behavior and display scaling
+## Current slice — Existing TUI lower-panel behavior
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Added runtime manual min/max dB adjustment and percentile-based automatic scaling with bounded cadence, smoothing, padding, and minimum range.
 - Replaced the prototype 5x7 scale font with anti-aliased Pillow/FreeType DejaVu Sans Mono; retained deterministic bitmap fallback and explicit backend/font options.
 - Composed W/F history, passband/selection strip, frequency ticks/labels, and preset stems/labels into one 1024-bin Kitty image.
 - Added deterministic dependency-free 5x7 bitmap text, round major ticks, exact shared frequency columns, and pixel-coordinate collision rejection.
@@ -28,7 +29,6 @@ Next goal:
 
 - Reuse existing dashboard/status rendering and configurable keymap dispatch in the lower panel.
 - Add command mode with existing parsing, history, hints, errors, preset/receiver persistence, and audio/volume controls.
-- Add visible manual colormap limits, runtime adjustment, and percentile-based automatic scaling with bounded smoothing.
 - Keep waterfall-specific selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
 - Add pure/fake-operation tests before another attended local session.
 

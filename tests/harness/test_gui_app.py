@@ -190,6 +190,19 @@ def test_gui_close_key_policy_supports_q_escape_and_control_q():
     assert gui_close_key("enter") is False
 
 
+def test_gui_model_render_scale_change_invalidates_cached_rgb_history():
+    model = WaterfallGuiModel(history_rows=5)
+    model.load_fixture(FIXTURE)
+    first = model.image()
+
+    assert model.set_render_scale(-120, -20) is True
+    second = model.image()
+
+    assert model.rasterizer.presented_generation == 5
+    assert second.rgb != first.rgb
+    assert model.set_render_scale(-120, -20) is False
+
+
 def test_fixture_timeline_publishes_incrementally_and_stops_after_repeats():
     model = WaterfallGuiModel(history_rows=12)
     timeline = FixtureWaterfallTimeline.from_fixture(FIXTURE, repeat=2)

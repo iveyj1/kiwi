@@ -35,6 +35,10 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 
 Every published row retains its own start, center, span, bin width, and server zoom metadata. Display remapping must use those per-row coordinates, not the latest snapshot mapping for the entire history. During zoom/recenter transitions, retained rows are cropped or resampled into the current target viewport and unavailable coverage is black; new rows use their updated receiver mapping. This keeps history registered to one current frequency ruler without falsely stretching old rows onto the new scale.
 
+## Display-level control
+
+Manual local rendering retains independent minimum/maximum dB limits and never changes receiver-side W/F setup. Automatic mode samples bounded numeric snapshot history every 20 generations, estimates low/high percentiles with padding, enforces a minimum 20 dB range, and applies bounded exponential smoothing. A level change invalidates cached RGB rows and recolors from the retained numeric snapshot; it does not alter or duplicate network frames.
+
 ## Questions to resolve
 
 - Does received W/F cadence decrease as zoom increases, or is the observed slowdown in presented redraw cadence? Leave this unmodified until receive/draw/encode/write timing is measured.

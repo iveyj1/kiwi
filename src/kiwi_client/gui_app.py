@@ -276,6 +276,17 @@ class WaterfallGuiModel:
         )
         self._session_mapped = False
 
+    def set_render_scale(self, min_dbm: float, max_dbm: float) -> bool:
+        """Change local display levels and invalidate cached RGB history."""
+        if max_dbm <= min_dbm:
+            raise ValueError("render max dB must be greater than render min dB")
+        if min_dbm == self.render_min_db and max_dbm == self.render_max_db:
+            return False
+        self.render_min_db = min_dbm
+        self.render_max_db = max_dbm
+        self.rasterizer = SnapshotRasterizer(min_dbm=min_dbm, max_dbm=max_dbm)
+        return True
+
     def load_fixture(self, path: Path, *, repeat: int = 1) -> int:
         timeline = FixtureWaterfallTimeline.from_fixture(path, repeat=repeat)
         while timeline.advance(self.publisher):

@@ -747,6 +747,20 @@ A focused test verifies FreeType output includes anti-aliased intermediate pixel
 
 Implement manual/automatic colormap scaling, then reuse existing TUI lower-panel behavior.
 
+## 2026-09-04 — Manual and automatic waterfall display levels
+
+### Decision
+
+Added `WaterfallLevelController` for local-only colormap limits. Manual keys independently adjust min/max in 5 dB steps and disable auto mode. Automatic mode samples bounded numeric history every 20 generations, estimates configurable low/high percentiles with padding, enforces a minimum 20 dB range, and smooths changes. Applying new limits invalidates cached RGB history and recolors retained numeric rows without affecting receiver commands or frame queues. Console status reports mode and effective range.
+
+### Test result
+
+Pure tests cover independent manual adjustment, auto-mode cancellation, percentile outlier resistance, padding, smoothing, minimum range, cadence, and status. GUI-model coverage proves scale changes invalidate/rebuild RGB history. Full harness: 362 tests passed in 3.99 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Evaluate default percentile/padding values during attended use, then proceed with existing-TUI lower-panel reuse.
+
 ## YYYY-MM-DD
 
 ### Finding
