@@ -775,6 +775,24 @@ Dry-run coverage records 1.0/0.1 kHz defaults. Existing TUI key/command harness 
 
 Refine compact dashboard/status reuse and add explicit runtime audio state/toggle behavior.
 
+## 2026-09-04 — Step cycling, edge passbands, and Kitty flicker
+
+### Finding
+
+Attended use found `t`/`T` changed controller step-pair state without updating console selection increments, passbands disappeared when either edge left the viewport, and high-zoom operation occasionally showed one fully black W/F/scale frame.
+
+### Decision
+
+Live startup now selects the configured pair nearest the requested 1.0/0.1 kHz console defaults. Existing TUI `t`/`T` dispatch remains authoritative and synchronizes resulting main/fine values back into the waterfall model; status shows both. Graphical passbands now draw their visible intersection with the viewport and clip at boundaries. Routine redraw no longer calls curses `erase()` over the Kitty placement: only lower text rows are cleared, while full-screen clearing is reserved for startup/resize. This removes the likely clear-before-image-transfer flicker path without changing image coalescing.
+
+### Test result
+
+Focused tests cover nearest configured step-pair choice and a partially off-screen passband at exact clipped columns. Integrated/scale/TUI harness: 69 tests passed. Full harness: 364 tests passed in 3.99 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat high-zoom operation. If a black frame persists without curses clearing, instrument/replace same-image-ID transfer with a double-buffered Kitty placement.
+
 ## YYYY-MM-DD
 
 ### Finding

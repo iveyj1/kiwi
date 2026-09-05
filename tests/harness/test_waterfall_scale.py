@@ -74,6 +74,26 @@ def test_graphical_scale_uses_exact_frequency_columns_for_all_markers():
     assert result.preset_labels == ("A 120.000",)
 
 
+def test_graphical_passband_clips_at_visible_viewport_edge():
+    waterfall = RasterImage(width=101, height=1, rgb=b"\x00" * 101 * 3)
+    result = compose_waterfall_scale(
+        waterfall,
+        100.0,
+        200.0,
+        tuned_khz=102.0,
+        selected_khz=102.0,
+        low_cut_hz=-5000,
+        high_cut_hz=5000,
+        presets={},
+        font_backend="bitmap",
+        font_scale=1,
+    )
+
+    assert pixel(result.image, 0, result.tuning_top + 2) == PASSBAND_SCALE_RGB
+    assert pixel(result.image, 2, result.tuning_top + 6) == PASSBAND_SCALE_RGB
+    assert pixel(result.image, 7, result.tuning_top + 2) == PASSBAND_SCALE_RGB
+
+
 def test_graphical_scale_omits_irregular_edge_and_rejects_colliding_presets():
     waterfall = RasterImage(width=401, height=1, rgb=b"\x00" * 401 * 3)
     result = compose_waterfall_scale(

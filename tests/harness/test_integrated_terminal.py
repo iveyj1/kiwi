@@ -13,6 +13,7 @@ from kiwi_client.integrated_terminal import (
     format_frequency_tick_ruler,
     format_preset_ruler,
     main,
+    nearest_step_pair_index,
 )
 from kiwi_client.session_manager import RadioSessionManager
 from kiwi_client.waterfall import WaterfallFrame
@@ -32,6 +33,12 @@ def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
     assert layout.tui_top == 21
     assert layout.tui_rows == 19
     assert layout.columns == 120
+
+
+def test_console_default_step_selects_matching_configured_pair():
+    pairs = ((100, 10), (1000, 100), (5000, 1000))
+    assert nearest_step_pair_index(pairs, main_hz=1000, small_hz=100) == 1
+    assert nearest_step_pair_index(pairs, main_hz=1100, small_hz=90) == 1
 
 
 def test_integrated_layout_rejects_terminal_too_small():

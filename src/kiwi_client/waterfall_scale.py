@@ -228,11 +228,14 @@ def compose_waterfall_scale(
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
     tuning_top = waterfall.height
 
-    low = _frequency_column(tuned_khz + low_cut_hz / 1000.0, start_khz, end_khz, waterfall.width)
+    low_frequency = tuned_khz + low_cut_hz / 1000.0
+    high_frequency = tuned_khz + high_cut_hz / 1000.0
+    low_frequency, high_frequency = sorted((low_frequency, high_frequency))
     center = _frequency_column(tuned_khz, start_khz, end_khz, waterfall.width)
-    high = _frequency_column(tuned_khz + high_cut_hz / 1000.0, start_khz, end_khz, waterfall.width)
-    if low is not None and high is not None:
-        low, high = sorted((low, high))
+    if high_frequency >= start_khz and low_frequency <= end_khz:
+        low = _frequency_column(max(start_khz, low_frequency), start_khz, end_khz, waterfall.width)
+        high = _frequency_column(min(end_khz, high_frequency), start_khz, end_khz, waterfall.width)
+        assert low is not None and high is not None
         for x in range(low, high + 1):
             for y in (tuning_top + 2, tuning_top + 3):
                 _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)

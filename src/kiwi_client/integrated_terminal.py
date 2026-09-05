@@ -121,6 +121,21 @@ def format_preset_ruler(
     return "".join(ruler)
 
 
+def nearest_step_pair_index(
+    pairs: tuple[tuple[float, float], ...],
+    *,
+    main_hz: float,
+    small_hz: float,
+) -> int:
+    """Choose the configured pair nearest requested console main/fine steps."""
+    if not pairs or main_hz <= 0 or small_hz <= 0:
+        raise ValueError("step pairs and requested steps must be positive")
+    return min(
+        range(len(pairs)),
+        key=lambda index: abs(pairs[index][0] - main_hz) + abs(pairs[index][1] - small_hz),
+    )
+
+
 class ControllerConsoleSource:
     """Bind the console display to one controller-owned paired live session."""
 
@@ -273,6 +288,7 @@ def run_fixture_shell(
     next_source = started
     next_refresh = 0.0
     dirty = True
+    full_redraw = True
     entry: str | None = None
     pending_preset = False
     tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
@@ -296,6 +312,8 @@ def run_fixture_shell(
             last_response = response
         if new_message is not None:
             message = new_message
+        model.main_step_hz = tui_controller.state.current_step_hz
+        model.small_step_hz = tui_controller.state.current_small_step_hz
 
     try:
         while True:
@@ -317,6 +335,7 @@ def run_fixture_shell(
                 key = None
             if key == curses.KEY_RESIZE:
                 presenter.invalidate()
+                full_redraw = True
                 dirty = True
             elif entry is not None and key is not None:
                 if key in ("\n", "\r"):
@@ -442,7 +461,15 @@ def run_fixture_shell(
                     time.sleep(0.03)
                     continue
                 snapshot = model.publisher.latest()
-                screen.erase()
+                if full_redraw:
+                    screen.erase()
+                else:
+                    for row in range(layout.divider_row, lines):
+                        try:
+                            screen.move(row, 0)
+                            screen.clrtoeol()
+                        except curses.error:
+                            pass
                 state = model.session.state
                 if live_source is not None:
                     message = f"live SND {state.snd_status} / W/F {state.wf_status}"
@@ -479,7 +506,7 @@ def run_fixture_shell(
                 else:
                     prompt = ":"
                 rows = [
-                    f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
+                    f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom}",
                     f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {levels.status_text()} | {message}",
                     "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
                     prompt,
@@ -494,6 +521,7 @@ def run_fixture_shell(
                     presenter.draw(image, layout, generation=snapshot.generation)
                 next_refresh = now + 1.0 / refresh_hz
                 dirty = False
+                full_redraw = False
             time.sleep(0.005)
     finally:
         if live_source is not None:
@@ -597,6 +625,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.receiver:
             host, port = normalize_receiver_address(args.receiver, default_port=state.port)
             state = replace(state, host=host, port=port)
+        mode = state.mode.lower()
+        pairs = state.mode_step_pairs.get(mode, ((args.main_step_khz * 1000.0, args.small_step_khz * 1000.0),))
+        step_index = nearest_step_pair_index(
+            pairs,
+            main_hz=args.main_step_khz * 1000.0,
+            small_hz=args.small_step_khz * 1000.0,
+        )
+        state = replace(state, mode_step_indices={**state.mode_step_indices, mode: step_index})
         controller = ClientController(
             state=state,
             allow_live_default=config.live.allow_live,

@@ -18,6 +18,9 @@ Completed and validated:
 
 Completed:
 
+- Synchronized `t`/`T` configured step-pair cycling into console selection and exposed current main/fine steps in status.
+- Clipped partially visible passbands at viewport boundaries instead of dropping the entire bracket.
+- Stopped routine curses refreshes from erasing the Kitty image region; full-screen clearing is now limited to startup/resize to prevent transient black frames.
 - Set integrated-console selection defaults to 1.0/0.1 kHz with explicit CLI overrides, independent of local config step-pair ordering.
 - Reused existing live TUI key dispatch, command editing/history, contextual hints, preset/store/receiver prefixes, configured non-waterfall actions, and error handling in the lower panel.
 - Added runtime manual min/max dB adjustment and percentile-based automatic scaling with bounded cadence, smoothing, padding, and minimum range.
