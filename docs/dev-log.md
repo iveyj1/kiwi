@@ -701,6 +701,20 @@ Added a mixed-history regression containing a 0..100 kHz row followed by a 25..7
 
 Repeat live zoom transitions and verify retained history remains registered to the current ruler while new rows arrive.
 
+## 2026-09-04 — Graphical scale direction
+
+### Finding
+
+Attended zoom validation now looks good. Terminal-cell frequency ticks and preset annotations remain visibly disconnected from the pixel-exact waterfall coordinate system; even correctly calculated stems quantize to character columns.
+
+### Decision
+
+Move the complete waterfall-relative presentation into one raster: W/F history, tuning/passband strip, major tick stems and numeric labels, and preset stems/labels all share the same 1024-bin frequency transform. Use deterministic harness-testable bitmap text and pixel-coordinate collision rejection. Keep the lower control/status half in curses so existing TUI behavior remains reusable rather than turning the entire application into a custom graphical toolkit.
+
+### Follow-up
+
+Implement fixture tests for bitmap glyphs, round major ticks, exact frequency columns, preset label collisions, and composed-image dimensions before replacing the terminal ruler rows.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -1,6 +1,6 @@
 # TODO
 
-## Current slice — Existing TUI behavior in integrated console
+## Current slice — Graphical waterfall scales and presets
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
@@ -16,18 +16,19 @@ Completed and validated:
 - Two bounded local `10.0.0.40:8073` runs displayed actual 5000 kHz W/F data with synchronized running status.
 - Automated live screenshot: `docs/screenshots/kiwi-console-live-local.png`.
 
-Next goal: model the lower console on the existing TUI where it fits.
+Next goal: move all waterfall-relative scales into one frequency-aligned raster composition.
 
 Done criteria:
 
-- Reuse existing dashboard/status rendering and configurable keymap dispatch rather than maintaining console-only equivalents.
-- Add command mode with existing parsing, history, hints, and error reporting.
-- Recall/store presets and receiver registers through `ClientController`, preserving persistence semantics.
-- Add audio toggle/state and volume controls; live audio currently requires startup `--audio`.
-- Add visible manual colormap limits using existing render-min/max controls, runtime adjustment, and a percentile-based auto-scale mode with bounded smoothing.
-- Keep waterfall selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
-- Keep exact frequency/preset tick stems aligned, omit unit suffixes and irregular edge labels, and retain only the high-resolution raster passband bracket.
-- Add pure/fake-operation tests before another attended local session.
+- Compose W/F history, passband/selection strip, major frequency ticks/labels, and visible preset stems/labels into one 1024-bin graphical image.
+- Use one shared frequency-to-pixel transform for waterfall data, tuning indicators, frequency ticks, and presets.
+- Keep round major labels and omit irregular exact-edge labels and unit suffixes.
+- Add deterministic dependency-free bitmap text or an equally harness-testable lightweight renderer.
+- Resolve label collisions in pixel coordinates and preserve readable output under Kitty scaling/resizing.
+- Remove redundant terminal-cell ruler rows after graphical parity is covered.
+- Keep the lower controls/status in curses and resume existing-TUI reuse afterward.
+- Follow with manual/automatic colormap scaling and audio/TUI controls.
+- Add pure raster fixture tests before another attended local session.
 
 ## Plan
 

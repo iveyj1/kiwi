@@ -117,14 +117,14 @@ Requirements:
 
 - curses owns layout and keyboard input,
 - an integrated backend places Kitty graphics inside a curses-reserved rectangle,
-- use a Kiwi-style passband bracket and selection pointer outside the raster instead of low-contrast full-height marker lines,
+- compose the W/F, Kiwi-style passband/selection strip, frequency ticks/labels, and preset stems/labels into one frequency-aligned graphical surface instead of mixing pixel and terminal-cell coordinates,
 - reuse the existing TUI startup state, controller, presets, keymap/command modes, dashboard/status data, and persistence where they fit,
 - network/audio workers publish bounded state while all curses/Kitty terminal writes remain on the UI thread,
 - live mode starts through controller-owned `radio-bg`, requires `--allow-live`, and stops/joins on all exit paths,
 - resize and alternate-screen cleanup are deterministic,
 - unsupported terminals retain a text/status fallback.
 
-The fixture shell and controller-backed live source are complete. Fake-operation coverage preceded two bounded local receiver tests; automated fixture and live Kitty screenshots are retained under `docs/screenshots/`. Next, replace console-only lower-panel behavior with existing TUI dashboard, configurable keymap, command/history/hints, presets, receiver switching, audio, and persistence components where appropriate.
+The fixture shell and controller-backed live source are complete. Fake-operation coverage preceded two bounded local receiver tests; automated fixture and live Kitty screenshots are retained under `docs/screenshots/`. Live zoom history now remains aligned per row. The next visual slice moves frequency and preset scales into the same 1024-bin graphical composition as the waterfall; after that, replace console-only lower-panel behavior with existing TUI dashboard, configurable keymap, command/history/hints, receiver switching, audio, and persistence components where appropriate.
 
 ## Later — SND consumer fan-out
 
