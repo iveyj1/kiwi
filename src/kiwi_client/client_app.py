@@ -26,7 +26,7 @@ from kiwi_client.live_record import LiveSndWavRecordConfig, record_live_snd_wav
 from kiwi_client.live_session import RoutedSessionCommand, run_live_paired_session
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.live_worker import BackgroundOperation, StatusCallback
-from kiwi_client.playback import NullAudioSink, SoundDeviceSink
+from kiwi_client.playback import NullAudioSink, SoundDeviceSink, SwitchableAudioSink
 from kiwi_client.session_manager import (
     DirectFrequency,
     RadioSessionManager,
@@ -35,6 +35,7 @@ from kiwi_client.session_manager import (
     SelectFrequency,
     SetSessionIntent,
     TransportUpdate,
+    ToggleAudio,
     TuneSelected,
     ZoomWaterfall,
 )
@@ -254,6 +255,14 @@ class ClientOperations(Protocol):
 class LiveClientOperations:
     """Default operations that call guarded live play/record/capture modules."""
 
+    def __init__(self) -> None:
+        self._paired_audio_sink: SwitchableAudioSink | None = None
+
+    def set_paired_audio_enabled(self, enabled: bool) -> bool:
+        if self._paired_audio_sink is None:
+            raise RuntimeError("paired audio session is not active")
+        return self._paired_audio_sink.set_enabled(enabled)
+
     def play(
         self,
         config: LiveSndPlaybackConfig,
@@ -290,9 +299,11 @@ class LiveClientOperations:
         status_callback: StatusCallback,
         frame_callback: Callable[[Any], None] | None = None,
     ) -> dict[str, Any]:
-        sink = NullAudioSink() if null_sink else SoundDeviceSink()
-        return asyncio.run(
-            run_live_paired_session(
+        sink = SwitchableAudioSink(SoundDeviceSink, enabled=not null_sink)
+        self._paired_audio_sink = sink
+        try:
+            return asyncio.run(
+                run_live_paired_session(
                 waterfall_config,
                 snd_config,
                 sink,
@@ -301,8 +312,11 @@ class LiveClientOperations:
                 command_queue=command_queue,
                 status_callback=status_callback,
                 frame_callback=frame_callback,
+                )
             )
-        )
+        finally:
+            if self._paired_audio_sink is sink:
+                self._paired_audio_sink = None
 
     def record(
         self,
@@ -898,9 +912,19 @@ class ClientController:
 
     def dispatch_session_action(self, action) -> dict[str, Any]:
         """Dispatch one typed shared-session action and keep legacy state synchronized."""
+        previous_session_state = self.paired_session.state
         response = self._session_action_response(action)
         if isinstance(action, (TuneSelected, DirectFrequency)):
             self.state = replace(self.state, frequency_khz=self.paired_session.state.frequency_khz)
+        elif isinstance(action, ToggleAudio):
+            setter = getattr(self.operations, "set_paired_audio_enabled", None)
+            if setter is not None:
+                try:
+                    setter(self.paired_session.state.audio_enabled)
+                except Exception:
+                    self.paired_session.state = previous_session_state
+                    raise
+            self.last_play_bg_null_sink = not self.paired_session.state.audio_enabled
         return response
 
     def _session_action_response(self, action) -> dict[str, Any]:

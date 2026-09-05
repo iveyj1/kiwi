@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Added runtime `a` audio mute/output toggle backed by one shared lazy sink; device state survives receiver restart and failed enable rolls back cleanly.
 - Made RSSI numeric/S-unit fields fixed width, corrected units to dBm, and retained the bounded signal-strength bar.
 - Detect controller publisher replacement after receiver switch, clear old Kitty history/placement, and bind/display new receiver frames.
 - Synchronized `t`/`T` configured step-pair cycling into console selection and exposed current main/fine steps in status.
@@ -35,7 +36,7 @@ Completed:
 Next goal:
 
 - Refine compact dashboard/status presentation using existing TUI model data.
-- Verify preset/receiver persistence and add explicit audio toggle/state controls; command/history/hints and configurable dispatch are now integrated for live mode.
+- Verify preset/receiver persistence and refine audio/volume status; command/history/hints, configurable dispatch, and runtime audio toggle are now integrated for live mode.
 - Keep waterfall-specific selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
 - Add pure/fake-operation tests before another attended local session.
 

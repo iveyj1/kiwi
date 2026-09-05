@@ -13,7 +13,8 @@ import struct
 import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Protocol
+from threading import RLock
+from typing import Callable, Protocol
 
 
 class AudioSink(Protocol):
@@ -38,6 +39,63 @@ class PlaybackResult:
     chunks: int
     bytes_written: int
     dry_run: bool
+
+
+class SwitchableAudioSink:
+    """Keep a primary SND stream alive while lazily opening/muting its device sink."""
+
+    def __init__(self, sink_factory: Callable[[], AudioSink], *, enabled: bool = False) -> None:
+        self.sink_factory = sink_factory
+        self.enabled = enabled
+        self.delegate: AudioSink | None = None
+        self.format: tuple[int, int, int] | None = None
+        self._started = False
+        self._lock = RLock()
+
+    def _open(self) -> None:
+        if self.delegate is not None or self.format is None:
+            return
+        sink = self.sink_factory()
+        sample_rate_hz, channels, sample_width_bytes = self.format
+        sink.start(
+            sample_rate_hz=sample_rate_hz,
+            channels=channels,
+            sample_width_bytes=sample_width_bytes,
+        )
+        self.delegate = sink
+
+    def start(self, *, sample_rate_hz: int, channels: int, sample_width_bytes: int) -> None:
+        with self._lock:
+            self.format = (sample_rate_hz, channels, sample_width_bytes)
+            self._started = True
+            if self.enabled:
+                self._open()
+
+    def write(self, pcm: bytes) -> None:
+        with self._lock:
+            if not self._started:
+                raise RuntimeError("toggleable sink has not been started")
+            if self.delegate is not None:
+                self.delegate.write(pcm)
+
+    def set_enabled(self, enabled: bool) -> bool:
+        with self._lock:
+            if enabled == self.enabled:
+                return False
+            if enabled and self._started:
+                self._open()
+            elif not enabled and self.delegate is not None:
+                self.delegate.stop()
+                self.delegate = None
+            self.enabled = enabled
+            return True
+
+    def stop(self) -> None:
+        with self._lock:
+            if self.delegate is not None:
+                self.delegate.stop()
+                self.delegate = None
+            self._started = False
 
 
 class SoundDeviceSink:

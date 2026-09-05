@@ -839,6 +839,20 @@ After harness coverage passed, automated Kitty input tuned a bounded null-audio 
 
 Proceed with runtime audio state/toggle and compact dashboard refinement.
 
+## 2026-09-05 — Runtime integrated audio toggle
+
+### Decision
+
+Moved the existing lazy switchable sink from the standalone waterfall module into the shared playback layer and made it lock-protected. Controller-backed paired sessions now always use this gate: `--audio` controls startup state and `a` opens/closes `SoundDeviceSink` without stopping primary SND. Typed `ToggleAudio` updates the device gate, shared status, and receiver-restart preference; device startup failure restores the prior muted state. The standalone terminal reuses the same implementation.
+
+### Test result
+
+Audio tests cover muted startup, lazy device creation, writes, mute, reopen, stop, and pre-start misuse. Controller tests cover toggle state/restart preference and failure rollback. Focused audio/standalone/controller/console harness: 112 tests passed before the rollback addition. Full harness: 370 tests passed in 4.07 seconds; `compileall` and `git diff --check` passed. No additional receiver connection was made.
+
+### Follow-up
+
+Attended-test `a` mute/unmute and volume keys, then refine compact dashboard/persistence behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

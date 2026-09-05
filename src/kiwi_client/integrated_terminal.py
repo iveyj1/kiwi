@@ -420,6 +420,13 @@ def run_fixture_shell(
             elif key == "f":
                 entry = ""
                 dirty = True
+            elif key == "a":
+                try:
+                    model.toggle_audio()
+                    message = f"audio {'ON' if model.session.state.audio_enabled else 'MUTED'}"
+                except RuntimeError as exc:
+                    message = f"audio error: {exc}"
+                dirty = True
             elif key == "p" and tui_input is None:
                 pending_preset = True
                 message = "preset register?"
@@ -547,11 +554,11 @@ def run_fixture_shell(
                 if tui_controller is not None:
                     metrics = tui_controller.background.status().metrics or {}
                 rows = [
-                    f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom}",
+                    f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",
-                    "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
+                    "h/l select H/L fine Enter tune c center +/- zoom f freq p preset a audio u auto [/] min {/} max q quit",
                     prompt,
                 ]
                 if tui_input is not None and tui_config is not None:

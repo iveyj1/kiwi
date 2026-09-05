@@ -27,7 +27,7 @@ from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
 from kiwi_client.paired_session import PairedSessionCoordinator, pair_session_configs
-from kiwi_client.playback import AudioSink, NullAudioSink, SoundDeviceSink
+from kiwi_client.playback import AudioSink, NullAudioSink, SoundDeviceSink, SwitchableAudioSink
 from kiwi_client.protocol import parse_msg
 from kiwi_client.waterfall import (
     WaterfallCursor,
@@ -856,60 +856,6 @@ def preview_terminal_fixture(path: Path, viewer: WaterfallTerminalViewer) -> int
     if frames:
         viewer.finish()
     return frames
-
-
-class SwitchableAudioSink:
-    """Keep SND connected while lazily enabling or muting local audio output."""
-
-    def __init__(self, sink_factory: Callable[[], AudioSink], *, enabled: bool = False) -> None:
-        self.sink_factory = sink_factory
-        self.enabled = enabled
-        self.delegate: AudioSink | None = None
-        self.format: tuple[int, int, int] | None = None
-
-    def start(self, *, sample_rate_hz: int, channels: int, sample_width_bytes: int) -> None:
-        self.format = (sample_rate_hz, channels, sample_width_bytes)
-        if self.enabled:
-            self._start_delegate()
-
-    def _start_delegate(self) -> None:
-        if self.delegate is not None or self.format is None:
-            return
-        sink = self.sink_factory()
-        sample_rate_hz, channels, sample_width_bytes = self.format
-        sink.start(
-            sample_rate_hz=sample_rate_hz,
-            channels=channels,
-            sample_width_bytes=sample_width_bytes,
-        )
-        self.delegate = sink
-
-    def set_enabled(self, enabled: bool) -> None:
-        if enabled == self.enabled:
-            return
-        if enabled:
-            self.enabled = True
-            try:
-                self._start_delegate()
-            except Exception:
-                self.enabled = False
-                raise
-        else:
-            self.enabled = False
-            if self.delegate is not None:
-                self.delegate.stop()
-                self.delegate = None
-
-    def write(self, pcm: bytes) -> None:
-        if self.enabled:
-            self._start_delegate()
-            if self.delegate is not None:
-                self.delegate.write(pcm)
-
-    def stop(self) -> None:
-        if self.delegate is not None:
-            self.delegate.stop()
-            self.delegate = None
 
 
 class WaterfallAudioController:

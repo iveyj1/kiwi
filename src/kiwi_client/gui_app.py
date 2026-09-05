@@ -23,6 +23,7 @@ from kiwi_client.session_manager import (
     RadioSessionSnapshot,
     RecenterWaterfall,
     SelectFrequency,
+    ToggleAudio,
     TuneSelected,
     ZoomWaterfall,
 )
@@ -392,6 +393,10 @@ class WaterfallGuiModel:
         self._mapped_snapshot()
         self._dispatch(SelectFrequency(frequency_khz))
         return self._dispatch(TuneSelected())
+
+    def toggle_audio(self):
+        self._mapped_snapshot()
+        return self._dispatch(ToggleAudio())
 
     def recenter(self):
         self._mapped_snapshot()

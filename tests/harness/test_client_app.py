@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from kiwi_client.client_app import ClientCommandError, ClientController, ClientState, run_script, main
-from kiwi_client.session_manager import SelectFrequency, TuneSelected
+from kiwi_client.session_manager import SelectFrequency, ToggleAudio, TuneSelected
 from kiwi_client.waterfall import WaterfallFrame
 
 
@@ -343,6 +343,40 @@ def test_background_playback_maps_to_generation_aware_shared_lifecycle():
     assert stopped.snd_status == "stopped"
     assert stopped.wf_status == "stopped"
     assert stopped.active_receiver is None
+
+
+def test_public_audio_toggle_updates_gate_and_restart_preference():
+    class Operations:
+        def __init__(self):
+            self.values = []
+
+        def set_paired_audio_enabled(self, enabled):
+            self.values.append(enabled)
+
+    operations = Operations()
+    controller = ClientController(operations=operations)
+
+    controller.dispatch_session_action(ToggleAudio())
+    assert operations.values == [True]
+    assert controller.paired_session.state.audio_enabled is True
+    assert controller.last_play_bg_null_sink is False
+
+    controller.dispatch_session_action(ToggleAudio())
+    assert operations.values == [True, False]
+    assert controller.paired_session.state.audio_enabled is False
+    assert controller.last_play_bg_null_sink is True
+
+
+def test_public_audio_toggle_rolls_back_state_when_device_enable_fails():
+    class Operations:
+        def set_paired_audio_enabled(self, enabled):
+            raise RuntimeError("synthetic audio device failure")
+
+    controller = ClientController(operations=Operations())
+    with pytest.raises(RuntimeError, match="synthetic audio device failure"):
+        controller.dispatch_session_action(ToggleAudio())
+
+    assert controller.paired_session.state.audio_enabled is False
 
 
 def test_public_session_tune_keeps_legacy_frequency_synchronized():
