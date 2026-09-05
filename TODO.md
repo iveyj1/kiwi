@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Added live RSSI dB, conventional HF S-unit estimate, and bounded signal-strength bar from controller SND metrics.
 - Synchronized `t`/`T` configured step-pair cycling into console selection and exposed current main/fine steps in status.
 - Clipped partially visible passbands at viewport boundaries instead of dropping the entire bracket.
 - Stopped routine curses refreshes from erasing the Kitty image region; full-screen clearing is now limited to startup/resize to prevent transient black frames.

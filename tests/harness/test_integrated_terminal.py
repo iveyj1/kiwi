@@ -14,6 +14,8 @@ from kiwi_client.integrated_terminal import (
     format_preset_ruler,
     main,
     nearest_step_pair_index,
+    format_rssi_indicator,
+    rssi_s_unit,
 )
 from kiwi_client.session_manager import RadioSessionManager
 from kiwi_client.waterfall import WaterfallFrame
@@ -33,6 +35,19 @@ def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
     assert layout.tui_top == 21
     assert layout.tui_rows == 19
     assert layout.columns == 120
+
+
+def test_rssi_indicator_formats_hf_s_units_and_bounded_bar():
+    assert rssi_s_unit(-121) == "S1"
+    assert rssi_s_unit(-73) == "S9"
+    assert rssi_s_unit(-53) == "S9+20"
+    assert rssi_s_unit(-20) == "S9+53"
+
+    weak = format_rssi_indicator(-120.0, width=10)
+    strong = format_rssi_indicator(-40.0, width=10)
+    assert weak == "RSSI -120.0 dB S1 [#---------]"
+    assert strong == "RSSI -40.0 dB S9+33 [########--]"
+    assert format_rssi_indicator(None, width=10) == "RSSI unavailable [----------]"
 
 
 def test_console_default_step_selects_matching_configured_pair():

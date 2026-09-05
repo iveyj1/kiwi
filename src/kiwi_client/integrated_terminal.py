@@ -121,6 +121,26 @@ def format_preset_ruler(
     return "".join(ruler)
 
 
+def rssi_s_unit(rssi_db: float) -> str:
+    """Convert HF RSSI to a conventional S-unit label (S9 = -73 dBm)."""
+    if rssi_db > -73:
+        return f"S9+{round(rssi_db + 73)}"
+    unit = round(9 + (rssi_db + 73) / 6)
+    return f"S{min(9, max(1, unit))}"
+
+
+def format_rssi_indicator(rssi_db: float | None, *, width: int = 18) -> str:
+    """Format one bounded text signal-strength meter for the curses panel."""
+    if width <= 0:
+        raise ValueError("RSSI indicator width must be positive")
+    if rssi_db is None:
+        return f"RSSI unavailable [{'-' * width}]"
+    fraction = min(1.0, max(0.0, (rssi_db + 130.0) / 110.0))
+    filled = round(fraction * width)
+    bar = "#" * filled + "-" * (width - filled)
+    return f"RSSI {rssi_db:.1f} dB {rssi_s_unit(rssi_db)} [{bar}]"
+
+
 def nearest_step_pair_index(
     pairs: tuple[tuple[float, float], ...],
     *,
@@ -505,9 +525,13 @@ def run_fixture_shell(
                     prompt = f":{tui_input.command}_"
                 else:
                     prompt = ":"
+                metrics = {}
+                if tui_controller is not None:
+                    metrics = tui_controller.background.status().metrics or {}
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom}",
-                    f"W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation} | {levels.status_text()} | {message}",
+                    f"{format_rssi_indicator(metrics.get('rssi_db'))} | W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation}",
+                    f"{levels.status_text()} | {message}",
                     "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
                     prompt,
                 ]

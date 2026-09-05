@@ -793,6 +793,20 @@ Focused tests cover nearest configured step-pair choice and a partially off-scre
 
 Repeat high-zoom operation. If a black frame persists without curses clearing, instrument/replace same-image-ID transfer with a double-buffered Kitty placement.
 
+## 2026-09-04 — Integrated RSSI indication
+
+### Decision
+
+Added a compact lower-panel RSSI meter sourced from existing primary SND worker metrics. It reports calibrated RSSI dB, a conventional HF estimate using S9=-73 dBm and 6 dB per unit below S9, and a clamped 10-segment visual range mapped over -130..-20 dB. Fixture/no-metric state reports unavailable without inventing a value.
+
+### Test result
+
+Pure coverage verifies S1, S9, and S9+ labels plus weak/strong/unavailable bounded bars. Targeted integrated harness: 15 tests passed. Full harness: 365 tests passed in 5.47 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Evaluate readability during the next attended live run and later add peak/decay behavior only if instantaneous RSSI is too noisy.
+
 ## YYYY-MM-DD
 
 ### Finding
