@@ -6,6 +6,7 @@ Branch: `feature/shared-radio-session`, based on the newly updated `main` integr
 
 Completed and validated:
 
+- Fixed zoom-transition history so every retained/new row remaps from its own captured frequency coordinates instead of the newest row's scale.
 - Fixed live tune state being overwritten during legacy/shared status synchronization.
 - `f` and selection+Enter now tune without implicit recenter; `c` remains explicit center.
 - Added a high-resolution Kiwi-style raster tuning strip so sub-cell indicator movement remains visible.

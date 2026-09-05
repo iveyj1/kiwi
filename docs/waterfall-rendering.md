@@ -31,6 +31,10 @@ See [Waterfall display specification](waterfall-spec.md) for the fixture-first p
 - Raw intensity mapping `sample - 255` gives plausible uncalibrated values for the fixture: about `-200..-25 dBm`, median near `-87 dBm`, with stable bright bins near the low-bin edge and around bins 529/538.
 - The first bin is `-200 dBm` in both local rows; bin orientation and exact frequency mapping remain open until center/span/start metadata is incorporated.
 
+## Mixed zoom/recenter history
+
+Every published row retains its own start, center, span, bin width, and server zoom metadata. Display remapping must use those per-row coordinates, not the latest snapshot mapping for the entire history. During zoom/recenter transitions, retained rows are cropped or resampled into the current target viewport and unavailable coverage is black; new rows use their updated receiver mapping. This keeps history registered to one current frequency ruler without falsely stretching old rows onto the new scale.
+
 ## Questions to resolve
 
 - Does received W/F cadence decrease as zoom increases, or is the observed slowdown in presented redraw cadence? Leave this unmodified until receive/draw/encode/write timing is measured.

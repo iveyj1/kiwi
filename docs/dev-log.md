@@ -683,6 +683,24 @@ Focused ruler tests cover exact preset/tick columns, unit-free labels, and suppr
 
 Retry with `--audio` if sound is desired, then implement lower-panel audio and colormap controls through existing TUI/controller behavior.
 
+## 2026-09-04 — Per-row zoom history remapping
+
+### Finding
+
+Live zoom initially remapped retained history correctly, then appeared to return to the old scale as new frames arrived. Each snapshot row already retained its original start/span, but `SnapshotRasterizer` rebuilt every historical row using only the newest snapshot mapping during a zoom transition.
+
+### Decision
+
+The rasterizer now caches only the target viewport and remaps every retained or newly appended row from that row's own immutable `start_khz`/`span_khz`. Old and new zoom generations therefore share the current ruler correctly, with black fill outside each row's captured coverage.
+
+### Test result
+
+Added a mixed-history regression containing a 0..100 kHz row followed by a 25..75 kHz row and proved each maps independently into the 25..75 kHz target. Targeted GUI/console harness: 29 tests passed. Full harness: 354 tests passed in 3.92 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Repeat live zoom transitions and verify retained history remains registered to the current ruler while new rows arrive.
+
 ## YYYY-MM-DD
 
 ### Finding

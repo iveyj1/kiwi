@@ -152,7 +152,7 @@ class SnapshotRasterizer:
         self._max_rows: int | None = None
         self._rgb_rows: deque[bytes] = deque()
         self._padding_rows: dict[int, bytes] = {}
-        self._view: tuple[float, float, float, float] | None = None
+        self._view: tuple[float, float] | None = None
 
     @staticmethod
     def _remap_row(
@@ -185,12 +185,10 @@ class SnapshotRasterizer:
         target_start_khz: float | None = None,
         target_end_khz: float | None = None,
     ) -> RasterImage:
-        source_start = snapshot.current_start_khz
-        source_end = None if source_start is None or snapshot.current_span_khz is None else source_start + snapshot.current_span_khz
-        if target_start_khz is None or target_end_khz is None or source_start is None or source_end is None:
+        if target_start_khz is None or target_end_khz is None:
             view = None
         else:
-            view = (source_start, source_end, target_start_khz, target_end_khz)
+            view = (target_start_khz, target_end_khz)
         view_changed = view != self._view
         if snapshot.generation > self.presented_generation or view_changed:
             delta = snapshot.generation - self.presented_generation
@@ -211,14 +209,14 @@ class SnapshotRasterizer:
             for row in new_rows:
                 rendered = render_dbm_rows((row.dbm,), min_dbm=self.min_dbm, max_dbm=self.max_dbm)
                 rgb_row = rendered.rgb
-                if view is not None:
+                if view is not None and row.start_khz is not None and row.span_khz is not None:
                     rgb_row = self._remap_row(
                         rgb_row,
                         snapshot.width,
-                        source_start_khz=view[0],
-                        source_end_khz=view[1],
-                        target_start_khz=view[2],
-                        target_end_khz=view[3],
+                        source_start_khz=row.start_khz,
+                        source_end_khz=row.start_khz + row.span_khz,
+                        target_start_khz=view[0],
+                        target_end_khz=view[1],
                     )
                 self._rgb_rows.append(rgb_row)
             self.presented_generation = snapshot.generation

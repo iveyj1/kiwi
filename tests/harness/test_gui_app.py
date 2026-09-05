@@ -15,7 +15,14 @@ from kiwi_client.gui_app import (
 )
 
 
-from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, PASSBAND_MARKER_RGB, TUNED_MARKER_RGB
+from kiwi_client.waterfall import WaterfallFrame
+from kiwi_client.waterfall_raster import (
+    CURSOR_MARKER_RGB,
+    PASSBAND_MARKER_RGB,
+    TUNED_MARKER_RGB,
+    render_dbm_rows,
+)
+from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 
 
 FIXTURE = Path("tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl")
@@ -219,6 +226,35 @@ def test_snapshot_rasterizer_consumes_latest_generation_and_pads_history(monkeyp
     assert image.height == 12
     assert rasterizer.presented_generation == 2
     assert calls.count(1) == 3  # two data rows plus one cached padding row
+
+
+def test_snapshot_rasterizer_remaps_each_history_row_from_its_original_frequency_mapping():
+    publisher = WaterfallSnapshotPublisher(max_rows=2)
+    publisher.append(WaterfallFrame(
+        sequence=1,
+        bins=(0,) * 5,
+        dbm=(-100, -90, -80, -70, -60),
+        start_khz=0.0,
+        span_khz=100.0,
+    ))
+    snapshot = publisher.append(WaterfallFrame(
+        sequence=2,
+        bins=(0,) * 5,
+        dbm=(-50,) * 5,
+        start_khz=25.0,
+        span_khz=50.0,
+    ))
+    rasterizer = SnapshotRasterizer(min_dbm=-110, max_dbm=-40)
+
+    image = rasterizer.update(snapshot, target_start_khz=25.0, target_end_khz=75.0)
+    expected_old_first = render_dbm_rows(((-90,),), min_dbm=-110, max_dbm=-40).rgb
+    wrong_unmapped_first = render_dbm_rows(((-100,),), min_dbm=-110, max_dbm=-40).rgb
+
+    assert image.rgb[:3] == expected_old_first
+    assert image.rgb[:3] != wrong_unmapped_first
+    assert image.rgb[image.width * 3:image.width * 3 + 3] == render_dbm_rows(
+        ((-50,),), min_dbm=-110, max_dbm=-40
+    ).rgb
 
 
 def test_animated_fixture_dry_run_reports_timeline_and_presented_generation(capsys):
