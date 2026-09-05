@@ -22,8 +22,10 @@ Done criteria:
 - Reuse existing dashboard/status rendering and configurable keymap dispatch rather than maintaining console-only equivalents.
 - Add command mode with existing parsing, history, hints, and error reporting.
 - Recall/store presets and receiver registers through `ClientController`, preserving persistence semantics.
-- Add audio toggle/state and volume controls.
+- Add audio toggle/state and volume controls; live audio currently requires startup `--audio`.
+- Add visible manual colormap limits using existing render-min/max controls, runtime adjustment, and a percentile-based auto-scale mode with bounded smoothing.
 - Keep waterfall selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
+- Keep exact frequency/preset tick stems aligned, omit unit suffixes and irregular edge labels, and retain only the high-resolution raster passband bracket.
 - Add pure/fake-operation tests before another attended local session.
 
 ## Plan

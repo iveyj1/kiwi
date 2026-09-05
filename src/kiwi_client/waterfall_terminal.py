@@ -176,12 +176,18 @@ def frequency_label_decimals(step_khz: float) -> int:
     return max(0, min(6, int(math.ceil(-math.log10(step_khz) - 1e-12))))
 
 
-def _format_frequency_label(frequency_khz: float, decimals: int, *, edge: bool) -> str:
+def _format_frequency_label(
+    frequency_khz: float,
+    decimals: int,
+    *,
+    edge: bool,
+    include_units: bool = True,
+) -> str:
     label_decimals = min(6, decimals + 1) if edge else decimals
     number = f"{frequency_khz:.{label_decimals}f}"
     if edge and "." in number:
         number = number.rstrip("0").rstrip(".")
-    return f"{number} kHz"
+    return f"{number} kHz" if include_units else number
 
 
 def frequency_ticks(
@@ -190,6 +196,7 @@ def frequency_ticks(
     *,
     columns: int,
     columns_per_tick: int = 18,
+    include_units: bool = True,
 ) -> tuple[FrequencyTick, ...]:
     """Choose and place adaptive, non-overlapping major frequency labels."""
     if columns <= 0:
@@ -216,7 +223,7 @@ def frequency_ticks(
     candidates: list[FrequencyTick] = []
     for index, frequency_khz in enumerate(frequencies):
         edge = index == 0 or index == len(frequencies) - 1
-        label = _format_frequency_label(frequency_khz, decimals, edge=edge)
+        label = _format_frequency_label(frequency_khz, decimals, edge=edge, include_units=include_units)
         if len(label) > columns:
             label = label[:columns]
         if index == 0:
@@ -254,6 +261,7 @@ def format_frequency_ruler(
     *,
     columns: int,
     columns_per_tick: int = 18,
+    include_units: bool = True,
 ) -> str:
     """Render adaptive major frequency labels into one fixed-width terminal row."""
     ruler = [" "] * columns
@@ -262,6 +270,7 @@ def format_frequency_ruler(
         end_khz,
         columns=columns,
         columns_per_tick=columns_per_tick,
+        include_units=include_units,
     ):
         ruler[tick.label_start:tick.label_stop] = tick.label
     return "".join(ruler)

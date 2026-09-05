@@ -665,6 +665,24 @@ Harness coverage proves controller frequency survives status synchronization, co
 
 Repeat live `f` and selection+Enter testing, then continue existing-TUI lower-panel reuse.
 
+## 2026-09-04 — Console scale alignment and duplicate bracket removal
+
+### Finding
+
+Live validation confirmed W/F, tuning, and presets but no sound because the console intentionally defaulted to a null sink. It also exposed duplicate green passband brackets (one high-resolution raster strip and one terminal-text fallback), preset stems positioned at label starts rather than exact frequencies, unnecessary `kHz` suffixes, and distracting exact edge labels such as `308.6` beside round major ticks.
+
+### Decision
+
+Retained only the high-resolution raster passband bracket. Frequency marks now occupy exact frequency columns on a dedicated tick row, labels omit units, and non-major exact edges are suppressed while aligned round edge majors remain. Preset stems now occupy the exact mapped column and labels are placed adjacent without moving the stem. Sound remains opt-in with `--audio`; runtime audio controls and automatic/manual colormap scaling are added to the lower-panel plan.
+
+### Test result
+
+Focused ruler tests cover exact preset/tick columns, unit-free labels, and suppression of an uneven 308.6 kHz edge. Full harness: 353 tests passed in 4.01 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Retry with `--audio` if sound is desired, then implement lower-panel audio and colormap controls through existing TUI/controller behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

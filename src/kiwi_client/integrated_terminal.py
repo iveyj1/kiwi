@@ -15,7 +15,12 @@ from typing import Any, BinaryIO, Mapping
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage, encode_png
-from kiwi_client.waterfall_terminal import encode_kitty_image, format_frequency_ruler, terminal_supports_kitty
+from kiwi_client.waterfall_terminal import (
+    choose_frequency_tick_step,
+    encode_kitty_image,
+    frequency_ticks,
+    terminal_supports_kitty,
+)
 
 
 @dataclass(frozen=True)
@@ -112,44 +117,30 @@ def append_tuning_strip(
     return RasterImage(image.width, image.height + height, image.rgb + bytes(strip))
 
 
-def format_passband_scale(
+def format_frequency_tick_ruler(
     start_khz: float,
     end_khz: float,
     *,
-    tuned_khz: float,
-    selected_khz: float,
-    low_cut_hz: int,
-    high_cut_hz: int,
     columns: int,
-) -> str:
-    """Render a Kiwi-style passband bracket and selection pointer outside the raster."""
-    if columns <= 0 or end_khz <= start_khz:
-        raise ValueError("passband scale requires positive columns and frequency span")
-    scale = [" "] * columns
-
-    def position(frequency_khz: float) -> int | None:
-        if not start_khz <= frequency_khz <= end_khz:
-            return None
-        return round((frequency_khz - start_khz) / (end_khz - start_khz) * (columns - 1))
-
-    low = position(tuned_khz + low_cut_hz / 1000.0)
-    center = position(tuned_khz)
-    high = position(tuned_khz + high_cut_hz / 1000.0)
-    if low is not None and high is not None:
-        low, high = sorted((low, high))
-        if high > low:
-            for column in range(low + 1, high):
-                scale[column] = "─"
-            scale[low] = "└"
-            scale[high] = "┘"
-            if center is not None and low < center < high:
-                scale[center] = "┴"
-    elif center is not None:
-        scale[center] = "┴"
-    selected = position(selected_khz)
-    if selected is not None and (center is None or selected != center):
-        scale[selected] = "▼"
-    return "".join(scale)
+) -> tuple[str, str]:
+    """Return exact tick marks plus unit-free, non-overlapping frequency labels."""
+    ticks = frequency_ticks(start_khz, end_khz, columns=columns, include_units=False)
+    target_labels = max(2, columns // 18)
+    major_step = choose_frequency_tick_step((end_khz - start_khz) / (target_labels - 1))
+    ticks = tuple(
+        tick
+        for tick in ticks
+        if not tick.edge
+        or abs(tick.frequency_khz / major_step - round(tick.frequency_khz / major_step)) < 1e-9
+    )
+    marks = [" "] * columns
+    labels = [" "] * columns
+    span = end_khz - start_khz
+    for tick in ticks:
+        position = round((tick.frequency_khz - start_khz) / span * (columns - 1))
+        marks[position] = "|"
+        labels[tick.label_start:tick.label_stop] = tick.label
+    return "".join(marks), "".join(labels)
 
 
 def format_preset_ruler(
@@ -174,16 +165,20 @@ def format_preset_ruler(
             continue
         frequency_khz = float(frequency)
         if start_khz <= frequency_khz <= end_khz:
-            candidates.append((frequency_khz, f"|{register} {frequency_khz:.3f}"))
+            candidates.append((frequency_khz, f"{register} {frequency_khz:.3f}"))
     for frequency_khz, label in sorted(candidates):
-        label = label[:columns]
-        position = round((frequency_khz - start_khz) / span * (columns - 1))
-        start = min(max(0, position - len(label) // 2), columns - len(label))
+        label = label[:max(0, columns - 1)]
+        marker = round((frequency_khz - start_khz) / span * (columns - 1))
+        start = marker + 1 if marker + 1 + len(label) <= columns else marker - len(label)
+        start = max(0, start)
         stop = start + len(label)
-        if any(start < used_stop + 1 and stop + 1 > used_start for used_start, used_stop in occupied):
+        used_start = min(marker, start)
+        used_stop = max(marker + 1, stop)
+        if any(used_start < previous_stop + 1 and used_stop + 1 > previous_start for previous_start, previous_stop in occupied):
             continue
+        ruler[marker] = "|"
         ruler[start:stop] = label
-        occupied.append((start, stop))
+        occupied.append((used_start, used_stop))
     return "".join(ruler)
 
 
@@ -323,15 +318,12 @@ def run_fixture_shell(
         curses.curs_set(0)
     except curses.error:
         pass
-    passband_attributes = 0
     preset_attributes = 0
     if curses.has_colors():
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_GREEN, -1)
-        curses.init_pair(2, curses.COLOR_CYAN, -1)
-        passband_attributes = curses.color_pair(1) | curses.A_BOLD
-        preset_attributes = curses.color_pair(2)
+        curses.init_pair(1, curses.COLOR_CYAN, -1)
+        preset_attributes = curses.color_pair(1)
     if (timeline is None) == (live_source is None):
         raise ValueError("console requires exactly one fixture or live source")
     if timeline is not None:
@@ -475,25 +467,22 @@ def run_fixture_shell(
                         low_cut_hz=state.low_cut_hz,
                         high_cut_hz=state.high_cut_hz,
                     )
+                    frequency_marks, frequency_labels = format_frequency_tick_ruler(
+                        start_khz,
+                        end_khz,
+                        columns=columns,
+                    )
                     _safe_line(
                         screen,
                         layout.passband_row,
-                        format_passband_scale(
-                            start_khz,
-                            end_khz,
-                            tuned_khz=state.frequency_khz,
-                            selected_khz=state.selected_khz,
-                            low_cut_hz=state.low_cut_hz,
-                            high_cut_hz=state.high_cut_hz,
-                            columns=columns,
-                        ),
+                        frequency_marks,
                         columns,
-                        passband_attributes,
+                        curses.A_DIM,
                     )
                     _safe_line(
                         screen,
                         layout.frequency_row,
-                        format_frequency_ruler(start_khz, end_khz, columns=columns),
+                        frequency_labels,
                         columns,
                     )
                     _safe_line(

@@ -12,7 +12,7 @@ from kiwi_client.integrated_terminal import (
     IntegratedTerminalLayout,
     KittyPanePresenter,
     append_tuning_strip,
-    format_passband_scale,
+    format_frequency_tick_ruler,
     format_preset_ruler,
     main,
 )
@@ -81,23 +81,6 @@ def test_high_resolution_tuning_strip_draws_passband_center_and_selection():
     assert pixel(70, 7) == CURSOR_MARKER_RGB
 
 
-def test_passband_scale_uses_bracket_center_and_separate_selection_pointer():
-    scale = format_passband_scale(
-        737.0,
-        972.0,
-        tuned_khz=760.0,
-        selected_khz=800.0,
-        low_cut_hz=-5000,
-        high_cut_hz=5000,
-        columns=80,
-    )
-
-    assert len(scale) == 80
-    assert "└" in scale and "┴" in scale and "┘" in scale
-    assert "▼" in scale
-    assert scale.index("▼") > scale.index("┘")
-
-
 def test_preset_ruler_places_only_visible_non_overlapping_presets():
     ruler = format_preset_ruler(
         {
@@ -113,7 +96,19 @@ def test_preset_ruler_places_only_visible_non_overlapping_presets():
     assert len(ruler) == 80
     assert "a 760.000" in ruler
     assert "b 800.000" in ruler
+    assert ruler[round((760.0 - 737.0) / (972.0 - 737.0) * 79)] == "|"
     assert "x 5000.000" not in ruler
+
+
+def test_frequency_tick_ruler_aligns_bars_omits_units_and_skips_uneven_edge():
+    marks, labels = format_frequency_tick_ruler(260.0, 308.6, columns=81)
+
+    assert len(marks) == len(labels) == 81
+    assert marks[0] == "|"  # aligned 260 major survives at the edge
+    assert "280" in labels
+    assert "300" in labels
+    assert "308.6" not in labels
+    assert "kHz" not in labels
 
 
 def test_kitty_pane_presenter_uses_absolute_saved_cursor_and_deletes_image():
