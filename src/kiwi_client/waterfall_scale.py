@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol
 
 from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage
 from kiwi_client.waterfall_terminal import choose_frequency_tick_step, frequency_label_decimals
@@ -99,6 +99,83 @@ def draw_bitmap_text(
                             rgb[offset:offset + 3] = encoded_color
 
 
+class ScaleTextRenderer(Protocol):
+    backend: str
+    line_height: int
+
+    def width(self, text: str) -> int: ...
+
+    def render(
+        self,
+        rgb: bytes | bytearray,
+        width: int,
+        height: int,
+        labels: list[tuple[int, int, str, tuple[int, int, int]]],
+    ) -> bytes: ...
+
+
+class BitmapScaleTextRenderer:
+    backend = "bitmap"
+
+    def __init__(self, *, scale: int) -> None:
+        self.scale = scale
+        self.line_height = 7 * scale
+
+    def width(self, text: str) -> int:
+        return bitmap_text_width(text, scale=self.scale)
+
+    def render(self, rgb, width, height, labels) -> bytes:
+        canvas = bytearray(rgb)
+        for x, y, text, color in labels:
+            draw_bitmap_text(canvas, width, height, x, y, text, color, scale=self.scale)
+        return bytes(canvas)
+
+
+class PillowScaleTextRenderer:
+    """C-backed FreeType text renderer used by the integrated graphical scale."""
+
+    backend = "pillow"
+
+    def __init__(self, *, font_size: int, font_name: str = "DejaVuSansMono.ttf") -> None:
+        from PIL import ImageFont
+
+        if font_size <= 0:
+            raise ValueError("FreeType font size must be positive")
+        self.font = ImageFont.truetype(font_name, font_size)
+        self.line_height = font_size
+
+    def width(self, text: str) -> int:
+        return max(1, math.ceil(self.font.getlength(text)))
+
+    def render(self, rgb, width, height, labels) -> bytes:
+        from PIL import Image, ImageDraw
+
+        image = Image.frombytes("RGB", (width, height), bytes(rgb))
+        draw = ImageDraw.Draw(image)
+        for x, y, text, color in labels:
+            draw.text((x, y), text, fill=color, font=self.font, anchor="lt")
+        return image.tobytes()
+
+
+def scale_text_renderer(
+    backend: str,
+    *,
+    font_scale: int,
+    font_name: str = "DejaVuSansMono.ttf",
+) -> ScaleTextRenderer:
+    """Resolve FreeType text with a deterministic bitmap fallback."""
+    normalized = backend.lower()
+    if normalized not in ("auto", "pillow", "bitmap"):
+        raise ValueError("scale font backend must be auto, pillow or bitmap")
+    if normalized in ("auto", "pillow"):
+        try:
+            return PillowScaleTextRenderer(font_size=8 * font_scale, font_name=font_name)
+        except (ImportError, OSError):
+            if normalized == "pillow":
+                raise RuntimeError("Pillow/FreeType scale font is unavailable")
+    return BitmapScaleTextRenderer(scale=font_scale)
+
+
 @dataclass(frozen=True)
 class GraphicalScaleResult:
     image: RasterImage
@@ -107,6 +184,7 @@ class GraphicalScaleResult:
     tuning_top: int
     tick_top: int
     preset_stem_top: int
+    text_backend: str
 
 
 def _frequency_column(frequency_khz: float, start_khz: float, end_khz: float, width: int) -> int | None:
@@ -133,15 +211,18 @@ def compose_waterfall_scale(
     presets: Mapping[str, Mapping[str, Any]],
     label_target_pixels: int = 150,
     font_scale: int = 2,
+    font_backend: str = "auto",
+    font_name: str = "DejaVuSansMono.ttf",
 ) -> GraphicalScaleResult:
     """Compose pixel-aligned tuning, frequency and preset scales below W/F."""
     if end_khz <= start_khz or label_target_pixels < 20 or font_scale <= 0:
         raise ValueError("invalid graphical scale dimensions")
+    text_renderer = scale_text_renderer(font_backend, font_scale=font_scale, font_name=font_name)
     tuning_height = 8
     tick_height = 5
-    label_height = 7 * font_scale + 3
+    label_height = text_renderer.line_height + 3
     preset_stem_height = 5
-    preset_label_height = 7 * font_scale + 2
+    preset_label_height = text_renderer.line_height + 2
     footer_height = tuning_height + tick_height + label_height + preset_stem_height + preset_label_height
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
@@ -177,6 +258,7 @@ def compose_waterfall_scale(
     step = choose_frequency_tick_step((end_khz - start_khz) / (target_labels - 1))
     decimals = frequency_label_decimals(step)
     frequency_labels: list[str] = []
+    text_labels: list[tuple[int, int, str, tuple[int, int, int]]] = []
     occupied: list[tuple[int, int]] = []
     frequency = math.ceil((start_khz - step * 1e-12) / step) * step
     while frequency <= end_khz + step * 1e-9:
@@ -185,20 +267,16 @@ def compose_waterfall_scale(
             for y in range(tick_top, tick_top + tick_height):
                 _set_pixel(rgb, waterfall.width, column, y, FREQUENCY_SCALE_RGB)
             label = f"{frequency:.{decimals}f}"
-            label_width = bitmap_text_width(label, scale=font_scale)
+            label_width = text_renderer.width(label)
             label_x = min(max(0, column - label_width // 2), max(0, waterfall.width - label_width))
             interval = (label_x, label_x + label_width)
             if not any(interval[0] < used[1] + font_scale and interval[1] + font_scale > used[0] for used in occupied):
-                draw_bitmap_text(
-                    rgb,
-                    waterfall.width,
-                    output_height,
+                text_labels.append((
                     label_x,
                     tick_top + tick_height + 1,
                     label,
                     FREQUENCY_SCALE_RGB,
-                    scale=font_scale,
-                )
+                ))
                 occupied.append(interval)
                 frequency_labels.append(label)
         frequency += step
@@ -217,29 +295,27 @@ def compose_waterfall_scale(
         assert column is not None
         for y in range(preset_stem_top, preset_stem_top + preset_stem_height):
             _set_pixel(rgb, waterfall.width, column, y, PRESET_SCALE_RGB)
-        label_width = bitmap_text_width(label, scale=font_scale)
+        label_width = text_renderer.width(label)
         label_x = min(max(0, column - label_width // 2), max(0, waterfall.width - label_width))
         interval = (label_x, label_x + label_width)
         if any(interval[0] < used[1] + font_scale and interval[1] + font_scale > used[0] for used in preset_occupied):
             continue
-        draw_bitmap_text(
-            rgb,
-            waterfall.width,
-            output_height,
+        text_labels.append((
             label_x,
             preset_stem_top + preset_stem_height + 1,
             label,
             PRESET_SCALE_RGB,
-            scale=font_scale,
-        )
+        ))
         preset_occupied.append(interval)
         preset_labels.append(label)
 
+    rendered_rgb = text_renderer.render(rgb, waterfall.width, output_height, text_labels)
     return GraphicalScaleResult(
-        image=RasterImage(waterfall.width, output_height, bytes(rgb)),
+        image=RasterImage(waterfall.width, output_height, rendered_rgb),
         frequency_labels=tuple(frequency_labels),
         preset_labels=tuple(preset_labels),
         tuning_top=tuning_top,
         tick_top=tick_top,
         preset_stem_top=preset_stem_top,
+        text_backend=text_renderer.backend,
     )

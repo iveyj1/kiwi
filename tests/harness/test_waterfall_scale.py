@@ -1,3 +1,5 @@
+import pytest
+
 from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage
 from kiwi_client.waterfall_scale import (
     FREQUENCY_SCALE_RGB,
@@ -6,6 +8,7 @@ from kiwi_client.waterfall_scale import (
     bitmap_text_width,
     compose_waterfall_scale,
     draw_bitmap_text,
+    scale_text_renderer,
 )
 
 
@@ -21,6 +24,22 @@ def test_bitmap_font_draws_deterministic_numeric_and_register_text():
     assert bitmap_text_width("A 760.0", scale=2) == 82
     assert any(canvas)
     assert tuple(canvas[(1 * 80 + 3) * 3:(1 * 80 + 3) * 3 + 3]) == FREQUENCY_SCALE_RGB
+
+
+def test_pillow_freetype_renderer_is_antialiased_when_available():
+    pytest.importorskip("PIL")
+    renderer = scale_text_renderer("pillow", font_scale=2)
+    rendered = renderer.render(
+        b"\x00" * 120 * 24 * 3,
+        120,
+        24,
+        [(1, 1, "850.0", (255, 255, 255))],
+    )
+
+    channel_values = set(rendered[0::3])
+    assert renderer.backend == "pillow"
+    assert 255 in channel_values
+    assert any(0 < value < 255 for value in channel_values)
 
 
 def test_graphical_scale_uses_exact_frequency_columns_for_all_markers():

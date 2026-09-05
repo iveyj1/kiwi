@@ -571,10 +571,10 @@ The viewer caches bounded RGB rows and uses fast PNG compression so unchanged hi
 
 `kiwi-console` is the primary integrated terminal prototype. It places one composed Kitty image in the upper half of a curses alternate screen, followed by a compact control/status area. Fixture mode never connects; guarded live mode is described below.
 
-Install/update the editable command, then inspect its plan without opening curses:
+Install/update the editable command with anti-aliased graphical labels, then inspect its plan without opening curses:
 
 ```bash
-.kiwi-venv/bin/python -m pip install -e .
+.kiwi-venv/bin/python -m pip install -e '.[terminal-graphics]'
 kiwi-console --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl --dry-run
 ```
 
@@ -597,7 +597,7 @@ kiwi-console --allow-live --receiver 10.0.0.40:8073 \
 
 The controller opens SND before W/F, publishes bounded latest snapshots, routes typed tune/view actions to the active stream queues, and stops/joins both streams on console exit. `--dry-run` reports the intended command without connecting.
 
-Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent. Direct frequency entry and Enter tune SND without implicitly recentering W/F; use `c` explicitly to center on the selection. The upper Kitty image now composes W/F history, a two-pixel green passband/center bracket, magenta selection pointer, major frequency tick stems and bitmap labels, and cyan preset stems/bitmap labels on one 1024-bin graphical coordinate system. Labels omit `kHz`, non-major exact edges are suppressed, and pixel-coordinate collision rejection keeps labels readable. Redundant terminal-cell rulers have been removed. This follows the general KiwiSDR visual language without duplicating the browser UI.
+Fixture controls are `h`/`l` or arrows for main selection steps, `H`/`L` for fine steps, Enter to tune selected, `c` to center, `+`/`-` to zoom, `f` for direct kHz entry, `p` followed by a register to recall a preset locally, and `q` to exit. Generated radio commands remain local and are not sent. Direct frequency entry and Enter tune SND without implicitly recentering W/F; use `c` explicitly to center on the selection. The upper Kitty image now composes W/F history, a two-pixel green passband/center bracket, magenta selection pointer, major frequency tick stems and anti-aliased FreeType labels, and cyan preset stems/labels on one 1024-bin graphical coordinate system. Labels omit `kHz`, non-major exact edges are suppressed, and pixel-coordinate collision rejection keeps labels readable. `--scale-font auto` uses Pillow with DejaVu Sans Mono and falls back to the deterministic bitmap font; `--scale-font bitmap` forces the fallback and `--scale-font-name` selects another installed TrueType font. Redundant terminal-cell rulers have been removed. This follows the general KiwiSDR visual language without duplicating the browser UI.
 
 Automated fixture capture used for local visual regression:
 

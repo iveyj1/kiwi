@@ -729,6 +729,24 @@ Three pure raster tests cover deterministic glyph output, exact marker/tick/pres
 
 Proceed with existing-TUI lower-panel reuse and manual/automatic colormap controls.
 
+## 2026-09-04 — FreeType graphical scale labels
+
+### Finding
+
+The dependency-free 5x7 font kept exact alignment but was visibly crude, and its Python per-pixel glyph loop was inappropriate as the preferred renderer.
+
+### Decision
+
+Added a lazy Pillow/FreeType scale renderer using DejaVu Sans Mono with anti-aliasing and C-backed rasterization. Text labels are collected and rendered onto the composed image in one Pillow pass rather than copying the image per label. `auto` falls back to the deterministic bitmap renderer if Pillow/font loading is unavailable; `pillow` and `bitmap` can be selected explicitly, and the font name is configurable. Added the optional `terminal-graphics` dependency group.
+
+### Test and visual result
+
+A focused test verifies FreeType output includes anti-aliased intermediate pixel values while existing exact-column/collision tests remain backend-independent. Automated Kitty fixture capture refreshed `docs/screenshots/kiwi-console-fixture.png` and shows materially smoother frequency/preset labels. Full harness: 357 tests passed in 3.95 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Implement manual/automatic colormap scaling, then reuse existing TUI lower-panel behavior.
+
 ## YYYY-MM-DD
 
 ### Finding

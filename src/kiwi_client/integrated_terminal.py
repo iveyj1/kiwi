@@ -246,6 +246,8 @@ def run_fixture_shell(
     presenter: KittyPanePresenter,
     source_fps: float,
     refresh_hz: float,
+    scale_font_backend: str = "auto",
+    scale_font_name: str = "DejaVuSansMono.ttf",
     demo_seconds: float | None = None,
 ) -> None:
     """Run fixture publication, curses text, and Kitty presentation in one thread."""
@@ -399,6 +401,8 @@ def run_fixture_shell(
                         low_cut_hz=state.low_cut_hz,
                         high_cut_hz=state.high_cut_hz,
                         presets=presets,
+                        font_backend=scale_font_backend,
+                        font_name=scale_font_name,
                     ).image
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
                 rows = [
@@ -436,6 +440,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--refresh-hz", type=float, default=5.0)
     parser.add_argument("--render-min-db", type=float, default=-100)
     parser.add_argument("--render-max-db", type=float, default=-40)
+    parser.add_argument("--scale-font", choices=("auto", "pillow", "bitmap"), default="auto")
+    parser.add_argument("--scale-font-name", default="DejaVuSansMono.ttf")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--demo-seconds", type=float, help="exit cleanly after a fixture demonstration interval")
     parser.add_argument("--dry-run", action="store_true")
@@ -484,6 +490,8 @@ def main(argv: list[str] | None = None) -> int:
                     presenter=presenter,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
+                    scale_font_backend=args.scale_font,
+                    scale_font_name=args.scale_font_name,
                     demo_seconds=args.demo_seconds,
                 )
             )
@@ -547,6 +555,8 @@ def main(argv: list[str] | None = None) -> int:
                     presenter=presenter,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
+                    scale_font_backend=args.scale_font,
+                    scale_font_name=args.scale_font_name,
                     demo_seconds=args.demo_seconds,
                 )
             )

@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Replaced the prototype 5x7 scale font with anti-aliased Pillow/FreeType DejaVu Sans Mono; retained deterministic bitmap fallback and explicit backend/font options.
 - Composed W/F history, passband/selection strip, frequency ticks/labels, and preset stems/labels into one 1024-bin Kitty image.
 - Added deterministic dependency-free 5x7 bitmap text, round major ticks, exact shared frequency columns, and pixel-coordinate collision rejection.
 - Removed redundant terminal-cell scale rows and returned that space to curses controls.

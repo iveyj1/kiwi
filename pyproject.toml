@@ -18,6 +18,9 @@ playback = [
 image = [
     "matplotlib>=3.8",
 ]
+terminal-graphics = [
+    "Pillow>=10",
+]
 gui-pyside = [
     "PySide6-Essentials>=6.8",
 ]
