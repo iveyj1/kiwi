@@ -715,6 +715,20 @@ Move the complete waterfall-relative presentation into one raster: W/F history, 
 
 Implement fixture tests for bitmap glyphs, round major ticks, exact frequency columns, preset label collisions, and composed-image dimensions before replacing the terminal ruler rows.
 
+## 2026-09-04 — Graphically composed waterfall scales
+
+### Decision
+
+Added `waterfall_scale.py` with a dependency-free 5x7 bitmap font and one compositing pass for W/F-relative UI. Tuning/passband, selection, round major tick stems/numeric labels, and visible preset stems/register-frequency labels now share the exact 1024-bin frequency transform. Labels reject collisions in pixel coordinates, omit units, and naturally exclude non-major exact edges. Removed the three terminal-cell scale rows and returned their space to the lower curses panel.
+
+### Test and visual result
+
+Three pure raster tests cover deterministic glyph output, exact marker/tick/preset columns, composed dimensions, round-edge behavior, and preset collision rejection. Full harness: 356 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed. An automated fixture-only Kitty run completed normally and refreshed `docs/screenshots/kiwi-console-fixture.png`; graphical 750/800/850/900/950 ticks, passband bracket, and preset A label align with the waterfall. No receiver connection was made.
+
+### Follow-up
+
+Proceed with existing-TUI lower-panel reuse and manual/automatic colormap controls.
+
 ## YYYY-MM-DD
 
 ### Finding

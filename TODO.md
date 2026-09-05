@@ -1,6 +1,6 @@
 # TODO
 
-## Current slice — Graphical waterfall scales and presets
+## Current slice — Existing TUI behavior and display scaling
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
 
@@ -16,19 +16,20 @@ Completed and validated:
 - Two bounded local `10.0.0.40:8073` runs displayed actual 5000 kHz W/F data with synchronized running status.
 - Automated live screenshot: `docs/screenshots/kiwi-console-live-local.png`.
 
-Next goal: move all waterfall-relative scales into one frequency-aligned raster composition.
+Completed:
 
-Done criteria:
+- Composed W/F history, passband/selection strip, frequency ticks/labels, and preset stems/labels into one 1024-bin Kitty image.
+- Added deterministic dependency-free 5x7 bitmap text, round major ticks, exact shared frequency columns, and pixel-coordinate collision rejection.
+- Removed redundant terminal-cell scale rows and returned that space to curses controls.
+- Updated automated Kitty fixture screenshot.
 
-- Compose W/F history, passband/selection strip, major frequency ticks/labels, and visible preset stems/labels into one 1024-bin graphical image.
-- Use one shared frequency-to-pixel transform for waterfall data, tuning indicators, frequency ticks, and presets.
-- Keep round major labels and omit irregular exact-edge labels and unit suffixes.
-- Add deterministic dependency-free bitmap text or an equally harness-testable lightweight renderer.
-- Resolve label collisions in pixel coordinates and preserve readable output under Kitty scaling/resizing.
-- Remove redundant terminal-cell ruler rows after graphical parity is covered.
-- Keep the lower controls/status in curses and resume existing-TUI reuse afterward.
-- Follow with manual/automatic colormap scaling and audio/TUI controls.
-- Add pure raster fixture tests before another attended local session.
+Next goal:
+
+- Reuse existing dashboard/status rendering and configurable keymap dispatch in the lower panel.
+- Add command mode with existing parsing, history, hints, errors, preset/receiver persistence, and audio/volume controls.
+- Add visible manual colormap limits, runtime adjustment, and percentile-based automatic scaling with bounded smoothing.
+- Keep waterfall-specific selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
+- Add pure/fake-operation tests before another attended local session.
 
 ## Plan
 

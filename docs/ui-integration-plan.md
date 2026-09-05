@@ -111,7 +111,7 @@ Toolkit comparison is complete; no further native integration is planned before 
 
 ## Phase 5 — Integrated curses-aware Kitty pane
 
-Status: **Fixture and controller-backed live waterfall implemented and validated locally; TUI feature reuse pending.**
+Status: **Graphically composed fixture/live waterfall and scales implemented; TUI feature reuse pending.**
 
 Requirements:
 
@@ -124,7 +124,7 @@ Requirements:
 - resize and alternate-screen cleanup are deterministic,
 - unsupported terminals retain a text/status fallback.
 
-The fixture shell and controller-backed live source are complete. Fake-operation coverage preceded two bounded local receiver tests; automated fixture and live Kitty screenshots are retained under `docs/screenshots/`. Live zoom history now remains aligned per row. The next visual slice moves frequency and preset scales into the same 1024-bin graphical composition as the waterfall; after that, replace console-only lower-panel behavior with existing TUI dashboard, configurable keymap, command/history/hints, receiver switching, audio, and persistence components where appropriate.
+The fixture shell and controller-backed live source are complete. Fake-operation coverage preceded two bounded local receiver tests; automated fixture and live Kitty screenshots are retained under `docs/screenshots/`. Live zoom history remains aligned per row. W/F history, tuning indicators, major frequency ticks/labels, and visible preset stems/labels now form one 1024-bin graphical composition with dependency-free bitmap text. Next, replace console-only lower-panel behavior with existing TUI dashboard, configurable keymap, command/history/hints, receiver switching, audio, and persistence components where appropriate.
 
 ## Later — SND consumer fan-out
 

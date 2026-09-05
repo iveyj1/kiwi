@@ -7,18 +7,16 @@ import pytest
 
 from kiwi_client.client_app import ClientController, ClientState
 from kiwi_client.integrated_terminal import (
-    PASSBAND_SCALE_RGB,
     ControllerConsoleSource,
     IntegratedTerminalLayout,
     KittyPanePresenter,
-    append_tuning_strip,
     format_frequency_tick_ruler,
     format_preset_ruler,
     main,
 )
 from kiwi_client.session_manager import RadioSessionManager
 from kiwi_client.waterfall import WaterfallFrame
-from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage
+from kiwi_client.waterfall_raster import RasterImage
 from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 
 
@@ -30,11 +28,9 @@ def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
 
     assert layout.waterfall_top == 0
     assert layout.waterfall_rows == 20
-    assert layout.passband_row == 20
-    assert layout.frequency_row == 21
-    assert layout.preset_row == 22
-    assert layout.tui_top == 24
-    assert layout.tui_rows == 16
+    assert layout.divider_row == 20
+    assert layout.tui_top == 21
+    assert layout.tui_rows == 19
     assert layout.columns == 120
 
 
@@ -55,30 +51,6 @@ def test_console_frequency_entry_tunes_without_implicit_recenter():
     assert model.session.state.frequency_khz == pytest.approx(860.0)
     assert model.session.state.selected_khz == pytest.approx(860.0)
     assert model.session.state.waterfall_center_khz == pytest.approx(original_center)
-
-
-def test_high_resolution_tuning_strip_draws_passband_center_and_selection():
-    image = RasterImage(width=101, height=2, rgb=b"\x00" * 101 * 2 * 3)
-    rendered = append_tuning_strip(
-        image,
-        100.0,
-        200.0,
-        tuned_khz=150.0,
-        selected_khz=170.0,
-        low_cut_hz=-10_000,
-        high_cut_hz=10_000,
-    )
-
-    def pixel(column, strip_row):
-        row = image.height + strip_row
-        offset = (row * rendered.width + column) * 3
-        return tuple(rendered.rgb[offset:offset + 3])
-
-    assert rendered.height == 10
-    assert pixel(40, 2) == PASSBAND_SCALE_RGB
-    assert pixel(50, 6) == PASSBAND_SCALE_RGB
-    assert pixel(60, 2) == PASSBAND_SCALE_RGB
-    assert pixel(70, 7) == CURSOR_MARKER_RGB
 
 
 def test_preset_ruler_places_only_visible_non_overlapping_presets():

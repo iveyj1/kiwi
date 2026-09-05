@@ -14,7 +14,8 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.state_store import load_presets_file
-from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage, encode_png
+from kiwi_client.waterfall_raster import RasterImage, encode_png
+from kiwi_client.waterfall_scale import compose_waterfall_scale
 from kiwi_client.waterfall_terminal import (
     choose_frequency_tick_step,
     encode_kitty_image,
@@ -31,9 +32,6 @@ class IntegratedTerminalLayout:
     lines: int
     waterfall_top: int
     waterfall_rows: int
-    passband_row: int
-    frequency_row: int
-    preset_row: int
     divider_row: int
     tui_top: int
     tui_rows: int
@@ -43,78 +41,17 @@ class IntegratedTerminalLayout:
         if columns < 40 or lines < 12:
             raise ValueError("integrated terminal requires at least 40 columns and 12 lines")
         waterfall_rows = lines // 2
-        passband_row = waterfall_rows
-        frequency_row = passband_row + 1
-        preset_row = frequency_row + 1
-        divider_row = preset_row + 1
+        divider_row = waterfall_rows
         tui_top = divider_row + 1
         return cls(
             columns=columns,
             lines=lines,
             waterfall_top=0,
             waterfall_rows=waterfall_rows,
-            passband_row=passband_row,
-            frequency_row=frequency_row,
-            preset_row=preset_row,
             divider_row=divider_row,
             tui_top=tui_top,
             tui_rows=lines - tui_top,
         )
-
-
-PASSBAND_SCALE_RGB = (0, 255, 0)
-
-
-def append_tuning_strip(
-    image: RasterImage,
-    start_khz: float,
-    end_khz: float,
-    *,
-    tuned_khz: float,
-    selected_khz: float,
-    low_cut_hz: int,
-    high_cut_hz: int,
-    height: int = 8,
-) -> RasterImage:
-    """Append a high-resolution Kiwi-style passband/selection strip below W/F data."""
-    if height < 6 or end_khz <= start_khz:
-        raise ValueError("tuning strip requires height >= 6 and a positive frequency span")
-    strip = bytearray(image.width * height * 3)
-
-    def column(frequency_khz: float) -> int | None:
-        if not start_khz <= frequency_khz <= end_khz:
-            return None
-        return round((frequency_khz - start_khz) / (end_khz - start_khz) * (image.width - 1))
-
-    def pixel(x: int, y: int, color: tuple[int, int, int]) -> None:
-        offset = (y * image.width + x) * 3
-        strip[offset:offset + 3] = bytes(color)
-
-    low = column(tuned_khz + low_cut_hz / 1000.0)
-    center = column(tuned_khz)
-    high = column(tuned_khz + high_cut_hz / 1000.0)
-    if low is not None and high is not None:
-        low, high = sorted((low, high))
-        for x in range(low, high + 1):
-            for y in (2, 3):
-                pixel(x, y, PASSBAND_SCALE_RGB)
-        for x in range(low, min(image.width, low + 2)):
-            for y in range(0, 4):
-                pixel(x, y, PASSBAND_SCALE_RGB)
-        for x in range(max(0, high - 1), high + 1):
-            for y in range(0, 4):
-                pixel(x, y, PASSBAND_SCALE_RGB)
-    if center is not None:
-        for x in range(center, min(image.width, center + 2)):
-            for y in range(2, height - 1):
-                pixel(x, y, PASSBAND_SCALE_RGB)
-    selected = column(selected_khz)
-    if selected is not None and selected != center:
-        for radius in range(3):
-            y = height - 1 - radius
-            for x in range(max(0, selected - radius), min(image.width, selected + radius + 1)):
-                pixel(x, y, CURSOR_MARKER_RGB)
-    return RasterImage(image.width, image.height + height, image.rgb + bytes(strip))
 
 
 def format_frequency_tick_ruler(
@@ -318,12 +255,9 @@ def run_fixture_shell(
         curses.curs_set(0)
     except curses.error:
         pass
-    preset_attributes = 0
     if curses.has_colors():
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_CYAN, -1)
-        preset_attributes = curses.color_pair(1)
     if (timeline is None) == (live_source is None):
         raise ValueError("console requires exactly one fixture or live source")
     if timeline is not None:
@@ -452,13 +386,11 @@ def run_fixture_shell(
                         message += f" | {state.error.stream}: {state.error.message}"
                 image = None
                 if snapshot is None:
-                    _safe_line(screen, layout.passband_row, "Waiting for first W/F frame...", columns)
-                    _safe_line(screen, layout.frequency_row, "", columns)
-                    _safe_line(screen, layout.preset_row, "", columns)
+                    message = f"{message} | waiting for first W/F frame"
                 else:
                     image = model.image()
                     start_khz, end_khz = model.display_frequency_range()
-                    image = append_tuning_strip(
+                    image = compose_waterfall_scale(
                         image,
                         start_khz,
                         end_khz,
@@ -466,32 +398,8 @@ def run_fixture_shell(
                         selected_khz=state.selected_khz,
                         low_cut_hz=state.low_cut_hz,
                         high_cut_hz=state.high_cut_hz,
-                    )
-                    frequency_marks, frequency_labels = format_frequency_tick_ruler(
-                        start_khz,
-                        end_khz,
-                        columns=columns,
-                    )
-                    _safe_line(
-                        screen,
-                        layout.passband_row,
-                        frequency_marks,
-                        columns,
-                        curses.A_DIM,
-                    )
-                    _safe_line(
-                        screen,
-                        layout.frequency_row,
-                        frequency_labels,
-                        columns,
-                    )
-                    _safe_line(
-                        screen,
-                        layout.preset_row,
-                        format_preset_ruler(presets, start_khz, end_khz, columns=columns),
-                        columns,
-                        preset_attributes,
-                    )
+                        presets=presets,
+                    ).image
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | zoom {state.waterfall_zoom}",
