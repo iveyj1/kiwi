@@ -825,6 +825,20 @@ Harness coverage replaces the publisher directly and also performs a complete fa
 
 Repeat a live receiver-register switch and verify audio plus W/F resume together with a fresh history.
 
+## 2026-09-05 — Live receiver-switch validation
+
+### Decision
+
+Separated persistent UI event messages from continuously refreshed transport status so receiver-switch results remain observable. Transport status now always includes active receiver plus SND/W/F state.
+
+### Live result
+
+After harness coverage passed, automated Kitty input tuned a bounded null-audio session to 5000 kHz on local `.40` and sent stored receiver register `r2`. The controller restarted on `10.0.0.41:8073`; the console detected the replacement publisher, cleared old history, and displayed 38 fresh W/F rows with both streams running and RSSI -96.3 dBm S5. Screenshot: `docs/screenshots/kiwi-console-switch-41.png`. Normal exit succeeded; no reconnect loop or admin commands were used. Full harness remained green at 366 tests in 4.00 seconds; `compileall` and `git diff --check` passed.
+
+### Follow-up
+
+Proceed with runtime audio state/toggle and compact dashboard refinement.
+
 ## YYYY-MM-DD
 
 ### Finding

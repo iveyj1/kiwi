@@ -44,6 +44,27 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-05 — integrated receiver switch `.40` to `.41`
+
+```text
+Date/time: approximately 2026-09-05T23:18Z / 19:18 local
+Receivers: 10.0.0.40:8073 -> 10.0.0.41:8073 via stored register r 2
+Frequency: 5000.000 kHz
+Mode/filter: AM, -5000..5000 Hz
+W/F settings: zoom 7, speed 4, interp 13, 160-row history, 5 Hz presentation cap
+Stream type: paired primary SND + W/F; null audio sink
+Purpose: Verify integrated console publisher rebinding and fresh W/F after controller-owned receiver restart.
+Commands sent: normal paired setup/tune/view/keepalive plus user-level receiver switch; no admin commands.
+Observed behavior:
+  Automated Kitty remote input first tuned to 5000 kHz, then sent r2.
+  Console switched from .40 to .41, replaced/reset W/F history, and resumed rendering.
+  At screenshot time status showed receiver 10.0.0.41:8073, SND running, W/F running, 38 source/presented rows, RSSI -96.3 dBm S5.
+  Switch-result message reported receiver .41 and restarted playback.
+  Console exited normally without a reconnect loop.
+Fixture/artifact: docs/screenshots/kiwi-console-switch-41.png; complete fake .40 -> .41 switch regression in tests/harness/test_integrated_terminal.py.
+Follow-up: User-attended confirmation and eventual reverse switch; no protocol changes observed.
+```
+
 ### 2026-09-04 — integrated Kitty console paired W/F
 
 ```text

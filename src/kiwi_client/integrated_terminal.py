@@ -506,14 +506,16 @@ def run_fixture_shell(
                         except curses.error:
                             pass
                 state = model.session.state
+                transport_status = "fixture-only"
                 if live_source is not None:
-                    message = f"live SND {state.snd_status} / W/F {state.wf_status}"
+                    receiver = tui_controller.state.receiver if tui_controller is not None else "unknown"
+                    transport_status = f"live {receiver} | SND {state.snd_status} / W/F {state.wf_status}"
                     if state.error is not None:
-                        message += f" | {state.error.stream}: {state.error.message}"
+                        transport_status += f" | {state.error.stream}: {state.error.message}"
                 image = None
                 if snapshot is None:
                     presenter.clear()
-                    message = f"{message} | waiting for first W/F frame"
+                    transport_status += " | waiting for first W/F frame"
                 else:
                     if levels.observe(snapshot):
                         model.set_render_scale(levels.min_dbm, levels.max_dbm)
@@ -547,7 +549,8 @@ def run_fixture_shell(
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom}",
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation}",
-                    f"{levels.status_text()} | {message}",
+                    f"{levels.status_text()} | {transport_status}",
+                    f"Message: {message}",
                     "h/l select H/L fine Enter tune c center +/- zoom f freq p preset u auto [/] min {/} max q quit",
                     prompt,
                 ]
