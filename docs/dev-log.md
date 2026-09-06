@@ -915,6 +915,16 @@ Enable curses mouse event reporting for the console lifetime, consume `KEY_MOUSE
 
 A regression verifies reported mouse input is consumed while keyboard `KEY_UP` remains available to normal configured dispatch. Integrated harness: 18 tests passed. Full harness: 375 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
 
+## 2026-09-05 — Ten frequency divisions per label interval
+
+### Decision
+
+The graphical frequency ruler now divides each adjacent major-label interval into ten equal intervals. Minor ticks use the same exact frequency-to-pixel transform as labels and passband graphics but are two pixels high; labeled major ticks remain five pixels high. Labels and their adaptive 1/2/5 major step are unchanged.
+
+### Test result
+
+The scale regression verifies minor ticks at the first and ninth subdivisions and distinguishes their height from major stems. Focused scale/integrated harness: 24 tests passed. Full harness: 375 tests passed in 4.04 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
 ## YYYY-MM-DD
 
 ### Finding

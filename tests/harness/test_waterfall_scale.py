@@ -69,6 +69,11 @@ def test_graphical_scale_uses_exact_frequency_columns_for_all_markers():
     assert pixel(result.image, 0, tick_top) == FREQUENCY_SCALE_RGB
     assert pixel(result.image, 50, tick_top) == FREQUENCY_SCALE_RGB
     assert pixel(result.image, 100, tick_top) == FREQUENCY_SCALE_RGB
+    # Each labeled interval is split into ten; minor ticks are shorter.
+    assert pixel(result.image, 5, tick_top) == FREQUENCY_SCALE_RGB
+    assert pixel(result.image, 5, tick_top + 1) == FREQUENCY_SCALE_RGB
+    assert pixel(result.image, 5, tick_top + 2) != FREQUENCY_SCALE_RGB
+    assert pixel(result.image, 45, tick_top) == FREQUENCY_SCALE_RGB
 
     assert pixel(result.image, 20, result.preset_stem_top) == PRESET_SCALE_RGB
     assert result.preset_labels == ("A 120.000",)

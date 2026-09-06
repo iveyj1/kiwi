@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Divided every graphical frequency-label interval into ten equal intervals with short minor ticks while retaining full-height major stems.
 - Enabled curses mouse reporting and explicitly discard integrated-console mouse events, preventing Kitty wheel motion from falling back to repeated volume-mapped up/down arrows.
 - Fixed CW graphical passband placement: RF edges now include the configured CW radio-frequency offset while the center/reference marker remains at the user frequency.
 - Added shared `m` receive-mode prefix map (`a` AM, `u` USB, `l` LSB, `c` CW) using existing mode/passband/controller routing in both TUI and integrated console.

@@ -266,6 +266,14 @@ def compose_waterfall_scale(
     frequency_labels: list[str] = []
     text_labels: list[tuple[int, int, str, tuple[int, int, int]]] = []
     occupied: list[tuple[int, int]] = []
+    minor_step = step / 10.0
+    minor_frequency = math.ceil((start_khz - minor_step * 1e-12) / minor_step) * minor_step
+    while minor_frequency <= end_khz + minor_step * 1e-9:
+        column = _frequency_column(minor_frequency, start_khz, end_khz, waterfall.width)
+        if column is not None:
+            for y in range(tick_top, tick_top + 2):
+                _set_pixel(rgb, waterfall.width, column, y, FREQUENCY_SCALE_RGB)
+        minor_frequency += minor_step
     frequency = math.ceil((start_khz - step * 1e-12) / step) * step
     while frequency <= end_khz + step * 1e-9:
         column = _frequency_column(frequency, start_khz, end_khz, waterfall.width)
