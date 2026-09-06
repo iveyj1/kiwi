@@ -18,6 +18,8 @@ Completed and validated:
 
 Completed:
 
+- Replaced same-ID Kitty frame updates with two alternating image/placement IDs: display the complete new frame before deleting the previous frame to eliminate high-zoom black flashes.
+- User confirmed runtime audio toggle continues working across receiver switches.
 - Added runtime `a` audio mute/output toggle backed by one shared lazy sink; device state survives receiver restart and failed enable rolls back cleanly.
 - Made RSSI numeric/S-unit fields fixed width, corrected units to dBm, and retained the bounded signal-strength bar.
 - Detect controller publisher replacement after receiver switch, clear old Kitty history/placement, and bind/display new receiver frames.

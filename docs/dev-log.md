@@ -853,6 +853,24 @@ Audio tests cover muted startup, lazy device creation, writes, mute, reopen, sto
 
 Attended-test `a` mute/unmute and volume keys, then refine compact dashboard/persistence behavior.
 
+## 2026-09-05 — Double-buffered Kitty presentation
+
+### Finding
+
+User validation confirmed `a` audio toggle works, including across receiver switching. Roughly ten full W/F+ruler black flashes per minute remained at maximum zoom after routine curses image-area clears had already been removed. This isolates the likely gap to same-image-ID replacement in Kitty presentation rather than network history or curses layout.
+
+### Decision
+
+`KittyPanePresenter` now alternates image/placement IDs 41 and 42. It transmits and displays the complete next PNG at the stable rectangle before deleting the previous image ID, preserving one visible placement throughout ordered terminal processing. Coalescing remains generation/layout based; clear and final cleanup delete only the active slot and remain idempotent.
+
+### Test result
+
+A byte-level regression proves the second image/display command precedes deletion of the first and final cleanup deletes the active second image. Targeted presenter harness: 17 tests passed. Full harness: 371 tests passed in 4.04 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Run maximum zoom for several minutes and count any remaining black flashes. If they persist, capture Kitty protocol timing and test transmit-only plus explicit placement synchronization.
+
 ## YYYY-MM-DD
 
 ### Finding

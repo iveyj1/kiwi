@@ -212,12 +212,12 @@ class KittyPanePresenter:
         environ: Mapping[str, str] | None = None,
     ) -> None:
         self.output = output
-        self.image_id = image_id
-        self.placement_id = placement_id
+        self.image_ids = (image_id, image_id + 1)
+        self.placement_ids = (placement_id, placement_id + 1)
         self.force = force
         self.environ = os.environ if environ is None else environ
         self._last_key: tuple[int, int, int] | None = None
-        self._visible = False
+        self._active_slot: int | None = None
         self._finished = False
 
     def draw(
@@ -232,34 +232,46 @@ class KittyPanePresenter:
         key = None if generation is None else (generation, layout.columns, layout.waterfall_rows)
         if key is not None and key == self._last_key:
             return False
+        slot = 0 if self._active_slot is None else 1 - self._active_slot
+        image_id = self.image_ids[slot]
+        placement_id = self.placement_ids[slot]
         payload = encode_kitty_image(
             encode_png(image),
-            image_id=self.image_id,
-            placement_id=self.placement_id,
+            image_id=image_id,
+            placement_id=placement_id,
             columns=layout.columns,
             rows=layout.waterfall_rows,
         )
         position = f"\x1b[{layout.waterfall_top + 1};1H".encode("ascii")
+        previous_slot = self._active_slot
         self.output.write(b"\x1b7" + position + payload + b"\x1b8")
+        if previous_slot is not None:
+            previous_id = self.image_ids[previous_slot]
+            self.output.write(f"\x1b_Ga=d,d=i,i={previous_id},q=2;\x1b\\".encode("ascii"))
         flush = getattr(self.output, "flush", None)
         if flush is not None:
             flush()
         self._last_key = key
-        self._visible = True
+        self._active_slot = slot
         return True
+
+    @property
+    def active_image_id(self) -> int | None:
+        return None if self._active_slot is None else self.image_ids[self._active_slot]
 
     def invalidate(self) -> None:
         self._last_key = None
 
     def clear(self) -> bool:
         """Delete the current placement without finishing the reusable presenter."""
-        if not self._visible:
+        if self._active_slot is None:
             return False
-        self.output.write(f"\x1b_Ga=d,d=i,i={self.image_id},q=2;\x1b\\".encode("ascii"))
+        image_id = self.image_ids[self._active_slot]
+        self.output.write(f"\x1b_Ga=d,d=i,i={image_id},q=2;\x1b\\".encode("ascii"))
         flush = getattr(self.output, "flush", None)
         if flush is not None:
             flush()
-        self._visible = False
+        self._active_slot = None
         self._last_key = None
         return True
 

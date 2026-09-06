@@ -327,6 +327,25 @@ def test_integrated_fixture_dry_run_has_no_network_or_terminal_dependency(capsys
     assert "a 760.000" in result["presets_visible"]
 
 
+def test_kitty_pane_presenter_double_buffers_before_deleting_previous_frame():
+    output = io.BytesIO()
+    presenter = KittyPanePresenter(output=output, force=True, environ={})
+    layout = IntegratedTerminalLayout.compute(columns=80, lines=24)
+    image = RasterImage(width=1, height=1, rgb=b"\x00\x00\x00")
+
+    presenter.draw(image, layout, generation=1)
+    presenter.draw(image, layout, generation=2)
+    payload = output.getvalue()
+
+    second_image = payload.index(b"i=42,p=42")
+    delete_first = payload.index(b"a=d,d=i,i=41,q=2")
+    assert second_image < delete_first
+    assert presenter.active_image_id == 42
+
+    presenter.finish()
+    assert output.getvalue().endswith(b"\x1b_Ga=d,d=i,i=42,q=2;\x1b\\")
+
+
 def test_kitty_pane_presenter_coalesces_identical_generation():
     output = io.BytesIO()
     presenter = KittyPanePresenter(output=output, force=True, environ={})

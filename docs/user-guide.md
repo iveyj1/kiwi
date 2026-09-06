@@ -586,7 +586,7 @@ kiwi-console \
   --presets presets.toml --rows 400 --repeat 200 --fps 20 --refresh-hz 5
 ```
 
-The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` and duplicate generations are coalesced. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
+The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` and duplicate generations are coalesced. Kitty presentation alternates two image/placement IDs, displays each complete replacement first, and only then deletes the previous frame; this avoids the empty interval possible when replacing one image ID in place. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
 
 Guarded live mode uses the controller-owned paired SND/W/F worker and requires an explicit local receiver. Audio starts muted unless `--audio` is supplied:
 
