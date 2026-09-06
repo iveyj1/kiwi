@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Enabled curses mouse reporting and explicitly discard integrated-console mouse events, preventing Kitty wheel motion from falling back to repeated volume-mapped up/down arrows.
 - Fixed CW graphical passband placement: RF edges now include the configured CW radio-frequency offset while the center/reference marker remains at the user frequency.
 - Added shared `m` receive-mode prefix map (`a` AM, `u` USB, `l` LSB, `c` CW) using existing mode/passband/controller routing in both TUI and integrated console.
 - Added current system-volume percentage to the compact RSSI/W/F status row; `k`/`j` remain existing configured TUI actions.

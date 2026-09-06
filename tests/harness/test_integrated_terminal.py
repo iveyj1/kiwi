@@ -10,6 +10,7 @@ from kiwi_client.integrated_terminal import (
     ControllerConsoleSource,
     IntegratedTerminalLayout,
     KittyPanePresenter,
+    discard_console_mouse_event,
     format_frequency_tick_ruler,
     format_preset_ruler,
     main,
@@ -24,6 +25,15 @@ from kiwi_client.waterfall_snapshots import WaterfallSnapshotPublisher
 
 
 FIXTURE = Path("tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl")
+
+
+def test_console_discards_reported_mouse_wheel_instead_of_routing_as_volume_arrow(monkeypatch):
+    consumed = []
+    monkeypatch.setattr("kiwi_client.integrated_terminal.curses.getmouse", lambda: consumed.append(True))
+
+    assert discard_console_mouse_event(__import__("curses").KEY_MOUSE) is None
+    assert consumed == [True]
+    assert discard_console_mouse_event(__import__("curses").KEY_UP) == __import__("curses").KEY_UP
 
 
 def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():

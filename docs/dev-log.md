@@ -901,6 +901,20 @@ The existing configuration calls the user frequency the passband center, but its
 
 A pixel-level regression verifies both CW RF edges, the unchanged 300 kHz user marker, and absence of the former unshifted edge. Focused scale/integrated harness: 23 tests passed. Full harness: 374 tests passed in 4.03 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
 
+## 2026-09-05 — Prevent scroll-wheel volume changes
+
+### Finding
+
+There was no intentional mouse-to-volume mapping. The integrated console had not enabled curses mouse reporting, so Kitty's alternate-screen fallback translated wheel rotation into repeated up/down arrow sequences. Existing configured up/down actions step volume by 10 percent, producing large changes from a small wheel rotation.
+
+### Decision
+
+Enable curses mouse event reporting for the console lifetime, consume `KEY_MOUSE` events with `getmouse()`, and restore the previous no-reporting behavior during cleanup. All mouse events are currently ignored; keyboard up/down and `k`/`j` volume mappings remain unchanged.
+
+### Test result
+
+A regression verifies reported mouse input is consumed while keyboard `KEY_UP` remains available to normal configured dispatch. Integrated harness: 18 tests passed. Full harness: 375 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
 ## YYYY-MM-DD
 
 ### Finding

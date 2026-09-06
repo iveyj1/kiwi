@@ -282,6 +282,17 @@ class KittyPanePresenter:
         self._finished = True
 
 
+def discard_console_mouse_event(key):
+    """Consume reported mouse input so wheel motion cannot masquerade as arrow keys."""
+    if key != curses.KEY_MOUSE:
+        return key
+    try:
+        curses.getmouse()
+    except curses.error:
+        pass
+    return None
+
+
 def _safe_line(screen, row: int, text: str, columns: int, attributes: int = 0) -> None:
     try:
         screen.addnstr(row, 0, text.ljust(columns), max(0, columns - 1), attributes)
@@ -320,6 +331,12 @@ def run_fixture_shell(
     """Run fixture publication, curses text, and Kitty presentation in one thread."""
     screen.nodelay(True)
     screen.keypad(True)
+    mouse_reporting = False
+    try:
+        curses.mousemask(curses.ALL_MOUSE_EVENTS)
+        mouse_reporting = True
+    except curses.error:
+        pass
     try:
         curses.curs_set(0)
     except curses.error:
@@ -380,6 +397,7 @@ def run_fixture_shell(
                 key = screen.get_wch()
             except curses.error:
                 key = None
+            key = discard_console_mouse_event(key)
             if key == curses.KEY_RESIZE:
                 presenter.invalidate()
                 full_redraw = True
@@ -591,6 +609,11 @@ def run_fixture_shell(
                 full_redraw = False
             time.sleep(0.005)
     finally:
+        if mouse_reporting:
+            try:
+                curses.mousemask(0)
+            except curses.error:
+                pass
         if live_source is not None:
             live_source.stop()
         presenter.finish()
