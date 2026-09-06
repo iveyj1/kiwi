@@ -52,8 +52,8 @@ low_cut_hz = -3000
 high_cut_hz = 0
 
 [tuning.mode_passbands.cw]
-low_cut_hz = 650
-high_cut_hz = 1050
+low_cut_hz = 600
+high_cut_hz = 1000
 
 [tuning.mode_steps.am]
 pairs = [[100, 10], [1000, 100], [5000, 1000], [10000, 1000]]

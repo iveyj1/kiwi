@@ -21,6 +21,14 @@ mode = "am"
 mode_passbands = { am = [-5000, 5000], cw = [650, 1050], lsb = [-3000, 0], usb = [0, 3000] }
 port = 8073
 
+[radio_presets.c]
+frequency_khz = 297.8
+high_cut_hz = 1050
+host = "10.0.0.40"
+low_cut_hz = 650
+mode = "cw"
+port = 8073
+
 [radio_presets.d]
 agc_decay_ms = 1000
 agc_gain = 50
