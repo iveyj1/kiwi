@@ -871,6 +871,20 @@ A byte-level regression proves the second image/display command precedes deletio
 
 User validation at maximum zoom reported no further black flashes after double buffering. Continue compact dashboard, persistence, and volume-control refinement.
 
+## 2026-09-05 — Shared receive-mode keymap and compact volume status
+
+### Decision
+
+Added `m` as a shared TUI/integrated prefix for receive modes: `a` AM, `u` USB, `l` LSB, and `c` CW. Selection delegates to existing `mode` command behavior, so configured mode passbands, active SND command routing, shared state, and subsequent mode step pairs remain authoritative. Pending-mode hints show each mode and passband. The integrated compact status now includes controller volume percentage beside fixed RSSI and W/F generations; `k`/`j` continue through configured existing TUI volume actions.
+
+### Test result
+
+TUI harness cycles all four mode mappings and verifies expected default passbands plus pending-map hints. Existing 16-line key-hint bound is preserved by compacting step/mode help. Focused TUI/integrated harness: 69 tests passed. Full harness: 373 tests passed in 4.01 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+### Follow-up
+
+Attended-test mode switching and volume/audio controls, then verify preset/store persistence from the integrated command surface.
+
 ## YYYY-MM-DD
 
 ### Finding

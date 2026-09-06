@@ -567,10 +567,10 @@ def run_fixture_shell(
                     metrics = tui_controller.background.status().metrics or {}
                 rows = [
                     f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
-                    f"{format_rssi_indicator(metrics.get('rssi_db'))} | W/F source {0 if snapshot is None else snapshot.generation} presented {model.rasterizer.presented_generation}",
+                    f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",
-                    "h/l select H/L fine Enter tune c center +/- zoom f freq p preset a audio u auto [/] min {/} max q quit",
+                    "h/l select H/L fine t/T step m mode Enter tune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
                     prompt,
                 ]
                 if tui_input is not None and tui_config is not None:

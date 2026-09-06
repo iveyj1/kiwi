@@ -74,6 +74,14 @@ class CommandHint:
     detail: str = ""
 
 
+RECEIVE_MODE_KEYS = {
+    "a": "am",
+    "u": "usb",
+    "l": "lsb",
+    "c": "cw",
+}
+
+
 COMMAND_HINTS = [
     CommandHint("status", "show state", "status", "Status"),
     CommandHint("dashboard", "show dashboard", "dashboard", "Status"),
@@ -143,9 +151,14 @@ def render_pending_keymap_hints(
         "store-preset": "Store preset (frequency, mode and bandwidth only)",
         "store-all-preset": "Store preset (all radio parameters)",
         "receiver": "Receiver",
+        "receive-mode": "Receive mode",
     }
     lines = ["Key hints", labels.get(pending_key_action, pending_key_action)]
-    if pending_key_action == "receiver":
+    if pending_key_action == "receive-mode":
+        for key, mode in RECEIVE_MODE_KEYS.items():
+            low, high = passband_for_mode(controller.state if controller is not None else ClientState(), mode)
+            lines.append(f"{key} — {mode.upper()} ({low}..{high} Hz)")
+    elif pending_key_action == "receiver":
         receiver_lines: dict[str, str] = {}
         receiver_presets = controller.receiver_presets if controller is not None else {}
         if receiver_presets:
@@ -192,7 +205,7 @@ def sorted_preset_registers(presets: dict[Any, dict[str, Any]]) -> list[tuple[st
 def render_keymap_hints(config: KiwiClientConfig) -> str:
     """Render requested which-key style hints for keymap mode."""
     rows = [
-        ("Tuning", ["h — tune down", "l — tune up", "t/T — larger/smaller step pair"]),
+        ("Tuning", ["h — tune down", "l — tune up", "t/T — larger/smaller step pair; m <mode> — receive mode"]),
         ("Tuning modifiers", ["<shift> h/l — small step"]),
         ("Volume", ["k — volume up", "j — volume down"]),
         (
@@ -540,6 +553,11 @@ def handle_pending_keymap_register(
         if pending == "receiver":
             receiver = receiver_for_register(key_name, config, controller)
             return switch_receiver_from_keymap(controller, receiver)
+        if pending == "receive-mode":
+            mode = RECEIVE_MODE_KEYS.get(key_name)
+            if mode is None:
+                return None, "error: expected mode a=AM u=USB l=LSB c=CW"
+            return controller.execute(f"mode {mode}"), ""
     except ClientCommandError as exc:
         return None, f"error: {exc}"
     return None, None
@@ -608,6 +626,9 @@ def handle_tui_key(
         if key_name == "r":
             input_state.pending_key_action = "receiver"
             return None, "Receiver: press register [0..9] or [a..z]"
+        if key_name == "m":
+            input_state.pending_key_action = "receive-mode"
+            return None, "Receive mode: a=AM u=USB l=LSB c=CW"
         action = config.keys.get(key_name) if key_name is not None else None
         if action == "command-mode" or ch == ord(":"):
             input_state.mode = InputMode.COMMAND

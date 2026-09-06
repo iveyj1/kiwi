@@ -18,6 +18,8 @@ Completed and validated:
 
 Completed:
 
+- Added shared `m` receive-mode prefix map (`a` AM, `u` USB, `l` LSB, `c` CW) using existing mode/passband/controller routing in both TUI and integrated console.
+- Added current system-volume percentage to the compact RSSI/W/F status row; `k`/`j` remain existing configured TUI actions.
 - Replaced same-ID Kitty frame updates with two alternating image/placement IDs; user validation at maximum zoom confirmed black flashes are eliminated.
 - User confirmed runtime audio toggle continues working across receiver switches.
 - Added runtime `a` audio mute/output toggle backed by one shared lazy sink; device state survives receiver restart and failed enable rolls back cleanly.
@@ -37,7 +39,7 @@ Completed:
 
 Next goal:
 
-- Refine compact dashboard/status presentation using existing TUI model data.
+- Continue compact dashboard/status refinement using existing TUI model data; receiver, streams, tuning, steps, mode, audio, RSSI, volume, W/F generation, scale, and persistent messages are now connected.
 - Verify preset/receiver persistence and refine audio/volume status; command/history/hints, configurable dispatch, and runtime audio toggle are now integrated for live mode.
 - Keep waterfall-specific selection/tune/recenter behavior explicit where it intentionally differs from direct TUI tuning.
 - Add pure/fake-operation tests before another attended local session.

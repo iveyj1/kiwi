@@ -552,6 +552,39 @@ def test_tui_safe_quit_keeps_running_when_operation_does_not_stop_quickly():
     controller.background.join(timeout=1.0)
 
 
+def test_tui_receive_mode_prefix_maps_am_usb_lsb_and_cw():
+    controller = ClientController(state=ClientState(mode="am", low_cut_hz=-5000, high_cut_hz=5000))
+    config = load_config()
+    first_input = TuiInputState()
+
+    response, message = handle_tui_key(ord("m"), first_input, controller, config)
+    assert response is None
+    assert message == "Receive mode: a=AM u=USB l=LSB c=CW"
+
+    for key, expected_mode, expected_passband in (
+        ("u", "usb", (0, 3000)),
+        ("l", "lsb", (-3000, 0)),
+        ("c", "cw", (650, 1050)),
+        ("a", "am", (-5000, 5000)),
+    ):
+        input_state = TuiInputState()
+        handle_tui_key(ord("m"), input_state, controller, config)
+        response, message = handle_tui_key(ord(key), input_state, controller, config)
+        assert message == ""
+        assert response["type"] == "state"
+        assert controller.state.mode == expected_mode
+        assert (controller.state.low_cut_hz, controller.state.high_cut_hz) == expected_passband
+
+
+def test_tui_receive_mode_pending_hint_lists_mode_map():
+    text = render_tui_hints(TuiInputState(pending_key_action="receive-mode"), load_config())
+    assert "Receive mode" in text
+    assert "a — AM" in text
+    assert "u — USB" in text
+    assert "l — LSB" in text
+    assert "c — CW" in text
+
+
 def test_tui_keymap_prefix_sequences_store_and_recall_presets():
     controller = ClientController(volume_control=TuiFakeVolumeControl())
     state = TuiInputState()
