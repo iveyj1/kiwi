@@ -885,6 +885,22 @@ TUI harness cycles all four mode mappings and verifies expected default passband
 
 Attended-test mode switching and volume/audio controls, then verify preset/store persistence from the integrated command surface.
 
+## 2026-09-05 — CW graphical passband reference correction
+
+### Finding
+
+At user frequency 300 kHz, CW passband graphics appeared near 300.650–301.050 kHz. The scale composed every mode's cuts directly around the user frequency, but existing CW protocol/state documentation defines the Kiwi radio frequency as `user frequency + cw_offset_hz`. The command path already applied that offset; only the graphical scale omitted it.
+
+### Decision
+
+The graphical scale now accepts a distinct passband reference frequency. The integrated console supplies the radio frequency for CW and the user frequency for other modes. The green center/reference marker remains at the user frequency, while CW bracket edges show the actual RF interval. With current settings (`cw_offset_hz=-800`, cuts 650..1050 Hz), 300 kHz produces edges 299.850..300.250 kHz rather than 300.650..301.050 kHz.
+
+The existing configuration calls the user frequency the passband center, but its 850 Hz cut midpoint differs from the 800 Hz offset by 50 Hz. Therefore the actual bracket center is 300.050 kHz. This small residual is configuration semantics, not a rendering error; exact centering would require matching the offset magnitude to the cut midpoint (for example `-850` with the current cuts), which was not changed.
+
+### Test result
+
+A pixel-level regression verifies both CW RF edges, the unchanged 300 kHz user marker, and absence of the former unshifted edge. Focused scale/integrated harness: 23 tests passed. Full harness: 374 tests passed in 4.03 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
 ## YYYY-MM-DD
 
 ### Finding

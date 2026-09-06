@@ -209,6 +209,7 @@ def compose_waterfall_scale(
     low_cut_hz: int,
     high_cut_hz: int,
     presets: Mapping[str, Mapping[str, Any]],
+    passband_reference_khz: float | None = None,
     label_target_pixels: int = 150,
     font_scale: int = 2,
     font_backend: str = "auto",
@@ -228,8 +229,10 @@ def compose_waterfall_scale(
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
     tuning_top = waterfall.height
 
-    low_frequency = tuned_khz + low_cut_hz / 1000.0
-    high_frequency = tuned_khz + high_cut_hz / 1000.0
+    if passband_reference_khz is None:
+        passband_reference_khz = tuned_khz
+    low_frequency = passband_reference_khz + low_cut_hz / 1000.0
+    high_frequency = passband_reference_khz + high_cut_hz / 1000.0
     low_frequency, high_frequency = sorted((low_frequency, high_frequency))
     center = _frequency_column(tuned_khz, start_khz, end_khz, waterfall.width)
     if high_frequency >= start_khz and low_frequency <= end_khz:

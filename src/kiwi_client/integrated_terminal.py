@@ -547,6 +547,11 @@ def run_fixture_shell(
                         end_khz,
                         tuned_khz=state.frequency_khz,
                         selected_khz=state.selected_khz,
+                        passband_reference_khz=(
+                            state.frequency_khz + state.cw_offset_hz / 1000.0
+                            if state.mode == "cw"
+                            else state.frequency_khz
+                        ),
                         low_cut_hz=state.low_cut_hz,
                         high_cut_hz=state.high_cut_hz,
                         presets=presets,
