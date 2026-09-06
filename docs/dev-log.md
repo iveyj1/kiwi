@@ -869,7 +869,7 @@ A byte-level regression proves the second image/display command precedes deletio
 
 ### Follow-up
 
-Run maximum zoom for several minutes and count any remaining black flashes. If they persist, capture Kitty protocol timing and test transmit-only plus explicit placement synchronization.
+User validation at maximum zoom reported no further black flashes after double buffering. Continue compact dashboard, persistence, and volume-control refinement.
 
 ## YYYY-MM-DD
 
