@@ -5,6 +5,7 @@ from kiwi_client.waterfall_scale import (
     FREQUENCY_SCALE_RGB,
     PASSBAND_SCALE_RGB,
     PRESET_SCALE_RGB,
+    RECEIVER_SCALE_RGB,
     bitmap_text_width,
     compose_waterfall_scale,
     draw_bitmap_text,
@@ -88,17 +89,18 @@ def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_freque
         tuned_khz=300.0,
         passband_reference_khz=299.2,
         selected_khz=300.0,
-        low_cut_hz=650,
-        high_cut_hz=1050,
+        low_cut_hz=600,
+        high_cut_hz=1000,
         presets={},
         font_backend="bitmap",
         font_scale=1,
     )
 
-    assert pixel(result.image, 425, result.tuning_top + 2) == PASSBAND_SCALE_RGB
+    assert pixel(result.image, 100, result.tuning_top + 6) == RECEIVER_SCALE_RGB
+    assert pixel(result.image, 400, result.tuning_top + 2) == PASSBAND_SCALE_RGB
     assert pixel(result.image, 500, result.tuning_top + 6) == PASSBAND_SCALE_RGB
-    assert pixel(result.image, 625, result.tuning_top + 2) == PASSBAND_SCALE_RGB
-    assert pixel(result.image, 825, result.tuning_top + 2) != PASSBAND_SCALE_RGB
+    assert pixel(result.image, 600, result.tuning_top + 2) == PASSBAND_SCALE_RGB
+    assert pixel(result.image, 800, result.tuning_top + 2) != PASSBAND_SCALE_RGB
 
 
 def test_graphical_passband_clips_at_visible_viewport_edge():

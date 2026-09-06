@@ -588,8 +588,16 @@ def run_fixture_shell(
                 metrics = {}
                 if tui_controller is not None:
                     metrics = tui_controller.background.status().metrics or {}
+                radio_frequency_khz = (
+                    state.frequency_khz + state.cw_offset_hz / 1000.0
+                    if state.mode == "cw"
+                    else state.frequency_khz
+                )
+                tuning_status = f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz"
+                if state.mode == "cw":
+                    tuning_status = f"CW nominal {state.frequency_khz:.3f} kHz | RX {radio_frequency_khz:.3f} kHz"
                 rows = [
-                    f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
+                    f"{tuning_status} | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",

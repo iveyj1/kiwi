@@ -12,6 +12,7 @@ from kiwi_client.waterfall_terminal import choose_frequency_tick_step, frequency
 PASSBAND_SCALE_RGB = (0, 255, 0)
 FREQUENCY_SCALE_RGB = (210, 210, 210)
 PRESET_SCALE_RGB = (0, 255, 255)
+RECEIVER_SCALE_RGB = (255, 176, 0)
 
 # Dependency-free 5x7 font. Unknown characters use the question-mark glyph.
 _FONT = {
@@ -235,6 +236,13 @@ def compose_waterfall_scale(
     high_frequency = passband_reference_khz + high_cut_hz / 1000.0
     low_frequency, high_frequency = sorted((low_frequency, high_frequency))
     center = _frequency_column(tuned_khz, start_khz, end_khz, waterfall.width)
+    receiver = _frequency_column(passband_reference_khz, start_khz, end_khz, waterfall.width)
+    if receiver is not None and not math.isclose(passband_reference_khz, tuned_khz, abs_tol=1e-12):
+        for x in range(max(0, receiver - 2), min(waterfall.width, receiver + 3)):
+            _set_pixel(rgb, waterfall.width, x, tuning_top, RECEIVER_SCALE_RGB)
+        for x in range(receiver, min(waterfall.width, receiver + 2)):
+            for y in range(tuning_top, tuning_top + 7):
+                _set_pixel(rgb, waterfall.width, x, y, RECEIVER_SCALE_RGB)
     if high_frequency >= start_khz and low_frequency <= end_khz:
         low = _frequency_column(max(start_khz, low_frequency), start_khz, end_khz, waterfall.width)
         high = _frequency_column(min(end_khz, high_frequency), start_khz, end_khz, waterfall.width)

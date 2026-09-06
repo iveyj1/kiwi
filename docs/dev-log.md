@@ -925,6 +925,20 @@ The graphical frequency ruler now divides each adjacent major-label interval int
 
 The scale regression verifies minor ticks at the first and ninth subdivisions and distinguishes their height from major stems. Focused scale/integrated harness: 24 tests passed. Full harness: 375 tests passed in 4.04 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
 
+## 2026-09-05 — Distinct CW receiver-frequency marker
+
+### Finding
+
+User validation confirmed that applying `filter 600 1000` corrected the restored stale 650..1050 Hz CW passband. The green center mark still admitted ambiguity because it represented nominal/user frequency, not the lower Kiwi receiver frequency from which signed CW cuts are measured.
+
+### Decision
+
+For CW, draw a distinct amber marker at `nominal + cw_offset_hz` and retain the green center mark at nominal frequency. The compact status labels both values as `CW nominal` and `RX`. Other modes omit the redundant receiver marker because nominal and receiver frequencies coincide.
+
+### Test result
+
+The CW scale regression now verifies the amber receiver marker at 299.200 kHz, green nominal marker at 300.000 kHz, and signed passband edges at 299.800/300.200 kHz for offset -800 and cuts +600..+1000 Hz. Focused scale/integrated harness: 24 tests passed. Full harness: 375 tests passed in 4.05 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
 ## YYYY-MM-DD
 
 ### Finding
