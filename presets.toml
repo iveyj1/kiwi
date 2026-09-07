@@ -1,24 +1,9 @@
 [radio_presets.a]
 frequency_khz = 760.0
 high_cut_hz = 5000
-host = "10.0.0.41"
+host = "10.0.0.40"
 low_cut_hz = -5000
 mode = "am"
-port = 8073
-
-[radio_presets.b]
-agc_decay_ms = 1000
-agc_gain = 50
-agc_hang = false
-agc_on = true
-agc_slope = 6
-agc_threshold = -100
-frequency_khz = 10000.0
-high_cut_hz = 5000
-host = "10.0.0.42"
-low_cut_hz = -5000
-mode = "am"
-mode_passbands = { am = [-5000, 5000], cw = [650, 1050], lsb = [-3000, 0], usb = [0, 3000] }
 port = 8073
 
 [radio_presets.c]
@@ -54,3 +39,35 @@ receiver = "10.0.0.41:8073"
 [receiver_presets."3"]
 description = "misdr3"
 receiver = "10.0.0.42:8073"
+
+[receiver_presets."4"]
+description = "tustin"
+receiver = "http://kx4az-t2.proxy.kiwisdr.com:8073"
+
+[receiver_presets."5"]
+description = "k8bmz"
+receiver = "http://kiwi.k8bmz.net:8073/"
+
+[receiver_presets."6"]
+description = "misdr3 proxy"
+receiver = "misdr3.proxy.kiwisdr.com:8073"
+
+[receiver_presets."7"]
+description = "moxely"
+receiver = " http://kiwisdr.moxley.us:8073/ "
+
+[receiver_presets."8"]
+description = "VK5ARG Tarlee, Australia"
+receiver = "kiwisdr.areg.org.au:8074"
+
+[receiver_presets."9"]
+description = "OH6HPS Muurame, Finland"
+receiver = "oh6hps.ddns.net:8073"
+
+[receiver_presets.a]
+description = "HL5NTR Daegu, South Korea"
+receiver = "hl5ntr.ddns.net:8074"
+
+[receiver_presets.b]
+description = "ZL1ROT Rotorua, New Zealand"
+receiver = "sdr.rogerh.co.nz:8073"
