@@ -44,6 +44,21 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — ten-receiver public-directory W/F sample
+
+```text
+Date/time: 2026-09-07T16:49Z–16:52Z UTC
+Source: http://kiwisdr.com/public/ after the documented click-through request; receivers explicitly requested by user
+Settings: W/F only, 1000 kHz, zoom 0, speed 1, interp 13; sequential tests stopping after one frame or three seconds; no retries
+Successful first frame: kiwisdr.areg.org.au:8074, 178.17.3.34:8073, oh3aa.dy.fi:18073, hl5ntr.ddns.net:8074
+Silent for three seconds: sa4bna.hopto.org:8073, sk6ag2.ddns.net:8072, tredxk.no-ip.org:8075, sdr.rogerh.co.nz:8073, g3sdr.com:8078
+Explicit busy/password response: oh6hps.ddns.net:8073 (all no-password channels may be busy)
+Inconclusive directory redirect entries replaced in the sample: bern.proxy.kiwisdr.com, n0bqv.proxy.kiwisdr.com, pb8w.proxy.kiwisdr.com omitted ports and redirected WebSocket requests to an http:// URI rejected by the websockets library
+Observation: 4/10 produced valid standalone W/F immediately, proving non-local W/F transport and parsing. All four successes advertised ext_api >= 2 (three reported 4; one reported 2). K8BMZ advertises ext_api=1 and can provide either standalone W/F or SND but not both independent streams. Public receiver availability/policy varies substantially and combined console failure remains distinct from standalone parser capability.
+Fixture captured: none; all successful payloads matched existing protocol coverage
+Follow-up: test browser-style combined association only on a cooperative receiver and avoid implementing a two-allocation fallback
+```
+
 ### 2026-09-07 — unpaired parallel external SND/W/F
 
 ```text
