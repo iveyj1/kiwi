@@ -33,13 +33,20 @@
 - `.pi/prompts/review-slice.md` — review prompt.
 - `.pi/prompts/fixture-capture.md` — fixture capture prompt.
 
+## Data
+
+- `data/kiwi-public-receivers-2026-09-07.json` — timestamped structured export of 872 online public KiwiSDRs, including SNR and preserved directory metadata.
+
 ## Source
 
 - `src/kiwi_client/` — package code for protocol, transport, SND audio, recording, TUI, live workers, and waterfall rendering.
+- `src/kiwi_client/public_directory.py` — public-directory click-through fetch and deterministic HTML parser.
+- `tools/scrape_kiwi_public.py` — export live or saved public-directory HTML as structured JSON.
 - `tools/waterfall_image.py` — optional static PNG inspection helper for W/F fixtures.
 
 ## Tests
 
+- `tests/harness/test_public_directory.py` — synthetic directory parser coverage for identity, location, SNR, occupancy, GPS, and preserved metadata.
 - `tests/fixtures/kiwi/README.md` — fixture conventions.
 - `tests/fixtures/kiwi/snd-basic.jsonl` — placeholder SND fixture.
 - `tests/fixtures/kiwi/wf-basic.jsonl` — placeholder waterfall fixture.

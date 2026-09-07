@@ -967,6 +967,16 @@ All radio controls are now independent of W/F snapshots. Before the first frame,
 
 No-frame regressions verify exact incremental/direct SND tuning, deferred automatic edge recenter, audio toggle, explicit recenter, and zoom while waiting. Focused integrated/GUI harness: 38 tests passed. Full harness: 379 tests passed in 4.00 seconds; `compileall` passed. `git diff --check` passes for project changes but reports a trailing blank line in the separately modified, uncommitted `presets.toml`.
 
+## 2026-09-07 — Structured KiwiSDR public-directory export
+
+### Decision
+
+Added a stdlib-only click-through fetcher and deterministic parser for `http://kiwisdr.com/public/`. The parser splits receiver entries, extracts URL and all comment-encoded metadata, decodes HTML entities, and exposes normalized identity, location, GPS/grid, overall/HF SNR, occupancy, external-API capacity, antenna, band, hardware/software, status, and update fields while preserving the complete source metadata map. `tools/scrape_kiwi_public.py` supports live fetches and offline saved HTML.
+
+### Result
+
+Parsed the authorized 2026-09-07 directory HTML into `data/kiwi-public-receivers-2026-09-07.json`: 872 receivers, 872 with both SNR values, 872 with names, and 871 with locations. Synthetic parser harness passed. Full harness: 380 tests passed in 4.00 seconds; `compileall` and `git diff --check` passed for project changes (excluding separately modified `presets.toml`).
+
 ## YYYY-MM-DD
 
 ### Finding

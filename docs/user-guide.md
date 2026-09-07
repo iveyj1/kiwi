@@ -32,6 +32,17 @@ Config discovery order:
 3. `~/.config/kiwi-client/config.toml`.
 4. Built-in safe defaults.
 
+### Public receiver directory export
+
+Fetch the KiwiSDR public directory, perform its no-password click-through authorization, and export structured JSON:
+
+```bash
+.kiwi-venv/bin/python tools/scrape_kiwi_public.py \
+  --output data/kiwi-public-receivers.json
+```
+
+For deterministic/offline parsing, supply saved directory HTML with `--html FILE`. Each receiver contains URL, id, name, location, grid/GPS, overall and HF SNR in dB, users/capacity, external-API capacity, antenna, bands, hardware/software, status/update fields, and the complete source key/value metadata map.
+
 Optionally pass a TOML configuration file:
 
 ```bash

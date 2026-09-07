@@ -1,5 +1,13 @@
 # TODO
 
+## Current slice — Public receiver directory scrape
+
+Goal: scrape the explicitly authorized KiwiSDR public directory into structured JSON containing URL, name, location, SNR, occupancy, hardware/software, antenna, GPS, band, API capacity, and preserved source metadata.
+
+Done criteria: deterministic parser coverage from synthetic HTML, click-through fetch support without browser automation/passwords, one timestamped local JSON export, receiver/SNR count validation, docs/dev-log update, and full harness pass.
+
+Completed: exported 872 receivers to `data/kiwi-public-receivers-2026-09-07.json`; all 872 include overall/HF SNR and 871 include location. The complete source metadata map is retained per receiver.
+
 ## Current slice — Existing TUI lower-panel behavior
 
 Branch: `feature/shared-radio-session`, based on the newly updated `main` integration branch.
