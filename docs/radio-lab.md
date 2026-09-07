@@ -44,6 +44,22 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — public paired SND/W/F sample over Starlink
+
+```text
+Date/time: approximately 2026-09-07T16:56Z UTC
+Network: Starlink (reported by user); user reports 100% paired success on LAN/local receivers and prior 0% on selected Starlink/public attempts
+Receivers/settings: ten public-directory receivers plus configured r7; 1000 kHz AM, W/F zoom 0/speed 1/interp 13, null local sink
+Method: normal shared-timestamp paired SND/W/F, sequential, stop as soon as both streams produced data or after eight seconds, no retries/admin commands
+Both SND and W/F succeeded: kiwisdr.areg.org.au:8074 (2.2s), oh6hps.ddns.net:8073 (2.2s), hl5ntr.ddns.net:8074 (2.2s), sdr.rogerh.co.nz:8073 (5.3s)
+Explicit capacity/password errors: 178.17.3.34:8073 (all 4 client slots occupied), oh3aa.dy.fi:18073 (all no-password channels may be busy)
+Both sockets opened but no protocol data in eight seconds: sa4bna.hopto.org:8073, sk6ag2.ddns.net:8072, tredxk.no-ip.org:8075, g3sdr.com:8078
+Configured r7 partial success: kiwisdr.moxley.us:8073 produced 163 SND frames but zero W/F frames in eight seconds
+Observation: paired operation does work over the current Starlink path, disproving a universal Starlink transport failure. Receiver load/policy and silent-open behavior vary. Current `snd_status=running` / `wf_status=running` means sockets/tasks started, not that protocol data arrived; per-stream first-data status and timeout diagnostics are needed.
+Fixture captured: none; successful streams matched existing fixtures and no protocol behavior changed
+Follow-up: add first-message/first-frame status deadlines, then repeat the same receiver set through the planned hotspot for a controlled network-path comparison
+```
+
 ### 2026-09-07 — ten-receiver public-directory W/F sample
 
 ```text

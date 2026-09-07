@@ -64,7 +64,7 @@ See `docs/ui-integration-plan.md`.
 
 ## Deferred waterfall questions
 
-- Diagnose browser-style session association: a ten-receiver public-directory sample produced standalone W/F on 4/10 receivers (all reported `ext_api >= 2`), while K8BMZ `ext_api=1` delivers either standalone W/F or SND but not both independent streams. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback. Local receivers work through `proxy.kiwisdr.com`; password and URL normalization are ruled out.
+- Add first-message/first-frame status deadlines: a Starlink paired sample succeeded fully on 4/10 public receivers, returned explicit capacity errors on 2/10, and opened silently on 4/10; configured r7 produced SND only. Current `running` status indicates task/socket startup rather than received protocol data. Repeat the same set via hotspot for controlled path comparison. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback.
 - Measure whether zoom-dependent vertical slowdown is receiver cadence or presentation cadence.
 - Evaluate a small optional bounded W/F jitter/playout buffer and its smoothness/latency tradeoff.
 - Remap retained history across zoom/recenter changes like the KiwiSDR web client, resampling overlap and filling uncovered frequencies with black.
