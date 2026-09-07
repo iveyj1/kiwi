@@ -18,6 +18,8 @@ Completed and validated:
 
 Completed:
 
+- Made immediate SND tuning safe before the first W/F frame; missing frequency mapping now defers edge recenter instead of terminating `kiwi-console`.
+- User attended validation confirmed immediate tuning on a local receiver.
 - Made simple immediate tuning the integrated-console default: cursor steps tune SND immediately, crossing a visible edge recenters W/F, and live startup centers W/F on startup/restored frequency.
 - Added a distinct amber CW receiver-frequency marker at `nominal + cw_offset_hz`; CW compact status now labels both nominal and RX frequencies.
 - Divided every graphical frequency-label interval into ten equal intervals with short minor ticks while retaining full-height major stems.

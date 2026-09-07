@@ -372,16 +372,15 @@ class WaterfallGuiModel:
         return self.session.dispatch(action)
 
     def move_selection(self, delta: int, *, small: bool = False, clamp_to_view: bool = True):
-        snapshot = self._mapped_snapshot()
+        snapshot = self._mapped_snapshot() if clamp_to_view else self.publisher.latest()
         step_hz = self.small_step_hz if small else self.main_step_hz
         frequency = self.session.state.selected_khz + delta * step_hz / 1000.0
-        if clamp_to_view and snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
+        if snapshot is not None and clamp_to_view and snapshot.current_start_khz is not None and snapshot.current_span_khz is not None:
             start_khz, end_khz = self.display_frequency_range()
             frequency = min(max(frequency, start_khz), end_khz)
         return self._dispatch(SelectFrequency(frequency))
 
     def tune_selected(self):
-        self._mapped_snapshot()
         return self._dispatch(TuneSelected())
 
     def set_direct_frequency(self, frequency_khz: float):

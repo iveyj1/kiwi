@@ -286,9 +286,12 @@ def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool 
     """Move and immediately tune; recenter only after crossing the visible edge."""
     model.move_selection(delta, small=small, clamp_to_view=False)
     tuned = model.tune_selected()
-    start_khz, end_khz = model.display_frequency_range()
-    frequency_khz = model.session.state.frequency_khz
     recentered = None
+    try:
+        start_khz, end_khz = model.display_frequency_range()
+    except ValueError:
+        return tuned, recentered
+    frequency_khz = model.session.state.frequency_khz
     if frequency_khz < start_khz or frequency_khz > end_khz:
         recentered = model.recenter()
     return tuned, recentered

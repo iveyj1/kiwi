@@ -953,6 +953,20 @@ A current-config backend test normalized receiver register 4's URL to `kx4az-t2.
 
 Synthetic fixture tests verify immediate SND tuning without recenter while visible and exact W/F recenter after crossing the right edge. Focused integrated/GUI harness: 36 tests passed. Full harness: 377 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed.
 
+## 2026-09-07 — Tune safely before first W/F frame
+
+### Finding
+
+Two user-selected non-local receivers produced no waterfall; one may have produced audio. Moving the cursor while no W/F snapshot existed raised `waterfall GUI model has no frames` and terminated the console. Bounded KX4AZ-T2 tests found successful HTTP and WebSocket handshakes but no initial Kiwi messages on either stream. A browser Origin header did not help, and bundled reference `kiwirecorder` stalled similarly, pointing to receiver-side external API/channel policy rather than this client's parser.
+
+### Decision
+
+Immediate tuning no longer requires a W/F snapshot. Before the first frame, selection moves without viewport clamping, SND receives the exact tune, and edge recenter is deferred because no visible range exists. Once W/F mapping arrives, normal offscreen recenter resumes. User attended validation confirmed immediate tuning works on a local receiver.
+
+### Test result
+
+A new no-frame regression verifies exact SND tuning and no attempted W/F recenter while waiting. Focused integrated/GUI harness: 37 tests passed. Full harness: 378 tests passed in 4.10 seconds; `compileall` and `git diff --check` passed.
+
 ## YYYY-MM-DD
 
 ### Finding

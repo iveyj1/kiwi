@@ -73,6 +73,20 @@ def test_integrated_layout_rejects_terminal_too_small():
         IntegratedTerminalLayout.compute(columns=30, lines=8)
 
 
+def test_simple_console_tune_remains_available_while_waiting_for_first_waterfall_frame():
+    model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(
+        history_rows=5,
+        tuned_khz=300.0,
+        main_step_hz=100.0,
+    )
+
+    tuned, recentered = tune_console_selection(model, 1)
+
+    assert tuned.commands.snd == ("SET mod=am low_cut=-5000 high_cut=5000 freq=300.100",)
+    assert recentered is None
+    assert model.session.state.frequency_khz == pytest.approx(300.1)
+
+
 def test_simple_console_tune_moves_receiver_and_recenters_after_crossing_view_edge():
     model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(
         history_rows=5,

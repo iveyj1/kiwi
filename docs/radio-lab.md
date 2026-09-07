@@ -54,9 +54,9 @@ Mode/filter: CW, restored session settings
 Stream type: bounded paired SND/W/F, null local sink
 Purpose: diagnose receiver register 4 connection failure
 Commands sent: normal non-admin paired SND/W/F setup only
-Observed behavior: HTTP receiver endpoint returned KiwiSDR 1.902; current-config controller normalized the stored http:// URL and paired SND/W/F reached running without an operation error during a four-second/three-frame bound. Register definitions are startup-loaded, so a console predating the new r4 preset will not see it until restart.
-Fixture captured: none; protocol behavior was unchanged and existing fake-operation coverage remains authoritative
-Follow-up: restart kiwi-console and retry r then 4; capture exact status error if it still fails
+Observed behavior: HTTP receiver endpoint returned KiwiSDR 1.902 and current-config controller normalized the stored http:// URL. WebSocket upgrades returned 101, but neither SND nor W/F delivered an initial Kiwi message or W/F frame in repeated five-second bounds. Adding a browser-style Origin header made no difference and was not retained. The bundled reference kiwirecorder also stalled until an external ten-second process timeout, so this is not specific to the new parser or websockets transport. Receiver `/status` reported `users=5`, `users_max=8`, `mode=rx8.wf3`, and `ext_api=4`; receiver-side external-API/W/F availability or policy remains the likely cause despite browser access.
+Fixture captured: none because the receiver returned no protocol payload
+Follow-up: surface silent-start timeout diagnostics; retry when receiver usage changes or obtain its external-API policy from the operator
 ```
 
 ### 2026-09-05 — integrated receiver switch `.40` to `.41`
