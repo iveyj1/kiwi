@@ -44,6 +44,20 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — K8BMZ standalone versus paired external W/F
+
+```text
+Date/time: approximately 2026-09-07T12:25Z UTC
+Receiver: kiwi.k8bmz.net:8073 (register 5, external receiver explicitly supplied by user)
+Frequency/mode/settings: 298 kHz, CW, zoom 7, speed 4, interp 13
+Stream type: bounded W/F-only and paired SND/W/F comparisons, null local sink
+Purpose: determine whether non-local W/F parsing or paired allocation fails
+Commands sent: normal non-admin auth/setup only; no reconnect loops
+Observed behavior: presets.toml has no password and URL normalization is correct. HTTP /status reported active, users=2/8, mode=rx8.wf3, ext_api=1. Standalone project W/F received 37 valid frames in five seconds, proving external transport and parsing work. Paired runs received normal SND frames (about 90 in five seconds) but zero W/F frames. Browser-Origin, delayed W/F startup, and adjacent reference-client timestamps did not restore paired W/F. Bundled kiwiwfrecorder opened SND and W/F and received SND IQ before the server closed, without clear W/F output. This points to combined external-API stream allocation/association rather than password handling or generic W/F parsing.
+Fixture captured: none; standalone frames matched the existing parser and paired W/F returned no payload
+Follow-up: compare with a receiver advertising multiple available external API channels; preserve same-timestamp browser-compatible project behavior known to work on the local proxy
+```
+
 ### 2026-09-07 — requested KX4AZ-T2 proxy diagnosis
 
 ```text
