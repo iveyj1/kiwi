@@ -282,6 +282,18 @@ class KittyPanePresenter:
         self._finished = True
 
 
+def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool = False):
+    """Move and immediately tune; recenter only after crossing the visible edge."""
+    model.move_selection(delta, small=small, clamp_to_view=False)
+    tuned = model.tune_selected()
+    start_khz, end_khz = model.display_frequency_range()
+    frequency_khz = model.session.state.frequency_khz
+    recentered = None
+    if frequency_khz < start_khz or frequency_khz > end_khz:
+        recentered = model.recenter()
+    return tuned, recentered
+
+
 def discard_console_mouse_event(key):
     """Consume reported mouse input so wheel motion cannot masquerade as arrow keys."""
     if key != curses.KEY_MOUSE:
@@ -462,19 +474,19 @@ def run_fixture_shell(
                 message = "preset register?"
                 dirty = True
             elif key in ("h", curses.KEY_LEFT):
-                model.move_selection(-1)
+                tune_console_selection(model, -1)
                 presenter.invalidate()
                 dirty = True
             elif key in ("l", curses.KEY_RIGHT):
-                model.move_selection(1)
+                tune_console_selection(model, 1)
                 presenter.invalidate()
                 dirty = True
             elif key == "H":
-                model.move_selection(-1, small=True)
+                tune_console_selection(model, -1, small=True)
                 presenter.invalidate()
                 dirty = True
             elif key == "L":
-                model.move_selection(1, small=True)
+                tune_console_selection(model, 1, small=True)
                 presenter.invalidate()
                 dirty = True
             elif key in ("\n", "\r"):
@@ -601,7 +613,7 @@ def run_fixture_shell(
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",
-                    "h/l select H/L fine t/T step m mode Enter tune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
+                    "h/l tune H/L fine t/T step m mode Enter retune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
                     prompt,
                 ]
                 if tui_input is not None and tui_config is not None:
@@ -738,7 +750,7 @@ def main(argv: list[str] | None = None) -> int:
             receiver_presets=startup_receiver_presets(config),
         )
         controller.configure_waterfall_session(
-            center_khz=config.waterfall.center_khz,
+            center_khz=state.frequency_khz,
             zoom=config.waterfall.zoom,
             speed=config.waterfall.speed,
             interp=config.waterfall.interp,

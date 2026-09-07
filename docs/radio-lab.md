@@ -44,6 +44,21 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — requested KX4AZ-T2 proxy diagnosis
+
+```text
+Date/time: 2026-09-07T14:11Z UTC
+Receiver: kx4az-t2.proxy.kiwisdr.com:8073 (external receiver explicitly requested by user)
+Frequency: restored session frequency, approximately 298 kHz
+Mode/filter: CW, restored session settings
+Stream type: bounded paired SND/W/F, null local sink
+Purpose: diagnose receiver register 4 connection failure
+Commands sent: normal non-admin paired SND/W/F setup only
+Observed behavior: HTTP receiver endpoint returned KiwiSDR 1.902; current-config controller normalized the stored http:// URL and paired SND/W/F reached running without an operation error during a four-second/three-frame bound. Register definitions are startup-loaded, so a console predating the new r4 preset will not see it until restart.
+Fixture captured: none; protocol behavior was unchanged and existing fake-operation coverage remains authoritative
+Follow-up: restart kiwi-console and retry r then 4; capture exact status error if it still fails
+```
+
 ### 2026-09-05 — integrated receiver switch `.40` to `.41`
 
 ```text

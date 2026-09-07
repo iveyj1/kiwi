@@ -18,6 +18,7 @@ Completed and validated:
 
 Completed:
 
+- Made simple immediate tuning the integrated-console default: cursor steps tune SND immediately, crossing a visible edge recenters W/F, and live startup centers W/F on startup/restored frequency.
 - Added a distinct amber CW receiver-frequency marker at `nominal + cw_offset_hz`; CW compact status now labels both nominal and RX frequencies.
 - Divided every graphical frequency-label interval into ten equal intervals with short minor ticks while retaining full-height major stems.
 - Enabled curses mouse reporting and explicitly discard integrated-console mouse events, preventing Kitty wheel motion from falling back to repeated volume-mapped up/down arrows.

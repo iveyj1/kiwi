@@ -939,6 +939,20 @@ For CW, draw a distinct amber marker at `nominal + cw_offset_hz` and retain the 
 
 The CW scale regression now verifies the amber receiver marker at 299.200 kHz, green nominal marker at 300.000 kHz, and signed passband edges at 299.800/300.200 kHz for offset -800 and cuts +600..+1000 Hz. Focused scale/integrated harness: 24 tests passed. Full harness: 375 tests passed in 4.05 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
 
+## 2026-09-07 — Immediate console tuning and external receiver diagnosis
+
+### Decision
+
+The integrated console now defaults to simple immediate tuning. Main/fine cursor keys move selection without viewport clamping, send the SND tune immediately, and issue W/F recenter only after the tuned frequency crosses a visible edge. Live startup uses the restored/startup tuned frequency as initial W/F center rather than `[waterfall].center_khz`. Enter remains an explicit retune and `c` an explicit recenter.
+
+### Receiver finding
+
+A current-config backend test normalized receiver register 4's URL to `kx4az-t2.proxy.kiwisdr.com:8073` and established paired SND/W/F successfully. The likely observed `r4` failure was a console process started before register 4 was added to `presets.toml`; receiver registers are loaded at startup and are not hot-reloaded. Restarting `kiwi-console` loads the new register.
+
+### Test result
+
+Synthetic fixture tests verify immediate SND tuning without recenter while visible and exact W/F recenter after crossing the right edge. Focused integrated/GUI harness: 36 tests passed. Full harness: 377 tests passed in 4.02 seconds; `compileall` and `git diff --check` passed.
+
 ## YYYY-MM-DD
 
 ### Finding
