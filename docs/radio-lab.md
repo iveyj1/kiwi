@@ -44,6 +44,20 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — unpaired parallel external SND/W/F
+
+```text
+Date/time: approximately 2026-09-07T12:41Z UTC
+Receivers: kiwi.k8bmz.net:8073 (r5), then kx4az-t2.proxy.kiwisdr.com:8073 (r4); both explicitly requested external tests
+Frequency/mode/settings: nominal 298.000 kHz, CW receiver 297.200 kHz, cuts +600..+1000 Hz, W/F zoom 7/speed 4/interp 13
+Stream type: independent parallel SND and W/F, distinct timestamps separated by 37, five-second bounds, null sink
+Purpose: determine whether unpaired sessions restore W/F and whether they consume two allocations
+Commands sent: normal non-admin auth/setup only; no reconnect loops
+Observed behavior: on K8BMZ (`ext_api=1`), W/F received 63 valid frames while SND received no initial message or audio. This demonstrates that the independent sessions compete for separate external-API allocations rather than forming one receiver session; only one can succeed with the advertised single allocation. On KX4AZ-T2 (`ext_api=4`), neither stream returned an initial message in the bounded test, consistent with unavailable/full or policy-blocked API allocations at that time. Unpaired parallel operation therefore does not provide an acceptable combined fallback and can tie up two receiver allocations when available.
+Fixture captured: none; K8BMZ W/F matched existing parser behavior and no new protocol payload was discovered
+Follow-up: do not adopt unpaired parallel mode as the default; investigate browser session association/cookies/connection identity or accept receiver external-API policy limitations
+```
+
 ### 2026-09-07 — K8BMZ standalone versus paired external W/F
 
 ```text

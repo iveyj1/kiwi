@@ -64,7 +64,7 @@ See `docs/ui-integration-plan.md`.
 
 ## Deferred waterfall questions
 
-- Diagnose combined external-API allocation: K8BMZ delivers standalone W/F and paired SND but no paired W/F, while local receivers work through `proxy.kiwisdr.com`; password and URL normalization are ruled out.
+- Diagnose browser-style session association: K8BMZ delivers standalone W/F and paired SND but no paired W/F; unpaired parallel SND/W/F consumes separate API allocations and only W/F succeeds with `ext_api=1`, so it is not an acceptable fallback. Local receivers work through `proxy.kiwisdr.com`; password and URL normalization are ruled out.
 - Measure whether zoom-dependent vertical slowdown is receiver cadence or presentation cadence.
 - Evaluate a small optional bounded W/F jitter/playout buffer and its smoothness/latency tradeoff.
 - Remap retained history across zoom/recenter changes like the KiwiSDR web client, resampling overlap and filling uncovered frequencies with black.
