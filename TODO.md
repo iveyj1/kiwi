@@ -72,7 +72,7 @@ See `docs/ui-integration-plan.md`.
 
 ## Deferred waterfall questions
 
-- Add first-message/first-frame status deadlines: a Starlink paired sample succeeded fully on 4/10 public receivers, returned explicit capacity errors on 2/10, and opened silently on 4/10; configured r7 produced SND only. Current `running` status indicates task/socket startup rather than received protocol data. Repeat the same set via hotspot for controlled path comparison. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback.
+- Add first-message/first-frame and stalled-stream deadlines: a Starlink paired sample succeeded fully on 4/10 public receivers, and the same four worked through Verizon hotspot, but repeated switching eventually froze both streams. Further receiver switching did not recover; process restart did. Reproduce delayed/stalled worker teardown in the harness and distinguish socket/task startup from actual data flow before adding explicit session recovery. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback.
 - Measure whether zoom-dependent vertical slowdown is receiver cadence or presentation cadence.
 - Evaluate a small optional bounded W/F jitter/playout buffer and its smoothness/latency tradeoff.
 - Remap retained history across zoom/recenter changes like the KiwiSDR web client, resampling overlap and filling uncovered frequencies with black.

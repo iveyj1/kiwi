@@ -977,6 +977,20 @@ Added a stdlib-only click-through fetcher and deterministic parser for `http://k
 
 Parsed the authorized 2026-09-07 directory HTML into `data/kiwi-public-receivers-2026-09-07.json`: 872 receivers, 872 with both SNR values, 872 with names, and 871 with locations. Synthetic parser harness passed. Full harness: 380 tests passed in 4.00 seconds; `compileall` and `git diff --check` passed for project changes (excluding separately modified `presets.toml`).
 
+## 2026-09-07 — Clickable receiver-register page
+
+### Decision
+
+Added `receiver-presets.html`, a dependency-free table linking every current receiver register to its KiwiSDR web client in a new tab. A harness parses the HTML and `presets.toml`, normalizes URL forms, and requires exact set/count equality so future preset additions cannot silently leave the page stale.
+
+### User observation
+
+Public paired-working registers 8, 9, a, and b all worked through a Verizon hotspot. Repeated receiver switching eventually froze both SND and W/F; subsequent switching did not recover, while restarting `kiwi-console` did. This is now tracked as a stalled-worker/session recovery defect rather than a receiver-specific failure.
+
+### Test result
+
+Focused HTML/preset/state/TUI harness: 60 tests passed. Full harness: 381 tests passed in 4.62 seconds; `compileall` and `git diff --check` passed.
+
 ## YYYY-MM-DD
 
 ### Finding

@@ -32,6 +32,14 @@ Config discovery order:
 3. `~/.config/kiwi-client/config.toml`.
 4. Built-in safe defaults.
 
+### Receiver web links
+
+Open `receiver-presets.html` in a browser for a clickable table containing every receiver register from `presets.toml`:
+
+```bash
+xdg-open receiver-presets.html
+```
+
 ### Public receiver directory export
 
 Fetch the KiwiSDR public directory, perform its no-password click-through authorization, and export structured JSON:

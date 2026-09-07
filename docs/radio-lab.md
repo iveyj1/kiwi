@@ -44,6 +44,16 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-07 — user Verizon hotspot and switch-freeze observations
+
+```text
+Network: Verizon hotspot
+Receivers: paired-working public registers 8, 9, a, and b
+Observation: user confirmed all four paired SND/W/F receivers work. During repeated receiver switching, both SND and W/F later stopped. Switching to another receiver did not recover either stream; restarting kiwi-console recovered operation.
+Comparison: user reports other machines show results similar to prior public-receiver tests over Starlink, while LAN receivers have been consistently successful.
+Follow-up: reproduce with fake delayed/stalled transports, add first-data/stall status deadlines, and verify old worker/event-loop teardown before replacement startup. Do not assume another receiver switch is sufficient recovery.
+```
+
 ### 2026-09-07 — public paired SND/W/F sample over Starlink
 
 ```text

@@ -8,6 +8,7 @@
 - `pyproject.toml` — Python package metadata, optional dependencies, and CLI entry points.
 - `config.toml` — local working configuration.
 - `presets.toml` — durable local radio and receiver presets.
+- `receiver-presets.html` — clickable web-client links for every receiver register.
 
 ## Docs
 
@@ -47,6 +48,7 @@
 ## Tests
 
 - `tests/harness/test_public_directory.py` — synthetic directory parser coverage for identity, location, SNR, occupancy, GPS, and preserved metadata.
+- `tests/harness/test_receiver_presets_html.py` — verifies the HTML link set exactly matches receiver registers.
 - `tests/fixtures/kiwi/README.md` — fixture conventions.
 - `tests/fixtures/kiwi/snd-basic.jsonl` — placeholder SND fixture.
 - `tests/fixtures/kiwi/wf-basic.jsonl` — placeholder waterfall fixture.
