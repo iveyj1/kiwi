@@ -961,11 +961,11 @@ Two user-selected non-local receivers produced no waterfall; one may have produc
 
 ### Decision
 
-Immediate tuning no longer requires a W/F snapshot. Before the first frame, selection moves without viewport clamping, SND receives the exact tune, and edge recenter is deferred because no visible range exists. Once W/F mapping arrives, normal offscreen recenter resumes. User attended validation confirmed immediate tuning works on a local receiver.
+All radio controls are now independent of W/F snapshots. Before the first frame, incremental and direct frequency entry send exact SND tuning, audio toggle remains available, and recenter/zoom may still queue W/F commands. Incremental tuning moves without viewport clamping and defers automatic edge recenter because no visible range exists. Once W/F mapping arrives, normal offscreen recenter resumes. User attended validation confirmed immediate tuning works on a local receiver.
 
 ### Test result
 
-A new no-frame regression verifies exact SND tuning and no attempted W/F recenter while waiting. Focused integrated/GUI harness: 37 tests passed. Full harness: 378 tests passed in 4.10 seconds; `compileall` and `git diff --check` passed.
+No-frame regressions verify exact incremental/direct SND tuning, deferred automatic edge recenter, audio toggle, explicit recenter, and zoom while waiting. Focused integrated/GUI harness: 38 tests passed. Full harness: 379 tests passed in 4.00 seconds; `compileall` passed. `git diff --check` passes for project changes but reports a trailing blank line in the separately modified, uncommitted `presets.toml`.
 
 ## YYYY-MM-DD
 

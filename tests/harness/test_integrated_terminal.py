@@ -73,6 +73,23 @@ def test_integrated_layout_rejects_terminal_too_small():
         IntegratedTerminalLayout.compute(columns=30, lines=8)
 
 
+def test_direct_tune_and_audio_toggle_work_while_waiting_for_first_waterfall_frame():
+    model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(
+        history_rows=5,
+        tuned_khz=300.0,
+    )
+
+    tuned = model.set_tuned_frequency(400.125)
+    audio = model.toggle_audio()
+    recentered = model.recenter()
+    zoomed = model.zoom(1)
+
+    assert tuned.commands.snd == ("SET mod=am low_cut=-5000 high_cut=5000 freq=400.125",)
+    assert audio.state.audio_enabled is True
+    assert recentered.commands.waterfall == ("SET zoom=0 cf=400.125",)
+    assert zoomed.commands.waterfall == ("SET zoom=1 cf=400.125",)
+
+
 def test_simple_console_tune_remains_available_while_waiting_for_first_waterfall_frame():
     model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(
         history_rows=5,
