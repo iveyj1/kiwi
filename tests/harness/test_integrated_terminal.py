@@ -17,6 +17,8 @@ from kiwi_client.integrated_terminal import (
     nearest_step_pair_index,
     format_rssi_indicator,
     rssi_s_unit,
+    set_console_frequency,
+    tune_console_one_screen,
     tune_console_selection,
 )
 from kiwi_client.session_manager import RadioSessionManager
@@ -143,18 +145,43 @@ def test_simple_console_tune_does_not_recenter_while_cursor_remains_visible():
     assert model.session.state.waterfall_center_khz == pytest.approx(original_center)
 
 
-def test_console_frequency_entry_tunes_without_implicit_recenter():
+def test_console_frequency_entry_recenters_only_when_frequency_is_offscreen():
     model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(history_rows=5)
     timeline = __import__("kiwi_client.gui_app", fromlist=["FixtureWaterfallTimeline"]).FixtureWaterfallTimeline.from_fixture(FIXTURE)
     timeline.advance(model.publisher)
-    model.display_frequency_range()
+    start, end = model.display_frequency_range()
     original_center = model.session.state.waterfall_center_khz
 
-    model.set_tuned_frequency(860.0)
+    inside_tuned, inside_recentered = set_console_frequency(model, 860.0)
+    outside_tuned, outside_recentered = set_console_frequency(model, end + 10.0)
 
-    assert model.session.state.frequency_khz == pytest.approx(860.0)
-    assert model.session.state.selected_khz == pytest.approx(860.0)
-    assert model.session.state.waterfall_center_khz == pytest.approx(original_center)
+    assert inside_tuned.commands.snd == ("SET mod=am low_cut=-5000 high_cut=5000 freq=860.000",)
+    assert inside_recentered is None
+    assert original_center != pytest.approx(end + 10.0)
+    assert outside_tuned.commands.snd == (f"SET mod=am low_cut=-5000 high_cut=5000 freq={end + 10:.3f}",)
+    assert outside_recentered.commands.waterfall == (f"SET zoom=7 cf={end + 10:.3f}",)
+    assert model.session.state.frequency_khz == pytest.approx(end + 10.0)
+    assert model.session.state.selected_khz == pytest.approx(end + 10.0)
+    assert model.session.state.waterfall_center_khz == pytest.approx(end + 10.0)
+
+
+def test_console_one_screen_tunes_and_recenters_by_visible_span():
+    model = __import__("kiwi_client.gui_app", fromlist=["WaterfallGuiModel"]).WaterfallGuiModel(
+        history_rows=5,
+        tuned_khz=855.0,
+    )
+    timeline = __import__("kiwi_client.gui_app", fromlist=["FixtureWaterfallTimeline"]).FixtureWaterfallTimeline.from_fixture(FIXTURE)
+    timeline.advance(model.publisher)
+    start, end = model.display_frequency_range()
+    span = end - start
+
+    tuned_up, recentered_up = tune_console_one_screen(model, 1)
+    tuned_down, recentered_down = tune_console_one_screen(model, -1)
+
+    assert tuned_up.state.frequency_khz == pytest.approx(855.0 + span)
+    assert recentered_up.commands.waterfall == (f"SET zoom=7 cf={855.0 + span:.3f}",)
+    assert tuned_down.state.frequency_khz == pytest.approx(855.0)
+    assert recentered_down.commands.waterfall == ("SET zoom=7 cf=855.000",)
 
 
 def test_preset_ruler_places_only_visible_non_overlapping_presets():

@@ -1,10 +1,13 @@
+import asyncio
+import struct
 from pathlib import Path
+from threading import Event
 
 import pytest
 
 from kiwi_client.fixtures import load_jsonl_events
 from kiwi_client.live_capture import LiveCaptureError
-from kiwi_client.live_play import LiveSndPlaybackConfig, apply_fade_in, apply_fade_out, main, play_replay_snd
+from kiwi_client.live_play import LiveSndPlaybackConfig, apply_fade_in, apply_fade_out, main, play_live_snd, play_replay_snd
 from kiwi_client.playback import NullAudioSink
 from kiwi_client.transport import ReplayTransport
 
@@ -128,7 +131,7 @@ def test_live_play_dry_run_plan_has_commands():
 
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert "SET AR OK in=<audio_rate> out=44100" in plan["dynamic_commands"]
     assert "SET mod=am low_cut=-5000 high_cut=5000 freq=5000.000" in plan["dynamic_commands"]
@@ -145,7 +148,7 @@ def test_live_play_cli_dry_run_does_not_connect(capsys):
     code = main(["--dry-run", "--host", "10.0.0.40", "--timestamp", "123456"])
 
     assert code == 0
-    assert "ws://10.0.0.40:8073/123456/SND" in capsys.readouterr().out
+    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
 
 
 def test_live_play_rejects_non_allowed_receiver():
@@ -159,3 +162,105 @@ def test_live_play_allows_unrestricted_receiver_and_unlimited_limits():
     config = LiveSndPlaybackConfig(host="example.com", receivers_restricted=False, duration_seconds=0, max_frames=0)
 
     config.validate()
+
+
+class FakeWebSocket:
+    def __init__(self, messages, *, stall_after_messages=False):
+        self.messages = list(messages)
+        self.stall_after_messages = stall_after_messages
+        self.sent = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def send(self, command):
+        self.sent.append(command)
+
+    async def recv(self):
+        await asyncio.sleep(0)
+        if self.messages:
+            return self.messages.pop(0)
+        if self.stall_after_messages:
+            await asyncio.Event().wait()
+        raise RuntimeError("fake websocket exhausted")
+
+
+def test_live_play_reports_ready_only_after_auth_success():
+    websocket = FakeWebSocket([b"MSG badp=0"])
+    stop_event = Event()
+    ready = []
+
+    def connected(*args, **kwargs):
+        return websocket
+
+    def on_ready():
+        ready.append(list(websocket.sent))
+        stop_event.set()
+
+    asyncio.run(
+        play_live_snd(
+            LiveSndPlaybackConfig(timestamp=123, duration_seconds=0, max_frames=0),
+            NullAudioSink(),
+            allow_live=True,
+            stop_event=stop_event,
+            session_ready_callback=on_ready,
+            websocket_connect=connected,
+        )
+    )
+
+    assert ready == [["SET auth t=kiwi p="]]
+
+
+def test_live_play_does_not_report_ready_when_auth_fails():
+    websocket = FakeWebSocket([b"MSG badp=1"])
+    ready = []
+
+    with pytest.raises(LiveCaptureError, match="busy or bad password"):
+        asyncio.run(
+            play_live_snd(
+                LiveSndPlaybackConfig(timestamp=123),
+                NullAudioSink(),
+                allow_live=True,
+                session_ready_callback=lambda: ready.append(True),
+                websocket_connect=lambda *args, **kwargs: websocket,
+            )
+        )
+
+    assert ready == []
+
+
+def test_live_play_stalled_stream_does_not_block_stop_fade():
+    snd = b"SND" + struct.pack("<BI", 0, 1) + struct.pack(">Hh", 850, 1000)
+    websocket = FakeWebSocket(
+        [b"MSG badp=0", b"MSG sample_rate=12000 audio_rate=12000", snd],
+        stall_after_messages=True,
+    )
+    stop_event = Event()
+
+    async def exercise():
+        task = asyncio.create_task(
+            play_live_snd(
+                LiveSndPlaybackConfig(
+                    timestamp=123,
+                    duration_seconds=0,
+                    max_frames=0,
+                    startup_mute_ms=0,
+                    startup_fade_in_ms=0,
+                    stop_fade_out_ms=100,
+                ),
+                NullAudioSink(),
+                allow_live=True,
+                stop_event=stop_event,
+                status_callback=lambda status: stop_event.set(),
+                websocket_connect=lambda *args, **kwargs: websocket,
+            )
+        )
+        return await asyncio.wait_for(task, timeout=1.0)
+
+    result = asyncio.run(exercise())
+
+    assert result.chunks == 1
+    assert result.frames == 1

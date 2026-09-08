@@ -11,7 +11,7 @@ import asyncio
 import json
 import queue
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event
 from typing import Any, Callable
@@ -33,6 +33,7 @@ from kiwi_client.live_capture import (
 from kiwi_client.playback import AudioSink, NullAudioSink, PlaybackResult, SoundDeviceSink, samples_to_pcm16le
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
+from kiwi_client.session_bootstrap import KiwiBootstrapError, browser_websocket_uri, fallback_connection_timestamp, resolve_connection_timestamp
 from kiwi_client.transport import ReplayTransport
 
 
@@ -80,8 +81,8 @@ class LiveSndPlaybackConfig:
             raise LiveCaptureError("stop_fade_out_ms must be >= 0")
 
     def websocket_uri(self) -> str:
-        timestamp = self.timestamp if self.timestamp is not None else int(time.time())
-        return f"ws://{self.host}:{self.port}/{timestamp}/SND"
+        timestamp = self.timestamp if self.timestamp is not None else fallback_connection_timestamp()
+        return browser_websocket_uri(self.host, self.port, timestamp, "SND")
 
     @property
     def effective_radio_frequency_khz(self) -> float:
@@ -301,15 +302,25 @@ async def play_live_snd(
     command_queue: queue.Queue[str] | None = None,
     status_callback: Callable[[dict], None] | None = None,
     session_ready_callback: Callable[[], None] | None = None,
+    websocket_connect: Callable[..., Any] | None = None,
+    timestamp_resolver: Callable[[str, int], Any] = resolve_connection_timestamp,
 ) -> PlaybackResult:
     """Run one guarded live SND playback session."""
     config.validate()
     if not allow_live:
         raise LiveCaptureError("live playback requires allow_live=True")
-    try:
-        import websockets
-    except ImportError as exc:
-        raise LiveCaptureError("live playback requires optional dependency: pip install '.[live]'") from exc
+    if websocket_connect is None:
+        try:
+            import websockets
+        except ImportError as exc:
+            raise LiveCaptureError("live playback requires optional dependency: pip install '.[live]'") from exc
+        websocket_connect = websockets.connect
+    if config.timestamp is None:
+        try:
+            timestamp = await timestamp_resolver(config.host, config.port)
+        except KiwiBootstrapError as exc:
+            raise LiveCaptureError(str(exc)) from exc
+        config = replace(config, timestamp=timestamp)
 
     state = ReceiverState()
     sink_started = False
@@ -327,16 +338,15 @@ async def play_live_snd(
     fading_out = False
     start = time.monotonic()
     last_keepalive = start
+    authenticated = False
 
-    async with websockets.connect(
+    async with websocket_connect(
         config.websocket_uri(),
         max_queue=0,
         close_timeout=WEBSOCKET_CLOSE_TIMEOUT_SECONDS,
     ) as websocket:
         try:
             await websocket.send(encode_auth())
-            if session_ready_callback is not None:
-                session_ready_callback()
             while snd_loop_allowed(start, snd_frames, duration_seconds=config.duration_seconds, max_frames=config.max_frames):
                 if stop_event is not None and stop_event.is_set() and not fading_out:
                     fade_out_total = samples_for_ms(state.sample_rate, config.stop_fade_out_ms)
@@ -360,17 +370,27 @@ async def play_live_snd(
                 try:
                     message = await asyncio.wait_for(websocket.recv(), timeout=remaining)
                 except asyncio.TimeoutError:
+                    if fading_out:
+                        break
                     continue
                 if isinstance(message, str):
                     params = parse_msg(message).params
                     raise_for_kiwi_error(params, receiver=config.receiver)
                     state = state.apply_msg_params(params)
+                    if not authenticated and params.get("badp") == "0":
+                        authenticated = True
+                        if session_ready_callback is not None:
+                            session_ready_callback()
                 else:
                     payload = bytes(message)
                     if payload.startswith(b"MSG"):
                         params = parse_msg(payload).params
                         raise_for_kiwi_error(params, receiver=config.receiver)
                         state = state.apply_msg_params(params)
+                        if not authenticated and params.get("badp") == "0":
+                            authenticated = True
+                            if session_ready_callback is not None:
+                                session_ready_callback()
                     else:
                         if drop_samples_remaining is None:
                             drop_samples_remaining = startup_drop_samples(config, state.sample_rate)

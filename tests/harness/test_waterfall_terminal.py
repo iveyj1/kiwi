@@ -181,8 +181,8 @@ def test_combined_waterfall_and_delayed_audio_share_one_session_timestamp(tmp_pa
 
     assert args.timestamp == 123456
     assert waterfall.timestamp == audio.timestamp == 123456
-    assert waterfall.websocket_uri() == "ws://10.0.0.40:8073/123456/W/F"
-    assert audio.websocket_uri() == "ws://10.0.0.40:8073/123456/SND"
+    assert waterfall.websocket_uri() == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
+    assert audio.websocket_uri() == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
 
 
 def test_explicit_combined_session_timestamp_is_preserved(tmp_path: Path):

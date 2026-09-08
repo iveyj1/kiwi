@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import queue
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from threading import Event
 from typing import Any, Callable
 
+from kiwi_client.live_capture import LiveCaptureError
 from kiwi_client.live_play import LiveSndPlaybackConfig, play_live_snd
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig, capture_live_waterfall
 from kiwi_client.paired_session import PairedSessionCoordinator, pair_session_configs
 from kiwi_client.playback import AudioSink
+from kiwi_client.session_bootstrap import KiwiBootstrapError, resolve_connection_timestamp
 from kiwi_client.waterfall import WaterfallFrame
 
 
@@ -28,11 +30,20 @@ class RoutedSessionCommand:
 class PrimarySndSession:
     """UI-neutral primary SND task with readiness and error status."""
 
-    def __init__(self, config, sink, *, runner=play_live_snd, status_callback=None):
+    def __init__(
+        self,
+        config,
+        sink,
+        *,
+        runner=play_live_snd,
+        status_callback=None,
+        finish_timeout_seconds: float = 1.0,
+    ):
         self.config = config
         self.sink = sink
         self.runner = runner
         self.status_callback = status_callback
+        self.finish_timeout_seconds = finish_timeout_seconds
         self.command_queue: queue.Queue[str] = queue.Queue()
         self.stop_event: Event | None = None
         self.task: asyncio.Task | None = None
@@ -82,8 +93,13 @@ class PrimarySndSession:
     async def finish(self) -> None:
         if self.stop_event is not None:
             self.stop_event.set()
-        if self.task is not None:
-            await self.task
+        if self.task is None:
+            return
+        try:
+            await asyncio.wait_for(asyncio.shield(self.task), timeout=self.finish_timeout_seconds)
+        except asyncio.TimeoutError:
+            self.task.cancel()
+            await asyncio.gather(self.task, return_exceptions=True)
 
 
 async def run_live_paired_session(
@@ -98,8 +114,16 @@ async def run_live_paired_session(
     frame_callback: Callable[[WaterfallFrame], None] | None = None,
     snd_runner=play_live_snd,
     waterfall_runner=capture_live_waterfall,
+    timestamp_resolver=resolve_connection_timestamp,
 ) -> dict[str, Any]:
     """Run one headless paired session and route controller commands by stream."""
+    if waterfall_config.timestamp is None and snd_config.timestamp is None:
+        try:
+            timestamp = await timestamp_resolver(snd_config.host, snd_config.port)
+        except KiwiBootstrapError as exc:
+            raise LiveCaptureError(str(exc)) from exc
+        waterfall_config = replace(waterfall_config, timestamp=timestamp)
+        snd_config = replace(snd_config, timestamp=timestamp)
     waterfall_config, snd_config = pair_session_configs(waterfall_config, snd_config)
     primary = PrimarySndSession(
         snd_config,

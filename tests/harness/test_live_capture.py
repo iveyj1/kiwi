@@ -20,6 +20,10 @@ def test_kiwi_busy_error_messages_are_user_facing():
     assert kiwi_error_from_msg_params({"badp": "1"}, receiver="10.0.0.40:8073") == (
         "server busy or bad password: all no-password channels may be busy on 10.0.0.40:8073"
     )
+    assert kiwi_error_from_msg_params({"badp": "5"}, receiver="10.0.0.40:8073") == (
+        "authentication rejected by 10.0.0.40:8073: badp=5"
+    )
+    assert kiwi_error_from_msg_params({"badp": "0"}, receiver="10.0.0.40:8073") is None
     assert kiwi_error_from_msg_params({"down": None}, receiver="10.0.0.40:8073") == "server down: 10.0.0.40:8073"
     assert kiwi_error_from_msg_params({"redirect": "http://example.test:8073"}, receiver="10.0.0.40:8073") == (
         "server redirected 10.0.0.40:8073 to http://example.test:8073"
@@ -102,7 +106,7 @@ def test_live_capture_dry_run_plan_has_local_uri_and_fixture_tested_commands(tmp
     config.validate()
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert plan["dynamic_commands"] == [
         "SET AR OK in=<audio_rate> out=44100",
@@ -130,7 +134,7 @@ def test_live_capture_cli_dry_run_does_not_require_allow_live(tmp_path: Path, ca
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/123456/SND" in captured.out
+    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in captured.out
 
 
 def test_live_capture_cli_refuses_without_allow_live(tmp_path: Path):

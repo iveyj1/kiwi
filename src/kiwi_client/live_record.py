@@ -10,7 +10,7 @@ import argparse
 import asyncio
 import json
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Event
 from typing import Any, Callable
@@ -30,6 +30,7 @@ from kiwi_client.live_capture import (
 )
 from kiwi_client.protocol import parse_msg
 from kiwi_client.recorder import SndWavRecorder, WavRecordingResult
+from kiwi_client.session_bootstrap import KiwiBootstrapError, browser_websocket_uri, fallback_connection_timestamp, resolve_connection_timestamp
 from kiwi_client.transport import ReplayTransport
 
 
@@ -72,8 +73,8 @@ class LiveSndWavRecordConfig:
             raise LiveCaptureError(f"output already exists; use --overwrite to replace: {self.output}")
 
     def websocket_uri(self) -> str:
-        timestamp = self.timestamp if self.timestamp is not None else int(time.time())
-        return f"ws://{self.host}:{self.port}/{timestamp}/SND"
+        timestamp = self.timestamp if self.timestamp is not None else fallback_connection_timestamp()
+        return browser_websocket_uri(self.host, self.port, timestamp, "SND")
 
     @property
     def effective_radio_frequency_khz(self) -> float:
@@ -148,6 +149,7 @@ async def record_live_snd_wav(
     allow_live: bool = False,
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
+    timestamp_resolver: Callable[[str, int], Any] = resolve_connection_timestamp,
 ) -> WavRecordingResult:
     """Run one guarded live SND-to-WAV recording."""
     config.validate()
@@ -157,6 +159,12 @@ async def record_live_snd_wav(
         import websockets
     except ImportError as exc:
         raise LiveCaptureError("live recording requires optional dependency: pip install '.[live]'") from exc
+    if config.timestamp is None:
+        try:
+            timestamp = await timestamp_resolver(config.host, config.port)
+        except KiwiBootstrapError as exc:
+            raise LiveCaptureError(str(exc)) from exc
+        config = replace(config, timestamp=timestamp)
 
     recorder = SndWavRecorder()
     start = time.monotonic()

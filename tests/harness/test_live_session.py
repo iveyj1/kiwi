@@ -4,10 +4,30 @@ import threading
 from pathlib import Path
 
 from kiwi_client.live_play import LiveSndPlaybackConfig
-from kiwi_client.live_session import RoutedSessionCommand, run_live_paired_session
+from kiwi_client.live_session import PrimarySndSession, RoutedSessionCommand, run_live_paired_session
 from kiwi_client.live_waterfall import LiveWaterfallCaptureConfig
 from kiwi_client.playback import NullAudioSink, PlaybackResult
 from kiwi_client.waterfall import WaterfallFrame
+
+
+def test_primary_snd_finish_cancels_runner_that_ignores_cooperative_stop():
+    async def stuck_runner(config, sink, **kwargs):
+        kwargs["session_ready_callback"]()
+        await asyncio.Event().wait()
+
+    async def exercise():
+        primary = PrimarySndSession(
+            LiveSndPlaybackConfig(timestamp=123),
+            NullAudioSink(),
+            runner=stuck_runner,
+            finish_timeout_seconds=0.01,
+        )
+        primary.start()
+        assert await primary.wait_ready()
+        await asyncio.wait_for(primary.finish(), timeout=0.2)
+        assert primary.task.cancelled()
+
+    asyncio.run(exercise())
 
 
 def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
@@ -40,6 +60,12 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
                 await asyncio.sleep(0.005)
         return config.output
 
+    resolved = []
+
+    async def resolve_timestamp(host, port):
+        resolved.append((host, port))
+        return 4611686286989819482
+
     async def exercise():
         task = asyncio.create_task(
             run_live_paired_session(
@@ -53,6 +79,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
                 frame_callback=frames.append,
                 snd_runner=snd_runner,
                 waterfall_runner=wf_runner,
+                timestamp_resolver=resolve_timestamp,
             )
         )
         while order != ["snd", "wf"]:
@@ -67,6 +94,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     result = asyncio.run(exercise())
 
     assert order == ["snd", "wf"]
+    assert resolved == [("10.0.0.40", 8073)]
     assert snd_commands == ["SET mod=am low_cut=-5000 high_cut=5000 freq=6000.000"]
     assert wf_commands == ["SET zoom=8 cf=6000.000"]
     assert {status.get("snd_status") for status in statuses} >= {"running"}

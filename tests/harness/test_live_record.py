@@ -69,7 +69,7 @@ def test_live_record_dry_run_plan_has_wav_output_and_commands(tmp_path: Path):
 
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
     assert plan["output"].endswith("direct.wav")
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert "SET AR OK in=<audio_rate> out=44100" in plan["dynamic_commands"]
@@ -95,7 +95,7 @@ def test_live_record_cli_dry_run_does_not_connect(tmp_path: Path, capsys):
     ])
 
     assert code == 0
-    assert "ws://10.0.0.40:8073/123456/SND" in capsys.readouterr().out
+    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
 
 
 def test_live_record_rejects_non_allowed_receiver(tmp_path: Path):

@@ -33,6 +33,16 @@ Initial reference facts from `kiwiclient/kiwi/client.py` and `kiwiclient/test/ki
   - `version_maj`, `version_min`: Kiwi server version parts.
   - `bandwidth`: receiver bandwidth in Hz.
 
+Browser-compatible session bootstrap (upstream browser source plus local harness/live evidence):
+
+- The browser first requests `GET /VER`. Its JSON includes `maj`, `min`, `sp`, and a server-issued integer `ts`; a local v1.902 response supplied a 64-bit value.
+- Normal browser WebSocket paths are `/ws/kiwi/<ts>/SND` and `/ws/kiwi/<ts>/W/F`. The older kiwiclient-style `/<client-seconds>/SND` path is no longer used by project live transports.
+- Paired operation fetches `/VER` once and gives both streams exactly the same `ts`.
+- SND opens first and sends `SET auth t=kiwi p=`. W/F must not open merely because the SND socket accepted the auth command; it opens only after SND receives `MSG badp=0`.
+- Any observed nonzero `badp` is an authentication/session-policy failure. `badp=1` retains the existing no-password-capacity/password diagnostic; other values fail explicitly instead of leaving pairing waiting silently.
+- Browser source evidence: `web/kiwi/kiwi_util.js` (`kiwi_ajax('/VER')`, `conn_tstamp`, `open_websocket`) and `web/kiwi/kiwi.js` (`kiwi_valpwd1_cb`, `BADP_OK`, post-auth W/F open).
+- Harness coverage: `tests/harness/test_session_bootstrap.py`, `test_live_play.py`, and `test_live_session.py` cover `/VER` parsing, browser URI shape, post-auth readiness, auth rejection, and one timestamp fetch per pair.
+
 Current fixture coverage:
 
 - `tests/fixtures/kiwi/snd-session-basic.jsonl` contains synthetic `MSG` events for `audio_rate`, `sample_rate`, version, and bandwidth followed by one synthetic uncompressed mono SND frame.
@@ -53,12 +63,9 @@ Known guarded client MSG error handling:
 
 Still to record after more fixture-backed live captures exist:
 
-- WebSocket endpoint paths
-- Initial handshake/control command order
-- Stream selection
-- Authentication or identity fields, if any
-- Error/max-user behavior
-- Reconnect behavior
+- Complete initial handshake/control command order beyond the authenticated paired-stream gate
+- Authentication behavior for password-protected receivers
+- Exact server slot-release timing and reconnect behavior
 
 ## SND/audio stream
 
@@ -82,7 +89,7 @@ Initial reference facts from `kiwiclient/kiwi/client.py` and `kiwiclient/test/ki
 - Normal non-camping mono defaults to compression enabled unless the client sends `SET compression=0`; fixture-first tests should start with uncompressed mono and add compressed ADPCM later.
 - The reference fake server emits synthetic SND frames but uses zero S-meter, so it does not prove S-meter endianness.
 - Project W/F sessions disable the `websockets` library's protocol-level ping timer (`ping_interval=None`) and use Kiwi `SET keepalive` commands. Browser WebSocket clients do not originate protocol pings, and a user-observed background-terminal output stall caused the library's default 20-second ping timeout to close an otherwise valid W/F stream with code 1011. Fake-connector coverage verifies this connection option and clean closure reporting.
-- Combined browser operation opens `SND` and then `W/F` with the same `kiwi.conn_tstamp` (`openwebrx.js` calls `owrx_ws_open_snd()` before `owrx_ws_open_wf()`; `web/kiwi/kiwi_util.js` `open_websocket()` uses `kiwi.conn_tstamp`), identifying one paired client session. Shared timestamp alone was insufficient on `misdr.proxy.kiwisdr.com:8073`: reverse W/F-first ordering still closed W/F with code 1005. The combined viewer now opens/authenticates primary SND before W/F and keeps SND connected while local output is muted. User retest confirmed audible combined operation on that proxy. Harness coverage verifies SND-ready-before-W/F ordering, startup failure behavior, shared generated URIs, and explicit `--timestamp`.
+- Combined browser operation opens `SND` and then `W/F` with the same `kiwi.conn_tstamp` (`openwebrx.js` calls `owrx_ws_open_snd()` before `owrx_ws_open_wf()`; `web/kiwi/kiwi_util.js` `open_websocket()` uses `kiwi.conn_tstamp`), identifying one paired client session. Shared timestamp alone was insufficient on `misdr.proxy.kiwisdr.com:8073`: reverse W/F-first ordering still closed W/F with code 1005. The combined viewer now waits for primary SND `MSG badp=0` before opening W/F and keeps SND connected while local output is muted. User retest confirmed audible combined operation on that proxy. Harness coverage verifies SND-ready-before-W/F ordering, startup failure behavior, shared generated URIs, and explicit `--timestamp`.
 
 First fixture coverage:
 

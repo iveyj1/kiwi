@@ -52,7 +52,7 @@ def test_live_waterfall_config_dry_run_plan(tmp_path: Path):
     config.validate()
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/123456/W/F"
+    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
     assert plan["render_mindb"] == -110
     assert plan["render_maxdb"] == 0
     assert plan["ascii_ramp"] == " .:-=+*#%@"
@@ -102,7 +102,7 @@ def test_live_waterfall_cli_dry_run_does_not_require_allow_live(tmp_path: Path, 
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/123456/W/F" in captured.out
+    assert "ws://10.0.0.40:8073/ws/kiwi/123456/W/F" in captured.out
 
 
 def test_live_waterfall_cli_refuses_without_allow_live(tmp_path: Path):
@@ -132,7 +132,7 @@ def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Pat
     events = load_jsonl_events(path)
     raw_events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert path == output
-    assert fake_connect.calls[0][0] == "ws://10.0.0.40:8073/123456/W/F"
+    assert fake_connect.calls[0][0] == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
     assert fake_connect.calls[0][1]["ping_interval"] is None
     assert fake_connect.websocket.sent == config.dry_run_plan()["commands"]
     assert raw_events[0]["dir"] == "meta"

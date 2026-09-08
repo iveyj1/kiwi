@@ -26,6 +26,8 @@ Protocol handling must be usable without the desktop UI.
 
 Interactive receiver/playback lifecycle policy belongs in the controller layer, not in the TUI. See [Radio session state](radio-session-state.md) for the desired explicit session-state model around receiver switching, background playback, stale errors, and future bumpless transfer work. The staged extraction and frontend direction are defined in [Shared session and UI integration plan](ui-integration-plan.md).
 
+Live transport startup follows the current Kiwi browser bootstrap: fetch `/VER` once, use its server-issued `ts` for `/ws/kiwi/<ts>/SND`, wait for `MSG badp=0`, then open `/ws/kiwi/<ts>/W/F`. Both streams therefore share one authenticated receiver session. HTTP bootstrap and URI construction are isolated in `session_bootstrap.py`; stream parsers remain network-independent.
+
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md). The standalone combined viewer coordinates separate W/F and SND tasks through exact selected-frequency state and command queues; it does not merge their transport lifecycles or parsers. `WaterfallSnapshotPublisher` provides bounded immutable numeric history snapshots, preserving each row's original frequency mapping while coalescing slow consumers onto the latest generation.
 
 ## Suggested modules

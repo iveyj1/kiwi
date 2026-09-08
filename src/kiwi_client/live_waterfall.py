@@ -7,7 +7,7 @@ import asyncio
 import json
 import queue
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from threading import Event
@@ -25,6 +25,7 @@ from kiwi_client.live_capture import (
     snd_loop_allowed,
 )
 from kiwi_client.protocol import parse_msg
+from kiwi_client.session_bootstrap import KiwiBootstrapError, browser_websocket_uri, fallback_connection_timestamp, resolve_connection_timestamp
 from kiwi_client.waterfall import (
     WaterfallFrame,
     WaterfallReceiverState,
@@ -35,7 +36,7 @@ from kiwi_client.waterfall import (
 )
 from kiwi_client.waterfall_render import DEFAULT_ASCII_RAMP, render_ascii_waterfall_row
 
-WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
+WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 1.0
 
 
 def _is_websocket_connection_closed(exc: BaseException) -> bool:
@@ -114,8 +115,8 @@ class LiveWaterfallCaptureConfig:
 
     def websocket_uri(self) -> str:
         """Return the KiwiSDR W/F WebSocket URI for this capture."""
-        timestamp = self.timestamp if self.timestamp is not None else int(time.time())
-        return f"ws://{self.host}:{self.port}/{timestamp}/W/F"
+        timestamp = self.timestamp if self.timestamp is not None else fallback_connection_timestamp()
+        return browser_websocket_uri(self.host, self.port, timestamp, "W/F")
 
     def setup_commands(self) -> list[str]:
         """Return setup commands sent after auth."""
@@ -194,6 +195,7 @@ async def capture_live_waterfall(
     frame_callback: Callable[[WaterfallFrame], None] | None = None,
     command_queue: queue.Queue[str] | None = None,
     websocket_connect: Callable[..., Any] | None = None,
+    timestamp_resolver: Callable[[str, int], Any] = resolve_connection_timestamp,
 ) -> Path:
     """Run one guarded live W/F capture and write a JSONL fixture."""
     config.validate()
@@ -206,6 +208,12 @@ async def capture_live_waterfall(
         except ImportError as exc:
             raise LiveCaptureError("live waterfall capture requires optional dependency: pip install '.[live]'") from exc
         websocket_connect = websockets.connect
+    if config.timestamp is None:
+        try:
+            timestamp = await timestamp_resolver(config.host, config.port)
+        except KiwiBootstrapError as exc:
+            raise LiveCaptureError(str(exc)) from exc
+        config = replace(config, timestamp=timestamp)
 
     writer = JsonlCaptureWriter(_capture_metadata(config)) if save_events else _NullCaptureWriter()
     start = time.monotonic()

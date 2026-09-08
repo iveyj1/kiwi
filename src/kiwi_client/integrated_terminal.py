@@ -282,19 +282,33 @@ class KittyPanePresenter:
         self._finished = True
 
 
-def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool = False):
-    """Move and immediately tune; recenter only after crossing the visible edge."""
-    model.move_selection(delta, small=small, clamp_to_view=False)
-    tuned = model.tune_selected()
+def set_console_frequency(model: WaterfallGuiModel, frequency_khz: float):
+    """Tune directly and recenter when the entered frequency is outside the viewport."""
+    tuned = model.set_tuned_frequency(frequency_khz)
     recentered = None
     try:
         start_khz, end_khz = model.display_frequency_range()
     except ValueError:
         return tuned, recentered
-    frequency_khz = model.session.state.frequency_khz
     if frequency_khz < start_khz or frequency_khz > end_khz:
         recentered = model.recenter()
     return tuned, recentered
+
+
+def tune_console_one_screen(model: WaterfallGuiModel, direction: int):
+    """Tune and recenter one current visible span lower or higher."""
+    if direction not in (-1, 1):
+        raise ValueError("screen direction must be -1 or 1")
+    start_khz, end_khz = model.display_frequency_range()
+    frequency_khz = model.session.state.frequency_khz + direction * (end_khz - start_khz)
+    tuned = model.set_tuned_frequency(frequency_khz)
+    return tuned, model.recenter()
+
+
+def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool = False):
+    """Move and immediately tune; recenter only after crossing the visible edge."""
+    model.move_selection(delta, small=small, clamp_to_view=False)
+    return set_console_frequency(model, model.session.state.selected_khz)
 
 
 def discard_console_mouse_event(key):
@@ -420,8 +434,9 @@ def run_fixture_shell(
             elif entry is not None and key is not None:
                 if key in ("\n", "\r"):
                     try:
-                        model.set_tuned_frequency(float(entry))
-                        message = f"frequency {entry} kHz (local fixture state)"
+                        _tuned, recentered = set_console_frequency(model, float(entry))
+                        suffix = "; waterfall recentered" if recentered is not None else ""
+                        message = f"frequency {entry} kHz{suffix}"
                     except ValueError as exc:
                         message = str(exc)
                     entry = None
@@ -475,6 +490,22 @@ def run_fixture_shell(
             elif key == "p" and tui_input is None:
                 pending_preset = True
                 message = "preset register?"
+                dirty = True
+            elif key in (curses.KEY_UP, curses.KEY_PPAGE):
+                try:
+                    tune_console_one_screen(model, 1)
+                    message = "frequency up one screen"
+                except ValueError as exc:
+                    message = str(exc)
+                presenter.invalidate()
+                dirty = True
+            elif key in (curses.KEY_DOWN, curses.KEY_NPAGE):
+                try:
+                    tune_console_one_screen(model, -1)
+                    message = "frequency down one screen"
+                except ValueError as exc:
+                    message = str(exc)
+                presenter.invalidate()
                 dirty = True
             elif key in ("h", curses.KEY_LEFT):
                 tune_console_selection(model, -1)
@@ -616,7 +647,7 @@ def run_fixture_shell(
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",
-                    "h/l tune H/L fine t/T step m mode Enter retune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
+                    "h/l or ←/→ tune H/L fine ↑/↓ screen t/T step m mode Enter retune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
                     prompt,
                 ]
                 if tui_input is not None and tui_config is not None:

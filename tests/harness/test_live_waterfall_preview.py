@@ -22,7 +22,7 @@ def test_live_waterfall_preview_main_dry_run(capsys):
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/123456/W/F" in captured.out
+    assert "ws://10.0.0.40:8073/ws/kiwi/123456/W/F" in captured.out
     assert '"duration_seconds": 60.0' in captured.out
     assert '"max_frames": 50' in captured.out
 

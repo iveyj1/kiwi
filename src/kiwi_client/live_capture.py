@@ -11,7 +11,7 @@ import argparse
 import asyncio
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from threading import Event
@@ -23,11 +23,12 @@ from kiwi_client.capture import JsonlCaptureWriter, SndCaptureMetadata
 from kiwi_client.commands import encode_ar_ok, encode_auth, encode_basic_snd_setup, encode_keepalive
 from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
+from kiwi_client.session_bootstrap import KiwiBootstrapError, browser_websocket_uri, fallback_connection_timestamp, resolve_connection_timestamp
 
 LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
 MAX_DURATION_SECONDS = 60.0
 MAX_FRAMES = 1500
-WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 0.25
+WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 1.0
 KEEPALIVE_INTERVAL_SECONDS = 30.0
 RECEIVE_POLL_TIMEOUT_SECONDS = 0.5
 
@@ -41,8 +42,11 @@ def kiwi_error_from_msg_params(params: dict[str, str | None], *, receiver: str) 
     if "too_busy" in params:
         slots = params.get("too_busy") or "all"
         return f"server busy: all {slots} client slots are taken on {receiver}"
-    if params.get("badp") == "1":
+    badp = params.get("badp")
+    if badp == "1":
         return f"server busy or bad password: all no-password channels may be busy on {receiver}"
+    if badp is not None and badp != "0":
+        return f"authentication rejected by {receiver}: badp={badp}"
     if "down" in params:
         return f"server down: {receiver}"
     if "redirect" in params:
@@ -98,8 +102,8 @@ class LiveSndCaptureConfig:
 
     def websocket_uri(self) -> str:
         """Return the KiwiSDR SND WebSocket URI for this capture."""
-        timestamp = self.timestamp if self.timestamp is not None else int(time.time())
-        return f"ws://{self.host}:{self.port}/{timestamp}/SND"
+        timestamp = self.timestamp if self.timestamp is not None else fallback_connection_timestamp()
+        return browser_websocket_uri(self.host, self.port, timestamp, "SND")
 
     @property
     def effective_radio_frequency_khz(self) -> float:
@@ -199,6 +203,7 @@ async def capture_live_snd(
     allow_live: bool = False,
     stop_event: Event | None = None,
     status_callback: Callable[[dict], None] | None = None,
+    timestamp_resolver: Callable[[str, int], Any] = resolve_connection_timestamp,
 ) -> Path:
     """Run one guarded live SND capture and write a JSONL fixture.
 
@@ -213,6 +218,13 @@ async def capture_live_snd(
         import websockets
     except ImportError as exc:
         raise LiveCaptureError("live capture requires optional dependency: pip install '.[live]'") from exc
+
+    if config.timestamp is None:
+        try:
+            timestamp = await timestamp_resolver(config.host, config.port)
+        except KiwiBootstrapError as exc:
+            raise LiveCaptureError(str(exc)) from exc
+        config = replace(config, timestamp=timestamp)
 
     writer = JsonlCaptureWriter(_capture_metadata(config))
     start = time.monotonic()

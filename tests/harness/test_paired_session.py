@@ -39,8 +39,8 @@ def test_pair_session_configs_assigns_one_timestamp_to_both_streams(tmp_path):
     )
 
     assert wf.timestamp == snd.timestamp == 123456
-    assert wf.websocket_uri().endswith("/123456/W/F")
-    assert snd.websocket_uri().endswith("/123456/SND")
+    assert wf.websocket_uri().endswith("/ws/kiwi/123456/W/F")
+    assert snd.websocket_uri().endswith("/ws/kiwi/123456/SND")
 
 
 def test_pair_session_configs_preserves_explicit_timestamp_and_rejects_mismatch(tmp_path):

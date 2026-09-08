@@ -44,14 +44,30 @@ Follow-up:
 
 ## Live-test log
 
+### 2026-09-08 — browser-compatible paired bootstrap on local receiver
+
+```text
+Date/time: 2026-09-08T00:34Z UTC / 2026-09-07T20:34-04:00 local
+Receiver: 10.0.0.40:8073
+Frequency/mode/filter: 5000.000 kHz AM, -5000..5000 Hz
+Waterfall: zoom 7, speed 1, interp 13, wf_comp=0; five-frame limit
+Stream type: paired SND/W/F with null audio sink
+Purpose: validate one /VER fetch, /ws/kiwi server-timestamp paths, SND badp=0 gate, paired W/F startup, and graceful bounded teardown
+Observed behavior: success without retries; SND received 99 frames / 50,352 samples and W/F received five frames. Final observed SND seq=99 and W/F seq=95. No stream or auth error occurred.
+Fixture captured: no new radio payload fixture; the endpoint/bootstrap behavior is covered by deterministic fake-HTTP and fake-WebSocket harness tests, while existing local fixtures cover the received protocol payloads.
+Follow-up: repeat a bounded receiver-switch sequence only after first-data/stall diagnostics are added; do not infer public slot-release timing from this local single-session test.
+```
+
 ### 2026-09-07 — user Verizon hotspot and switch-freeze observations
 
 ```text
 Network: Verizon hotspot
-Receivers: paired-working public registers 8, 9, a, and b
-Observation: user confirmed all four paired SND/W/F receivers work. During repeated receiver switching, both SND and W/F later stopped. Switching to another receiver did not recover either stream; restarting kiwi-console recovered operation.
-Comparison: user reports other machines show results similar to prior public-receiver tests over Starlink, while LAN receivers have been consistently successful.
-Follow-up: reproduce with fake delayed/stalled transports, add first-data/stall status deadlines, and verify old worker/event-loop teardown before replacement startup. Do not assume another receiver switch is sufficient recovery.
+Receivers: paired-working public registers 8, 9, a, and b, followed by a local receiver with available channels
+Observation: user confirmed all four paired SND/W/F receivers work. During repeated receiver switching, both SND and W/F later stopped. Switching to another receiver, including an available local receiver after the browser-bootstrap fix, did not recover either stream; restarting kiwi-console recovered operation.
+Diagnosis: fixture harness reproduced a client teardown deadlock. If audio had previously started, cooperative stop enabled fade-out; with SND stalled, no subsequent frame completed the fade and the old paired worker remained alive, preventing replacement startup.
+Fix: abandon a pending stop fade on receive timeout and force-cancel a primary SND runner that ignores cooperative stop for one second.
+Fixture: synthetic stalled-WebSocket and stuck-runner regressions in `tests/harness/test_live_play.py` and `tests/harness/test_live_session.py`.
+Follow-up: user retest of rapid switching; separately add first-data/stall status deadlines for clearer diagnostics.
 ```
 
 ### 2026-09-07 — public paired SND/W/F sample over Starlink

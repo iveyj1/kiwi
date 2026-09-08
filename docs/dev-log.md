@@ -991,6 +991,34 @@ Public paired-working registers 8, 9, a, and b all worked through a Verizon hots
 
 Focused HTML/preset/state/TUI harness: 60 tests passed. Full harness: 381 tests passed in 4.62 seconds; `compileall` and `git diff --check` passed.
 
+## 2026-09-08 — Browser-compatible session bootstrap and auth gate
+
+### Finding
+
+Current Kiwi browser source fetches `/VER`, uses its server-issued `ts` in `/ws/kiwi/<ts>/<stream>`, and opens W/F only after SND receives `badp=0`. The project previously used legacy `/<seconds>/<stream>` paths and marked SND ready immediately after sending auth. Read-only forum research also reports that terminated receiver sessions can occasionally remain allocated for roughly 25 seconds and are ultimately covered by a 60-second sequence watchdog, making graceful teardown important during rapid switching.
+
+### Decision
+
+Added shared HTTP bootstrap/URI construction, one timestamp fetch per pair, explicit post-auth SND readiness, rejection of every nonzero `badp`, and browser-style paths across playback, capture, recording, and waterfall transports. Increased WebSocket close timeout from 0.25 to 1.0 seconds to give the close handshake a reasonable bounded opportunity before forced teardown.
+
+### Test result
+
+Harness-first regressions cover `/VER` parsing, invalid responses, nonblocking resolution, URI shape, one paired timestamp fetch, successful post-auth readiness, and failure without readiness. Full harness: 386 tests passed in 4.04 seconds before the final nonzero-`badp` assertion was added; targeted bootstrap/session tests passed. A subsequent bounded local pair on `10.0.0.40:8073` at 5000 kHz AM produced 99 SND and five W/F frames with no errors.
+
+### Follow-up
+
+A user retest found rapid switching could still freeze both streams and that selecting an available local receiver did not recover. The harness then reproduced the blocking teardown path: after audio starts, stop requests a fade-out, but a stalled SND stream supplies no frame to finish it. Playback now abandons a pending fade after a receive timeout. `PrimarySndSession.finish()` additionally gives cooperative stop one second and then cancels/joins a nonresponsive task. Synthetic stalled-WebSocket and stuck-runner tests cover both boundaries. First-data/stall status deadlines remain separate follow-up work.
+
+## 2026-09-08 — Offscreen frequency entry and screen-span tuning
+
+### Decision
+
+The integrated console now checks its current fixture-backed W/F mapping after direct frequency entry. An offscreen frequency sends the normal SND tune and a W/F recenter; an in-window frequency tunes without moving the viewport. Up arrow/Page Up and Down arrow/Page Down tune one complete visible span higher/lower and recenter explicitly.
+
+### Test result
+
+Fixture regressions cover conditional direct-entry recentering and exact bidirectional one-span movement using the captured zoom-7 waterfall mapping.
+
 ## YYYY-MM-DD
 
 ### Finding

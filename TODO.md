@@ -1,5 +1,24 @@
 # TODO
 
+## Current slice — Console offscreen tuning and screen jumps
+
+Goal: recenter the waterfall when direct frequency entry lands outside the visible range and provide one-screen horizontal frequency movement from vertical/page keys.
+
+Done criteria: fixture-backed helper tests cover in-window entry without recenter, offscreen entry with exact SND tune and W/F recenter, and one-span lower/higher jumps; integrated key handling and user guide are updated; full harness passes.
+
+- Implemented conditional frequency-entry recentering.
+- Added Up/Page Up and Down/Page Down one-visible-span tune/recenter controls.
+
+## Current slice — Browser/reference-client compatibility research
+
+Goal: explain the public-receiver reliability gap by comparing browser session setup, bundled kiwiclient tools, KiwiSDR policy/forum guidance, and relevant open-source clients before changing transport behavior.
+
+Done criteria: run reference tools locally before bounded Starlink/public tests; document exact SND/W/F ordering, timestamp, handshake, channel/API policy findings and responsible-use guidance; identify reproducible reference-tool failures versus project failures; survey comparable GitHub projects; propose a harness-first browser-compatible implementation plan without using forum credentials for any mutating action.
+
+- Implemented browser-compatible `/VER` timestamp bootstrap and `/ws/kiwi/<ts>/<stream>` paths with fake-HTTP regression coverage.
+- Paired startup now waits for SND `MSG badp=0` before opening W/F; all nonzero `badp` values fail explicitly.
+- Increased bounded WebSocket close-handshake time to reduce orphaned allocations; a short local paired validation succeeded. Public rapid-switch/stall validation remains pending first-data diagnostics.
+
 ## Current slice — Public receiver directory scrape
 
 Goal: scrape the explicitly authorized KiwiSDR public directory into structured JSON containing URL, name, location, SNR, occupancy, hardware/software, antenna, GPS, band, API capacity, and preserved source metadata.
@@ -72,7 +91,7 @@ See `docs/ui-integration-plan.md`.
 
 ## Deferred waterfall questions
 
-- Add first-message/first-frame and stalled-stream deadlines: a Starlink paired sample succeeded fully on 4/10 public receivers, and the same four worked through Verizon hotspot, but repeated switching eventually froze both streams. Further receiver switching did not recover; process restart did. Reproduce delayed/stalled worker teardown in the harness and distinguish socket/task startup from actual data flow before adding explicit session recovery. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback.
+- Add first-message/first-frame and stalled-stream deadlines: a Starlink paired sample succeeded fully on 4/10 public receivers, and the same four worked through Verizon hotspot, but repeated switching eventually froze both streams. Further receiver switching did not recover; process restart did. User reconfirmed after browser-compatible bootstrap that switching to an available local receiver still could not recover. Reproduce delayed/stalled worker teardown in the harness and distinguish socket/task startup from actual data flow before adding explicit session recovery. Fixed immediate defect: SND cooperative stop could enter fade-out after prior audio and wait forever when no further frame arrived; a receive timeout now abandons the fade, and paired teardown force-cancels a primary runner that ignores cooperative stop. Unpaired parallel operation consumes separate allocations and is not an acceptable fallback.
 - Measure whether zoom-dependent vertical slowdown is receiver cadence or presentation cadence.
 - Evaluate a small optional bounded W/F jitter/playout buffer and its smoothness/latency tradeoff.
 - Remap retained history across zoom/recenter changes like the KiwiSDR web client, resampling overlap and filling uncovered frequencies with black.
