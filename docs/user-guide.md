@@ -606,16 +606,16 @@ Run it from Kitty:
 ```bash
 kiwi-console \
   --fixture tests/fixtures/kiwi/local-wf-am-855-zoom7.jsonl \
-  --presets presets.toml --rows 400 --repeat 200 --fps 20 --refresh-hz 5
+  --presets presets.toml --rows 400 --repeat 200 --fps 20 --refresh-hz 20
 ```
 
-The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` and duplicate generations are coalesced. Kitty presentation alternates two image/placement IDs, displays each complete replacement first, and only then deletes the previous frame; this avoids the empty interval possible when replacing one image ID in place. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
+The curses/UI thread owns text and terminal writes. Source rows can arrive at `--fps`; PNG/image redraw starts are capped by `--refresh-hz` (default 20 Hz) and duplicate generations are coalesced. This reduces multi-row stepping compared with 5 Hz presentation without adding a display buffer or latency. Remove an old explicit `--refresh-hz 5` option to use the new default. Slower receivers and network bursts can still step; no intermediate signal rows are invented. On machines with expensive terminal rendering, lower the refresh cap or history depth. Kitty presentation alternates two image/placement IDs, displays each complete replacement first, and only then deletes the previous frame; this avoids the empty interval possible when replacing one image ID in place. Resize recomputes the upper image rectangle and redraws its stable image/placement ID. Exit deletes the Kitty image before curses restores the terminal.
 
 Guarded live mode uses the controller-owned paired SND/W/F worker and requires an explicit local receiver. Audio starts muted unless `--audio` is supplied:
 
 ```bash
 kiwi-console --allow-live --receiver 10.0.0.41:8073 \
-  --config config.toml --rows 300 --refresh-hz 5
+  --config config.toml --rows 300 --refresh-hz 20
 ```
 
 The controller completes authenticated SND startup before W/F, publishes bounded latest snapshots, routes typed tune/view actions to the active stream queues, and stops/joins both streams on console exit. WebSocket close handshakes allow one second before forced teardown to reduce orphaned server allocations during receiver switching. If SND stalls while a stop fade is pending, the next receive timeout abandons the fade; paired teardown also cancels a primary runner that has not stopped within one second, so a frozen old stream cannot permanently block receiver replacement. Press `a` to lazily open or close local audio output without tearing down the primary SND connection; the selected state survives receiver restart. Audio-device startup failure leaves the console muted and reports an error. Receiver restart replaces the bounded publisher; the console detects that identity change, clears old raster history/placement, and binds the new receiver's publisher before drawing its first frame. The lower panel shows fixed-width live SND RSSI in dBm, a conventional HF S-unit estimate (`S9 = -73 dBm`, 6 dB per S-unit below S9), and a bounded `-130..-20 dBm` bar. Fixed numeric/S-unit fields prevent the surrounding status line from jumping as signal strength changes. `--dry-run` reports the intended command without connecting.

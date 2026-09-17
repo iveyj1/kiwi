@@ -1039,6 +1039,14 @@ Recorded `.43` as the preferred local NDB target, not a new general startup defa
 
 Validation: 401 tests passed in 4.84 seconds using the project venv; compileall and diff checks passed. No live receivers contacted. Feature branch is prepared for review and a later explicitly requested merge into `main`.
 
+## 2026-09-17 — First waterfall smoothness experiment
+
+On `feature/waterfall-smooth-presentation`, raised the integrated console presentation default and `wf-test` launcher from 5 to 20 Hz. This isolates the known presentation bottleneck without adding buffering latency or altering acquisition/recording. Explicit refresh overrides remain supported; standalone viewer configuration is unchanged.
+
+Offline virtual-cadence comparison: 100 rows at 20 source FPS yielded 25 presentations/75 coalesced generations at 5 display Hz versus 100 presentations/zero coalescing at 20 Hz. A 5 FPS source at 20 display Hz still presents only the 100 real rows. This verifies cadence policy, not actual Kitty encoding throughput or perceived smoothness. User visual comparison remains required; a bounded playout buffer is a separate follow-up if burstiness persists.
+
+Validation: 403 tests passed in 5.47 seconds; compileall and diff checks passed. No live receiver connection made.
+
 ## YYYY-MM-DD
 
 ### Finding

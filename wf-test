@@ -2,8 +2,8 @@
 source ./kiwi-venv
 .kiwi-venv/bin/kiwi-console \
 --allow-live \
---receiver 10.0.0.41:8073 \
+--receiver 10.0.0.43:8073 \
 --config config.toml \
 --rows 300 \
---refresh-hz 5 \
+--refresh-hz 20 \
 --auto-scale

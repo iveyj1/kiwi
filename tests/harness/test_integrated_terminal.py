@@ -39,6 +39,28 @@ def test_console_discards_reported_mouse_wheel_instead_of_routing_as_volume_arro
     assert discard_console_mouse_event(__import__("curses").KEY_UP) == __import__("curses").KEY_UP
 
 
+def test_console_refresh_default_and_explicit_override():
+    from kiwi_client.integrated_terminal import build_arg_parser
+
+    parser = build_arg_parser()
+    assert parser.parse_args([]).refresh_hz == 20.0
+    assert parser.parse_args(["--refresh-hz", "5"]).refresh_hz == 5.0
+
+
+def test_console_cadence_reduces_coalesced_rows_without_inventing_slow_source_data():
+    from tools.waterfall_gui_benchmark import run_no_window_baseline
+
+    slow_display = run_no_window_baseline(frames=100, source_fps=20, consumer_fps=5)
+    fast_display = run_no_window_baseline(frames=100, source_fps=20, consumer_fps=20)
+    slow_source = run_no_window_baseline(frames=100, source_fps=5, consumer_fps=20)
+    assert slow_display.presented_snapshots == 25
+    assert slow_display.coalesced_generations == 75
+    assert fast_display.presented_snapshots == 100
+    assert fast_display.coalesced_generations == 0
+    assert slow_source.presented_snapshots == 100
+    assert slow_source.coalesced_generations == 0
+
+
 def test_integrated_layout_reserves_waterfall_rulers_and_tui_region():
     layout = IntegratedTerminalLayout.compute(columns=120, lines=40)
 

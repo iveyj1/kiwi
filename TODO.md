@@ -1,6 +1,12 @@
 # TODO
 
-## Current slice — Cleanup and main merge preparation
+## Current slice — Waterfall presentation cadence
+
+Goal: reduce visible multi-row stepping by removing the console's 5 Hz presentation bottleneck before introducing a playout buffer.
+
+Done criteria: 20 Hz console default and demo launcher; explicit lower refresh rates remain supported; offline cadence comparison and full tests pass; no additional buffering latency or receiver connections. User visual evaluation determines whether burst smoothing needs a separate bounded buffer.
+
+## Previous slice — Cleanup and main merge preparation
 
 Goal: consolidate the tested interactive client and local-address migration for review and merge into `main`, without merging or modifying `main` yet.
 

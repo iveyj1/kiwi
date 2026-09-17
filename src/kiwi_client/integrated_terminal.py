@@ -684,7 +684,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rows", type=int, default=400)
     parser.add_argument("--repeat", type=int, default=200)
     parser.add_argument("--fps", type=float, default=20.0)
-    parser.add_argument("--refresh-hz", type=float, default=5.0)
+    parser.add_argument("--refresh-hz", type=float, default=20.0,
+                        help="maximum display refresh rate (default: 20 Hz; does not change receiver cadence)")
     parser.add_argument("--main-step-khz", type=float, default=1.0)
     parser.add_argument("--small-step-khz", type=float, default=0.1)
     parser.add_argument("--render-min-db", type=float, default=-100)
