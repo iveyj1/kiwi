@@ -1,7 +1,7 @@
 [radio_presets.a]
 frequency_khz = 760.0
 high_cut_hz = 5000
-host = "10.0.0.40"
+host = "10.0.0.41"
 low_cut_hz = -5000
 mode = "am"
 port = 8073
@@ -9,7 +9,7 @@ port = 8073
 [radio_presets.c]
 frequency_khz = 297.8
 high_cut_hz = 1050
-host = "10.0.0.40"
+host = "10.0.0.41"
 low_cut_hz = 650
 mode = "cw"
 port = 8073
@@ -23,22 +23,22 @@ agc_slope = 6
 agc_threshold = -100
 frequency_khz = 9999.5
 high_cut_hz = 700
-host = "10.0.0.42"
+host = "10.0.0.43"
 low_cut_hz = 300
 mode = "cw"
 port = 8073
 
 [receiver_presets."1"]
 description = "misdr"
-receiver = "10.0.0.40:8073"
+receiver = "10.0.0.41:8073"
 
 [receiver_presets."2"]
 description = "misdr2"
-receiver = "10.0.0.41:8073"
+receiver = "10.0.0.42:8073"
 
 [receiver_presets."3"]
 description = "misdr3"
-receiver = "10.0.0.42:8073"
+receiver = "10.0.0.43:8073"
 
 [receiver_presets."4"]
 description = "tustin"

@@ -1,71 +1,54 @@
 # Machine handoff
 
-## Repository state
+## Repository and merge preparation
 
-- Integration branch: `wf1`
-- `main` is closed and must remain untouched until the user changes the workflow.
-- Implementation work uses short-lived feature branches merged into `wf1`.
-- Latest completed work: combined Kitty raster waterfall plus paired SND audio.
-- Last full harness: 280 tests passed.
+- Working branch: `feature/shared-radio-session`.
+- User direction: clean up and prepare for merge into `main`; do not execute the merge yet.
+- The former `wf1` workflow is superseded. At preparation time, local `main` is an ancestor of this feature branch (55 commits behind before cleanup commits).
+- Keep `kiwisdr-screenshot.png` untracked and unchanged. `state.json` is ignored local session state.
+- Do not commit forum credentials, session cookies, or downloaded authenticated pages.
 
-## Validated behavior
+## Current capabilities
 
-User validation on `misdr.proxy.kiwisdr.com:8073` confirmed combined audible SND and W/F operation after matching Kiwi browser session behavior:
+`kiwi-console` is the primary integrated Kitty waterfall/TUI. It uses controller-owned paired SND/W/F, bounded history, double-buffered presentation, runtime audio gating, mode/passband controls, preset/receiver registers, and saved state. The native GUI remains an optional prototype; standalone CLI tools remain available.
 
-1. Assign one shared session timestamp.
-2. Open and authenticate primary SND first.
-3. Open paired W/F second.
-4. Keep SND connected while local audio output is muted; `a` toggles the lazy output sink.
+The headless paired path fetches `/VER` once, uses its timestamp in `/ws/kiwi/<ts>/<stream>`, and waits for SND `badp=0` before opening W/F. A stalled audio stop-fade no longer waits indefinitely for new samples; the primary task has a cooperative-stop cancellation fallback. This does not prove every possible transport or audio-device hang is resolved.
 
-The working local defaults are 5000 kHz AM, passband -5000..5000 Hz, W/F zoom 7, speed 4, interp 13.
+## Local receivers
 
-## Standalone viewer controls
+| Register | Address | Role |
+|---|---|---|
+| `r1` | `10.0.0.41:8073` | General default |
+| `r2` | `10.0.0.42:8073` | Alternative |
+| `r3` | `10.0.0.43:8073` | Preferred NDB development target; user reports 4-channel mode |
 
-- `h` / `l`, arrows: active configured main frequency step.
-- `H` / `L`, shifted arrows: active configured small step.
-- `t` / `T`: cycle mode step pairs.
-- `0`: reset exact cursor to tuned frequency on the active round grid.
-- `c`: recenter W/F on exact cursor frequency.
-- `+` / `=` / `-`: bounded zoom around cursor.
-- `a`: mute/enable local audio output without tearing down primary SND.
-- Enter: send exact cursor tune to SND using mode, passband, command precision, and CW offset.
-- `q`: clean coordinated shutdown.
+Public receivers will commonly be in 8-channel mode according to the user. Reduced zoom and cadence must not prevent audio/signal analysis. Exact mode-dependent zoom limits remain to be verified from receiver metadata; do not hardcode the reported approximate 11/14 distinction.
 
-## Configuration note
+Root `config.toml` intentionally has live operation enabled and receiver restriction disabled. Library/generated defaults remain guarded. Review that local configuration before using it on another machine. Public receiver testing still requires explicit user authorization.
 
-Root `config.toml` currently has `[receivers].restricted = false` and includes:
-
-- `10.0.0.40:8073`
-- `10.0.0.41:8073`
-- `10.0.0.42:8073`
-- `misdr.proxy.kiwisdr.com:8073`
-
-Set `restricted = true` if only explicitly listed receivers should be accepted.
-
-## Setup on another machine
+## Setup and demo
 
 ```bash
-git clone git@github.com:iveyj1/kiwi.git kiwi-openai
-cd kiwi-openai
-git switch wf1
 ./setup-python
 source .kiwi-venv/bin/activate
 python -m pytest -q
 ```
 
-Typical run:
+Explicit local NDB-development target (restored frequency/mode still apply):
 
 ```bash
-kiwi-wf-terminal --allow-live --host misdr.proxy.kiwisdr.com --audio
+kiwi-console --allow-live --receiver 10.0.0.43:8073 \
+    --config config.toml --rows 300 --refresh-hz 5 --auto-scale
 ```
 
-Do not automatically test against external/public receivers. Use external receivers only when explicitly requested by the user. Local project receivers remain `10.0.0.40:8073` and `10.0.0.41:8073`.
+Console controls: `h/l` or Left/Right tune; `H/L` fine tune; Up/Page Up and Down/Page Down tune by one visible span; `f` enters frequency and recenters only when offscreen; `c` centers; `+/-` zoom; `a` toggles audio; `k/j` volume; `m` selects mode; `r` selects receiver; `q` exits.
 
-## Next work
+## Outstanding work
 
-- Evaluate combined mute/tune/recenter/zoom behavior during longer normal use.
-- Refine compact status and keyboard-help presentation if truncation is inconvenient.
-- Add timing diagnostics only if temporal jumps become problematic; current jumps resemble Kiwi browser behavior.
-- Decide whether to retain the standalone companion viewer or move toward integrated/native display.
+- First-message/first-frame/stall diagnostics and rapid-switch stress coverage. One unreproduced hang remains reported after the teardown fix.
+- Audit bootstrap, guardrails, and cancellation across all frontends.
+- Audit `zoom_max`/`zoom_cap` propagation for mode-dependent receivers.
+- Optional presentation-cadence improvement and short bounded W/F buffer; not part of this merge preparation.
+- SND/IQ fan-out into recording/detection; fixture-first NDB detector and later long-term integration. W/F is an overview, not the analysis data source.
 
-Detailed history is in `docs/dev-log.md`, protocol evidence in `docs/kiwi-protocol.md`, and current planning in `TODO.md`.
+Validation results are recorded in `docs/dev-log.md`; current work is tracked in `TODO.md`. Historical captures retain their original addresses.

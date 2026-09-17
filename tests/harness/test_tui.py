@@ -113,11 +113,11 @@ def test_render_tui_hints_show_defined_preset_register_frequency_and_mode():
 
 def test_render_tui_hints_show_stored_receiver_register_descriptions(tmp_path):
     controller = ClientController()
-    controller.execute("add-receiver a 10.0.0.42:8073 Backup receiver")
+    controller.execute("add-receiver a 10.0.0.43:8073 Backup receiver")
 
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(), controller)
 
-    assert "a — 10.0.0.42:8073 Backup receiver" in text
+    assert "a — 10.0.0.43:8073 Backup receiver" in text
 
 
 def test_render_tui_hints_hide_config_fallback_when_receiver_presets_exist(tmp_path):
@@ -125,21 +125,21 @@ def test_render_tui_hints_hide_config_fallback_when_receiver_presets_exist(tmp_p
     config_path.write_text(
         """
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.42:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073"]
 """.strip(),
         encoding="utf-8",
     )
     controller = ClientController()
-    controller.execute("add-receiver 1 10.0.0.40:8073 misdr")
+    controller.execute("add-receiver 1 10.0.0.42:8073 misdr")
     controller.execute("add-receiver 2 10.0.0.41:8073 misdr2")
-    controller.execute("add-receiver 3 10.0.0.42:8073 misdr3")
+    controller.execute("add-receiver 3 10.0.0.43:8073 misdr3")
 
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), controller)
 
     assert "0 —" not in text
-    assert "1 — 10.0.0.40:8073 misdr" in text
+    assert "1 — 10.0.0.42:8073 misdr" in text
     assert "2 — 10.0.0.41:8073 misdr2" in text
-    assert "3 — 10.0.0.42:8073 misdr3" in text
+    assert "3 — 10.0.0.43:8073 misdr3" in text
 
 
 def test_render_tui_hints_show_receiver_registers_sorted_by_register(tmp_path):
@@ -147,18 +147,18 @@ def test_render_tui_hints_show_receiver_registers_sorted_by_register(tmp_path):
     config_path.write_text(
         """
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073"]
 """.strip(),
         encoding="utf-8",
     )
     controller = ClientController()
-    controller.execute("add-receiver 2 10.0.0.42:8073 Backup receiver")
+    controller.execute("add-receiver 2 10.0.0.43:8073 Backup receiver")
 
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), controller)
 
     assert "0 —" not in text
     assert "1 —" not in text
-    assert "2 — 10.0.0.42:8073 Backup receiver" in text
+    assert "2 — 10.0.0.43:8073 Backup receiver" in text
 
 
 def test_render_tui_hints_show_receiver_register_addresses(tmp_path):
@@ -166,7 +166,7 @@ def test_render_tui_hints_show_receiver_register_addresses(tmp_path):
     config_path.write_text(
         """
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073"]
 """.strip(),
         encoding="utf-8",
     )
@@ -174,7 +174,7 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), load_config(config_path), ClientController())
 
     assert "0 — 10.0.0.41:8073" in text
-    assert "1 — 10.0.0.40:8073" in text
+    assert "1 — 10.0.0.42:8073" in text
     assert "2 —" not in text
 
 
@@ -190,8 +190,8 @@ def test_render_dashboard_includes_shared_paired_session_status():
     text = render_dashboard(
         ClientState(),
         paired_session={
-            "desired_receiver": "10.0.0.40:8073",
-            "active_receiver": "10.0.0.40:8073",
+            "desired_receiver": "10.0.0.42:8073",
+            "active_receiver": "10.0.0.42:8073",
             "snd_status": "running",
             "wf_status": "inactive",
             "audio_enabled": True,
@@ -199,8 +199,8 @@ def test_render_dashboard_includes_shared_paired_session_status():
         },
     )
 
-    assert "Session receiver: 10.0.0.40:8073" in text
-    assert "Active receiver: 10.0.0.40:8073" in text
+    assert "Session receiver: 10.0.0.42:8073" in text
+    assert "Active receiver: 10.0.0.42:8073" in text
     assert "Streams: SND running / W/F inactive" in text
     assert "Session audio: ON | W/F zoom: 7" in text
 
@@ -624,8 +624,8 @@ class TuiFailFirstReceiverOperations(TuiBlockingOperations):
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         self.play_configs.append(config)
         receiver = f"{config.host}:{config.port}"
-        if receiver == "10.0.0.42:8073":
-            raise RuntimeError("server busy or bad password: all no-password channels may be busy on 10.0.0.42:8073")
+        if receiver == "10.0.0.43:8073":
+            raise RuntimeError("server busy or bad password: all no-password channels may be busy on 10.0.0.43:8073")
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
             while not stop_event.is_set() and time.monotonic() < deadline:
@@ -637,8 +637,8 @@ class TuiBusyNewReceiverOperations(TuiBlockingOperations):
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         self.play_configs.append(config)
         receiver = f"{config.host}:{config.port}"
-        if receiver == "10.0.0.40:8073":
-            raise RuntimeError("server busy: all 4 client slots are taken on 10.0.0.40:8073")
+        if receiver == "10.0.0.42:8073":
+            raise RuntimeError("server busy: all 4 client slots are taken on 10.0.0.42:8073")
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
             while not stop_event.is_set() and time.monotonic() < deadline:
@@ -648,7 +648,7 @@ class TuiBusyNewReceiverOperations(TuiBlockingOperations):
 
 def test_tui_keymap_stored_receiver_prefix_switches_receiver():
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    controller.execute("add-receiver a http://10.0.0.42:8073/ Backup receiver")
+    controller.execute("add-receiver a http://10.0.0.43:8073/ Backup receiver")
     state = TuiInputState()
 
     response, message = handle_tui_key(ord("r"), state, controller, load_config())
@@ -656,20 +656,20 @@ def test_tui_keymap_stored_receiver_prefix_switches_receiver():
     assert message == "Receiver: press register [0..9] or [a..z]"
     response, message = handle_tui_key(ord("a"), state, controller, load_config())
 
-    assert message == "Receiver: 10.0.0.42:8073"
-    assert response["state"]["receiver"] == "10.0.0.42:8073"
+    assert message == "Receiver: 10.0.0.43:8073"
+    assert response["state"]["receiver"] == "10.0.0.43:8073"
 
 
 def test_tui_keymap_numeric_stored_receiver_register_switches_receiver():
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    controller.execute("add-receiver 2 http://10.0.0.42:8073/ Backup receiver")
+    controller.execute("add-receiver 2 http://10.0.0.43:8073/ Backup receiver")
     state = TuiInputState()
 
     handle_tui_key(ord("r"), state, controller, load_config())
     response, message = handle_tui_key(ord("2"), state, controller, load_config())
 
-    assert message == "Receiver: 10.0.0.42:8073"
-    assert response["state"]["receiver"] == "10.0.0.42:8073"
+    assert message == "Receiver: 10.0.0.43:8073"
+    assert response["state"]["receiver"] == "10.0.0.43:8073"
 
 
 def test_tui_add_receiver_command_persists_to_config_allowlist(tmp_path):
@@ -678,19 +678,19 @@ def test_tui_add_receiver_command_persists_to_config_allowlist(tmp_path):
         """
 [receivers]
 restricted = false
-allowed = ["10.0.0.40:8073"]
+allowed = ["10.0.0.42:8073"]
 """.strip() + "\n",
         encoding="utf-8",
     )
     config = load_config(config_path)
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.42:8073 Backup receiver")
+    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.43:8073 Backup receiver")
 
     response, message = handle_tui_key(10, state, controller, config)
 
     assert response["type"] == "receiver-preset"
-    assert message == "Saved receiver(s) to config: 10.0.0.42:8073"
-    assert load_config(config_path).receivers.allowed == ("10.0.0.40:8073", "10.0.0.42:8073")
+    assert message == "Saved receiver(s) to config: 10.0.0.43:8073"
+    assert load_config(config_path).receivers.allowed == ("10.0.0.42:8073", "10.0.0.43:8073")
 
 
 def test_tui_add_receiver_command_does_not_duplicate_config_allowlist(tmp_path):
@@ -699,19 +699,19 @@ def test_tui_add_receiver_command_does_not_duplicate_config_allowlist(tmp_path):
         """
 [receivers]
 restricted = false
-allowed = ["10.0.0.40:8073", "10.0.0.42:8073"]
+allowed = ["10.0.0.42:8073", "10.0.0.43:8073"]
 """.strip() + "\n",
         encoding="utf-8",
     )
     config = load_config(config_path)
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.42:8073 Backup receiver")
+    state = TuiInputState(mode=InputMode.COMMAND, command="ad 2 http://10.0.0.43:8073 Backup receiver")
 
     response, message = handle_tui_key(10, state, controller, config)
 
     assert response["type"] == "receiver-preset"
     assert message == ""
-    assert config_path.read_text(encoding="utf-8").count("10.0.0.42:8073") == 1
+    assert config_path.read_text(encoding="utf-8").count("10.0.0.43:8073") == 1
 
 
 def test_tui_keymap_receiver_prefix_switches_receiver_and_preserves_radio_parameters(tmp_path):
@@ -719,7 +719,7 @@ def test_tui_keymap_receiver_prefix_switches_receiver_and_preserves_radio_parame
     config_path.write_text(
         """
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073"]
 """.strip(),
         encoding="utf-8",
     )
@@ -735,8 +735,8 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
     response, message = handle_tui_key(ord("1"), state, controller, config)
 
     assert response["type"] == "state"
-    assert message == "Receiver: 10.0.0.40:8073"
-    assert response["state"]["receiver"] == "10.0.0.40:8073"
+    assert message == "Receiver: 10.0.0.42:8073"
+    assert response["state"]["receiver"] == "10.0.0.42:8073"
     assert response["state"]["frequency_khz"] == 7100.0
     assert response["state"]["mode"] == "usb"
     assert response["state"]["low_cut_hz"] == 300
@@ -751,7 +751,7 @@ def test_tui_receiver_switch_restarts_active_background_playback(tmp_path):
 allow_live = true
 
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073"]
 """.strip(),
         encoding="utf-8",
     )
@@ -766,10 +766,10 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
     controller.execute("stop")
     controller.execute("wait 2")
 
-    assert message == "Receiver: 10.0.0.40:8073; restarted playback"
+    assert message == "Receiver: 10.0.0.42:8073; restarted playback"
     assert response["type"] == "batch"
-    assert controller.state.receiver == "10.0.0.40:8073"
-    assert [f"{config.host}:{config.port}" for config in operations.play_configs] == ["10.0.0.41:8073", "10.0.0.40:8073"]
+    assert controller.state.receiver == "10.0.0.42:8073"
+    assert [f"{config.host}:{config.port}" for config in operations.play_configs] == ["10.0.0.41:8073", "10.0.0.42:8073"]
 
 
 def test_tui_receiver_switch_after_failed_playback_starts_new_receiver(tmp_path):
@@ -780,7 +780,7 @@ def test_tui_receiver_switch_after_failed_playback_starts_new_receiver(tmp_path)
 allow_live = true
 
 [receivers]
-allowed = ["10.0.0.42:8073", "10.0.0.41:8073"]
+allowed = ["10.0.0.43:8073", "10.0.0.41:8073"]
 """.strip(),
         encoding="utf-8",
     )
@@ -788,7 +788,7 @@ allowed = ["10.0.0.42:8073", "10.0.0.41:8073"]
     operations = TuiFailFirstReceiverOperations()
     controller = ClientController(operations=operations, allow_live_default=True)
     state = TuiInputState()
-    controller.execute("receiver 10.0.0.42:8073")
+    controller.execute("receiver 10.0.0.43:8073")
 
     controller.execute("play-bg --null-sink")
     failed = controller.execute("wait 1")
@@ -805,7 +805,7 @@ allowed = ["10.0.0.42:8073", "10.0.0.41:8073"]
     assert running.running is True
     assert running.error is None
     assert [f"{play_config.host}:{play_config.port}" for play_config in operations.play_configs] == [
-        "10.0.0.42:8073",
+        "10.0.0.43:8073",
         "10.0.0.41:8073",
     ]
 
@@ -818,7 +818,7 @@ def test_tui_receiver_switch_busy_restores_previous_receiver_and_reports_error(t
 allow_live = true
 
 [receivers]
-allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073"]
 """.strip(),
         encoding="utf-8",
     )
@@ -839,7 +839,7 @@ allowed = ["10.0.0.41:8073", "10.0.0.40:8073"]
     assert response["type"] == "operation-status"
     assert [f"{play_config.host}:{play_config.port}" for play_config in operations.play_configs] == [
         "10.0.0.41:8073",
-        "10.0.0.40:8073",
+        "10.0.0.42:8073",
         "10.0.0.41:8073",
     ]
 
@@ -909,7 +909,7 @@ state_file = "{state_path}"
     )
     config = load_config(config_path)
     controller = ClientController(volume_control=TuiFakeVolumeControl())
-    controller.execute("add-receiver a 10.0.0.42:8073 Backup receiver")
+    controller.execute("add-receiver a 10.0.0.43:8073 Backup receiver")
 
     request_tui_quit(controller, config=config)
     restarted = ClientController()
@@ -919,7 +919,7 @@ state_file = "{state_path}"
     restarted.receiver_presets.update(startup_receiver_presets(config))
     text = render_tui_hints(TuiInputState(pending_key_action="receiver"), config, restarted)
 
-    assert "a — 10.0.0.42:8073 Backup receiver" in text
+    assert "a — 10.0.0.43:8073 Backup receiver" in text
     assert "receiver_presets" not in state_path.read_text(encoding="utf-8")
     assert "[receiver_presets.a]" in (tmp_path / "presets.toml").read_text(encoding="utf-8")
 

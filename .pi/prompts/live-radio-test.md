@@ -9,7 +9,7 @@ $@
 
 Rules:
 
-- Use only `10.0.0.40:8073` or fallback `10.0.0.41:8073`.
+- Use `10.0.0.41:8073` or fallbacks `10.0.0.42:8073` and `10.0.0.43:8073`.
 - First confirm the related harness tests pass.
 - Keep the test short.
 - Avoid reconnect loops.

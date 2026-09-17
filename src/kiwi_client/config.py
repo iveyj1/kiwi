@@ -32,7 +32,7 @@ max_frames = 1500
 
 [receivers]
 restricted = true
-allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073"]
 
 [presets]
 file = "presets.toml"
@@ -94,7 +94,7 @@ preset = 1
 playback = false
 
 [default_state]
-host = "10.0.0.40"
+host = "10.0.0.41"
 port = 8073
 frequency_khz = 5000.0
 mode = "am"
@@ -172,7 +172,7 @@ class ReceiverConfig:
     """Receiver allowlist settings."""
 
     restricted: bool = True
-    allowed: tuple[str, ...] = ("10.0.0.40:8073", "10.0.0.41:8073")
+    allowed: tuple[str, ...] = ("10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073")
 
 
 @dataclass(frozen=True)

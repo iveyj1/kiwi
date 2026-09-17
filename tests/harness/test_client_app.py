@@ -85,8 +85,8 @@ class FailFirstReceiverOperations(FakeOperations):
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         self.calls.append(("play", config, null_sink, stop_event, command_queue, status_callback))
         receiver = f"{config.host}:{config.port}"
-        if receiver == "10.0.0.42:8073":
-            raise RuntimeError("server busy on 10.0.0.42:8073")
+        if receiver == "10.0.0.43:8073":
+            raise RuntimeError("server busy on 10.0.0.43:8073")
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
             while not stop_event.is_set() and time.monotonic() < deadline:
@@ -98,8 +98,8 @@ class BusyNewReceiverOperations(FakeOperations):
     def play(self, config, *, null_sink: bool, stop_event=None, command_queue=None, status_callback=None):
         self.calls.append(("play", config, null_sink, stop_event, command_queue, status_callback))
         receiver = f"{config.host}:{config.port}"
-        if receiver == "10.0.0.40:8073":
-            raise RuntimeError("server busy on 10.0.0.40:8073")
+        if receiver == "10.0.0.42:8073":
+            raise RuntimeError("server busy on 10.0.0.42:8073")
         if stop_event is not None:
             deadline = time.monotonic() + 1.0
             while not stop_event.is_set() and time.monotonic() < deadline:
@@ -253,18 +253,18 @@ def test_client_mixed_batch_executes_sequentially_and_stops_on_error():
 def test_client_add_receiver_command_and_alias_store_receiver_registers():
     controller = ClientController()
 
-    response = controller.execute("add-receiver a 10.0.0.42:8073 Backup receiver")
+    response = controller.execute("add-receiver a 10.0.0.43:8073 Backup receiver")
     alias_response = controller.execute("ad b http://example.test:8073 Example receiver")
 
     assert response == {
         "type": "receiver-preset",
         "register": "a",
-        "receiver": "10.0.0.42:8073",
+        "receiver": "10.0.0.43:8073",
         "description": "Backup receiver",
     }
     assert alias_response["register"] == "b"
     assert alias_response["receiver"] == "example.test:8073"
-    assert controller.receiver_presets["a"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+    assert controller.receiver_presets["a"] == {"receiver": "10.0.0.43:8073", "description": "Backup receiver"}
 
 
 def test_client_receiver_url_with_trailing_slash_is_normalized():
@@ -289,7 +289,7 @@ def test_client_receiver_invalid_port_reports_command_error():
 def test_controller_initializes_shared_session_snapshot_from_client_state():
     controller = ClientController(
         state=ClientState(
-            host="10.0.0.40",
+            host="10.0.0.42",
             port=8073,
             frequency_khz=335.1255,
             mode="cw",
@@ -302,7 +302,7 @@ def test_controller_initializes_shared_session_snapshot_from_client_state():
 
     shared = controller.paired_session.state
 
-    assert shared.desired_receiver == "10.0.0.40:8073"
+    assert shared.desired_receiver == "10.0.0.42:8073"
     assert shared.frequency_khz == shared.selected_khz == pytest.approx(335.1255)
     assert shared.mode == "cw"
     assert (shared.low_cut_hz, shared.high_cut_hz) == (650, 1050)
@@ -428,24 +428,24 @@ def test_client_switch_receiver_restarts_active_paired_radio_session():
     controller = ClientController(operations=operations)
     controller.execute("radio-bg --allow-live --null-sink")
 
-    response, message = controller.switch_receiver("10.0.0.40:8073")
+    response, message = controller.switch_receiver("10.0.0.42:8073")
     controller.execute("stop")
     controller.execute("wait 1")
 
     receivers = [f"{call[1].host}:{call[1].port}" for call in operations.calls if call[0] == "radio"]
-    assert receivers == ["10.0.0.41:8073", "10.0.0.40:8073"]
+    assert receivers == ["10.0.0.41:8073", "10.0.0.42:8073"]
     assert response["type"] == "batch"
-    assert message == "Receiver: 10.0.0.40:8073; restarted playback"
+    assert message == "Receiver: 10.0.0.42:8073; restarted playback"
 
 
 def test_client_switch_receiver_idle_updates_session_without_playback():
     controller = ClientController()
 
-    response, message = controller.switch_receiver("10.0.0.40:8073")
+    response, message = controller.switch_receiver("10.0.0.42:8073")
 
-    assert message == "Receiver: 10.0.0.40:8073"
-    assert response["state"]["receiver"] == "10.0.0.40:8073"
-    assert response["session"]["desired_receiver"] == "10.0.0.40:8073"
+    assert message == "Receiver: 10.0.0.42:8073"
+    assert response["state"]["receiver"] == "10.0.0.42:8073"
+    assert response["session"]["desired_receiver"] == "10.0.0.42:8073"
     assert response["session"]["desired_playback"] is False
 
 
@@ -454,20 +454,20 @@ def test_client_switch_receiver_restarts_active_playback():
     controller = ClientController(operations=operations, allow_live_default=True)
 
     controller.execute("play-bg --null-sink")
-    response, message = controller.switch_receiver("10.0.0.40:8073")
+    response, message = controller.switch_receiver("10.0.0.42:8073")
     controller.execute("stop")
     controller.execute("wait 2")
 
-    assert message == "Receiver: 10.0.0.40:8073; restarted playback"
+    assert message == "Receiver: 10.0.0.42:8073; restarted playback"
     assert response["type"] == "batch"
-    assert controller.state.receiver == "10.0.0.40:8073"
-    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.40:8073"]
+    assert controller.state.receiver == "10.0.0.42:8073"
+    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.42:8073"]
 
 
 def test_client_switch_receiver_recovers_failed_playback_session():
     operations = FailFirstReceiverOperations()
     controller = ClientController(operations=operations, allow_live_default=True)
-    controller.execute("receiver 10.0.0.42:8073")
+    controller.execute("receiver 10.0.0.43:8073")
 
     controller.execute("play-bg --null-sink")
     failed = controller.execute("wait 1")
@@ -482,7 +482,7 @@ def test_client_switch_receiver_recovers_failed_playback_session():
     assert response["session"]["error"] is None
     assert running.running is True
     assert running.error is None
-    assert play_call_receivers(operations) == ["10.0.0.42:8073", "10.0.0.41:8073"]
+    assert play_call_receivers(operations) == ["10.0.0.43:8073", "10.0.0.41:8073"]
 
 
 def test_client_switch_receiver_busy_rolls_back_active_playback():
@@ -490,7 +490,7 @@ def test_client_switch_receiver_busy_rolls_back_active_playback():
     controller = ClientController(operations=operations, allow_live_default=True)
 
     controller.execute("play-bg --null-sink")
-    response, message = controller.switch_receiver("10.0.0.40:8073")
+    response, message = controller.switch_receiver("10.0.0.42:8073")
     controller.execute("stop")
     controller.execute("wait 2")
 
@@ -498,7 +498,7 @@ def test_client_switch_receiver_busy_rolls_back_active_playback():
     assert "server busy" in message
     assert "restored receiver: 10.0.0.41:8073" in message
     assert controller.state.receiver == "10.0.0.41:8073"
-    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.40:8073", "10.0.0.41:8073"]
+    assert play_call_receivers(operations) == ["10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.41:8073"]
 
 
 def test_client_command_aliases_update_state_and_status():
@@ -628,7 +628,7 @@ def test_client_store_and_recall_presets():
     stored_all = controller.execute("store all 2")
     controller.execute("volume 15")
 
-    controller.execute("receiver 10.0.0.40:8073")
+    controller.execute("receiver 10.0.0.42:8073")
     controller.execute("tune 5000")
     controller.execute("mode am -5000 5000")
     controller.execute("agc gain 50")

@@ -107,7 +107,7 @@ class ClientState:
     agc_decay_ms: int = 1000
     agc_gain: int = 50
     receivers_restricted: bool = True
-    allowed_receivers: tuple[str, ...] = ("10.0.0.40:8073", "10.0.0.41:8073")
+    allowed_receivers: tuple[str, ...] = ("10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073")
     connected: bool = False
 
     @property

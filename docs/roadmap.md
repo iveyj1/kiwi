@@ -11,7 +11,7 @@ Status key:
 
 ## Current position
 
-The project has completed the first SND audio harness, local capture, offline recording, short direct live-to-WAV, and short live playback milestones.
+The project has a usable integrated Kitty/curses receiver client on a shared paired-session architecture, alongside fixture replay, capture, WAV recording, audio playback, and an optional native GUI prototype. Current work is cleanup and preparation for merge into `main`; waterfall smoothing is deferred. Detailed milestone entries below retain the development history.
 
 Current verified baseline:
 
@@ -20,7 +20,10 @@ Current verified baseline:
 - Captured uncompressed mono SND fixture can be converted to a standard WAV file.
 - Guarded direct live-to-WAV recording has been verified against the local receiver.
 - Guarded live playback has written real radio audio to the default `sounddevice` output.
-- Explicit live play/record/capture sessions are currently capped at 60 seconds / 1500 SND frames.
+- Interactive sessions support unlimited duration/frame count using zero limits; automated live checks remain short and explicitly authorized.
+- General local default: `10.0.0.41:8073`; `.42` and `.43` are alternatives. Prefer `.43` for NDB development in its current user-reported 4-channel mode.
+- Public operation must accommodate 8-channel receivers with reduced W/F capabilities. NDB measurement will use received SND/IQ, not waterfall pixels.
+- Remaining reliability work includes first-data/stall diagnostics and extended receiver-switch regressions. Beacon detection and long-term integration remain planned.
 
 ## Milestone 1 — SND protocol and harness foundation
 

@@ -9,7 +9,7 @@ $@
 
 Rules:
 
-- Use local receivers only: `10.0.0.40:8073`, fallback `10.0.0.41:8073`.
+- Use local receivers only: `10.0.0.41:8073`, with `10.0.0.42:8073` and `10.0.0.43:8073` as fallbacks.
 - Keep capture short.
 - Avoid reconnect loops.
 - Do not send admin or mutating commands.

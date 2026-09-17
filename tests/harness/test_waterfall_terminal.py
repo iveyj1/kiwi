@@ -171,7 +171,7 @@ def test_terminal_main_reports_output_oserror_without_traceback(monkeypatch, cap
 
 def test_combined_waterfall_and_delayed_audio_share_one_session_timestamp(tmp_path: Path):
     args = apply_waterfall_config(
-        build_arg_parser().parse_args(["--host", "10.0.0.40"]),
+        build_arg_parser().parse_args(["--host", "10.0.0.42"]),
         default_config(),
     )
 
@@ -181,8 +181,8 @@ def test_combined_waterfall_and_delayed_audio_share_one_session_timestamp(tmp_pa
 
     assert args.timestamp == 123456
     assert waterfall.timestamp == audio.timestamp == 123456
-    assert waterfall.websocket_uri() == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
-    assert audio.websocket_uri() == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
+    assert waterfall.websocket_uri() == "ws://10.0.0.42:8073/ws/kiwi/123456/W/F"
+    assert audio.websocket_uri() == "ws://10.0.0.42:8073/ws/kiwi/123456/SND"
 
 
 def test_explicit_combined_session_timestamp_is_preserved(tmp_path: Path):
@@ -634,7 +634,7 @@ def test_live_viewer_uses_guarded_capture_and_parsed_frame_callback(tmp_path: Pa
     backend = FakeBackend()
     viewer = WaterfallTerminalViewer(backend=backend, max_rows=3, min_dbm=-255, max_dbm=0)
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "wf.jsonl",
         timestamp=123456,
@@ -682,14 +682,14 @@ def test_audio_startup_is_ready_before_paired_waterfall_opens(tmp_path: Path):
 
     viewer = WaterfallTerminalViewer(backend=FakeBackend(), max_rows=1)
     wf_config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "paired.jsonl",
         timestamp=123456,
         max_frames=1,
     )
     snd_config = LiveSndPlaybackConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         timestamp=123456,
     )
@@ -720,7 +720,7 @@ def test_audio_failure_before_ready_does_not_open_waterfall(tmp_path: Path):
         asyncio.run(
             view_live_waterfall(
                 LiveWaterfallCaptureConfig(
-                    host="10.0.0.40",
+                    host="10.0.0.42",
                     port=8073,
                     output=tmp_path / "never-open.jsonl",
                     max_frames=1,
@@ -748,7 +748,7 @@ def test_live_viewer_coalesces_immediate_frames_and_draws_off_event_loop(tmp_pat
         refresh_hz=12,
     )
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "wf-many.jsonl",
         timestamp=123456,

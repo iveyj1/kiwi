@@ -107,13 +107,13 @@ Dry-run only, no network:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_capture \
   --dry-run \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --output tests/fixtures/kiwi/local-snd-capture.jsonl
 ```
 
 Live execution is intentionally gated:
 
-- receiver must be one of `10.0.0.40:8073` or `10.0.0.41:8073`,
+- receiver must be one of `10.0.0.41:8073`, `10.0.0.42:8073`, or `10.0.0.43:8073`,
 - duration must be at most 5 seconds,
 - frame cap must be at most 100,
 - output file must not already exist unless `--overwrite` is supplied,
@@ -132,7 +132,7 @@ Planned purpose: capture a short local SND session fixture that validates the sy
 Preconditions:
 
 - `python3 -m pytest tests/harness tests/protocol` passes.
-- Use only `10.0.0.40:8073`; fallback to `10.0.0.41:8073` only if max users/busy.
+- Use `10.0.0.41:8073`; fall back to `10.0.0.42:8073` or `10.0.0.43:8073` if max users/busy.
 - No admin commands.
 - No reconnect loop.
 - Short, attended capture only.

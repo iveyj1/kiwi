@@ -27,7 +27,7 @@ class RecordingSink(NullAudioSink):
 
 def _config() -> LiveSndPlaybackConfig:
     return LiveSndPlaybackConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         frequency_khz=5000.0,
         mode="am",
@@ -93,7 +93,7 @@ def test_play_replay_snd_applies_startup_fade_in():
     transport = ReplayTransport(load_jsonl_events(FIXTURE))
     sink = RecordingSink()
     config = LiveSndPlaybackConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         frequency_khz=5000.0,
         mode="am",
@@ -131,7 +131,7 @@ def test_live_play_dry_run_plan_has_commands():
 
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.41:8073/ws/kiwi/123456/SND"
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert "SET AR OK in=<audio_rate> out=44100" in plan["dynamic_commands"]
     assert "SET mod=am low_cut=-5000 high_cut=5000 freq=5000.000" in plan["dynamic_commands"]
@@ -139,16 +139,16 @@ def test_live_play_dry_run_plan_has_commands():
 
 def test_live_play_cli_refuses_without_allow_live():
     with pytest.raises(SystemExit) as exc:
-        main(["--host", "10.0.0.40"])
+        main(["--host", "10.0.0.42"])
 
     assert exc.value.code == 2
 
 
 def test_live_play_cli_dry_run_does_not_connect(capsys):
-    code = main(["--dry-run", "--host", "10.0.0.40", "--timestamp", "123456"])
+    code = main(["--dry-run", "--host", "10.0.0.42", "--timestamp", "123456"])
 
     assert code == 0
-    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
+    assert "ws://10.0.0.42:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
 
 
 def test_live_play_rejects_non_allowed_receiver():

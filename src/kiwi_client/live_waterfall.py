@@ -316,7 +316,7 @@ async def capture_live_waterfall(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Guarded short local KiwiSDR W/F capture")
-    parser.add_argument("--host", default="10.0.0.40")
+    parser.add_argument("--host", default="10.0.0.41")
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--center-khz", type=float, default=5000.0)

@@ -16,7 +16,7 @@ from kiwi_client.session_manager import (
 
 def manager(**overrides):
     values = dict(
-        desired_receiver="10.0.0.40:8073",
+        desired_receiver="10.0.0.42:8073",
         frequency_khz=5000.0,
         selected_khz=5000.0,
         mode="am",

@@ -13,8 +13,9 @@
 
 | Name | Address | Notes |
 |---|---|---|
-| kiwi40 | `10.0.0.40:8073` | Primary; may have max users |
-| kiwi41 | `10.0.0.41:8073` | Fallback |
+| kiwi41 | `10.0.0.41:8073` | Primary |
+| kiwi42 | `10.0.0.42:8073` | Fallback |
+| kiwi43 | `10.0.0.43:8073` | Fallback |
 
 ## Live-test policy
 

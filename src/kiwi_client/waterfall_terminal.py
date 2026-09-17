@@ -1214,7 +1214,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audio", action=argparse.BooleanOptionalAction, default=None, help="start coordinated SND audio")
     parser.add_argument("--null-audio", action="store_true", help="run SND session but discard audio samples")
     parser.add_argument("--force", action="store_true", help="emit Kitty graphics even when capability detection fails")
-    parser.add_argument("--host", default="10.0.0.40")
+    parser.add_argument("--host", default="10.0.0.41")
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--center-khz", type=float)
     parser.add_argument("--zoom", type=int)

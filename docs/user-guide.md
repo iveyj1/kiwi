@@ -1,6 +1,10 @@
 # User Guide
 
-This file should describe user-visible behavior as the application develops.
+The primary interactive interface is `kiwi-console`, combining a Kitty waterfall with terminal controls.
+
+Local receiver registers are `r1` = `10.0.0.41:8073`, `r2` = `10.0.0.42:8073`, and `r3` = `10.0.0.43:8073`. Prefer `r3` for local NDB development: it is currently reported to use 4-channel firmware mode. General startup defaults remain on `.41`; saved state or explicit CLI options can override them.
+
+Expect reduced waterfall zoom and slower updates on many 8-channel public receivers. Exact limits depend on receiver metadata/firmware; the approximate zoom-11 versus zoom-14 distinction is not yet verified here. Closer NDB analysis will use received SND/IQ samples rather than waterfall pixels. A short display buffer and smoother presentation are deferred, not currently implemented.
 
 ## Basic client
 
@@ -129,7 +133,7 @@ max_frames = 1500
 [receivers]
 # Default is restricted to local receivers.
 restricted = true
-allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073"]
 
 [presets]
 # Durable radio and receiver-register presets live here.
@@ -178,7 +182,7 @@ state_file = "~/.local/state/kiwi-client/state.json"
 playback = true
 
 [default_state]
-host = "10.0.0.40"
+host = "10.0.0.41"
 port = 8073
 frequency_khz = 5000.0
 mode = "am"
@@ -237,7 +241,7 @@ Receiver restrictions can be changed with:
 ```toml
 [receivers]
 restricted = true
-allowed = ["10.0.0.40:8073", "10.0.0.41:8073"]
+allowed = ["10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073"]
 ```
 
 or explicitly disabled for unrestricted receiver addresses:
@@ -482,7 +486,7 @@ Guarded short local W/F capture is available behind `--allow-live`:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
   --dry-run \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --output tests/fixtures/kiwi/local-wf-capture.jsonl
 ```
 
@@ -491,7 +495,7 @@ Actual short capture, only when explicitly intended:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_waterfall \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --output tests/fixtures/kiwi/local-wf-capture.jsonl
 ```
 
@@ -500,7 +504,7 @@ A standalone guarded live ASCII preview is also available. By default it prints 
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_waterfall_preview \
   --allow-live \
-  --host 10.0.0.40
+  --host 10.0.0.41
 ```
 
 If the preview looks washed out or too sparse, adjust local ASCII scaling without changing the receiver-side W/F dB settings:
@@ -508,7 +512,7 @@ If the preview looks washed out or too sparse, adjust local ASCII scaling withou
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_waterfall_preview \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --max-frames 50 \
   --render-min-db -100 \
   --render-max-db -40
@@ -525,8 +529,8 @@ Useful controls:
 Installed script names:
 
 ```bash
-kiwi-wf-capture --allow-live --host 10.0.0.40 --output tests/fixtures/kiwi/local-wf-capture.jsonl
-kiwi-wf-live --allow-live --host 10.0.0.40 --max-frames 50 --render-min-db -100 --render-max-db -40
+kiwi-wf-capture --allow-live --host 10.0.0.41 --output tests/fixtures/kiwi/local-wf-capture.jsonl
+kiwi-wf-live --allow-live --host 10.0.0.41 --max-frames 50 --render-min-db -100 --render-max-db -40
 ```
 
 A detailed standalone raster viewer is available for terminals supporting the Kitty graphics protocol. Fixture mode is offline and retains all 1024 source bins in the raster image:
@@ -542,7 +546,7 @@ Guarded live mode uses the existing local receiver policy and can optionally sav
 ```bash
 kiwi-wf-terminal \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --center-khz 5000 \
   --rows 100 \
   --render-min-db -100 \
@@ -610,7 +614,7 @@ The curses/UI thread owns text and terminal writes. Source rows can arrive at `-
 Guarded live mode uses the controller-owned paired SND/W/F worker and requires an explicit local receiver. Audio starts muted unless `--audio` is supplied:
 
 ```bash
-kiwi-console --allow-live --receiver 10.0.0.40:8073 \
+kiwi-console --allow-live --receiver 10.0.0.41:8073 \
   --config config.toml --rows 300 --refresh-hz 5
 ```
 
@@ -677,7 +681,7 @@ Dry-run, no network:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_capture \
   --dry-run \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --output tests/fixtures/kiwi/local-snd-capture.jsonl
 ```
 
@@ -686,7 +690,7 @@ Actual live capture, only when explicitly intended:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_capture \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --output tests/fixtures/kiwi/local-snd-capture.jsonl
 ```
 
@@ -727,7 +731,7 @@ Direct guarded SND-to-WAV recording is available as a dry-run plan:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_record \
   --dry-run \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --frequency-khz 5000 \
   --mode am \
   --low-cut-hz -5000 \
@@ -740,7 +744,7 @@ Actual direct live recording, only when explicitly intended:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_record \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --frequency-khz 5000 \
   --mode am \
   --low-cut-hz -5000 \
@@ -783,7 +787,7 @@ Live SND playback dry-run plan:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_play \
   --dry-run \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --frequency-khz 5000 \
   --mode am \
   --low-cut-hz -5000 \
@@ -795,7 +799,7 @@ Live SND playback with audio output, only when explicitly intended:
 ```bash
 PYTHONPATH=src python3 -m kiwi_client.live_play \
   --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --frequency-khz 5000 \
   --mode am \
   --low-cut-hz -5000 \
@@ -811,7 +815,7 @@ Live SND playback with receiver connection but no audio-device output:
 PYTHONPATH=src python3 -m kiwi_client.live_play \
   --allow-live \
   --null-sink \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --frequency-khz 5000 \
   --mode am \
   --low-cut-hz -5000 \

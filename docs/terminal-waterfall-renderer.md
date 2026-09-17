@@ -27,7 +27,7 @@ Initial standalone experimental command:
 
 ```bash
 kiwi-wf-terminal --allow-live \
-  --host 10.0.0.40 \
+  --host 10.0.0.41 \
   --backend kitty \
   --rows 100 \
   --terminal-columns 128 \
@@ -39,7 +39,7 @@ kiwi-wf-terminal --allow-live \
 Dry-run/no-network mode:
 
 ```bash
-kiwi-wf-terminal --dry-run --host 10.0.0.40 --backend kitty
+kiwi-wf-terminal --dry-run --host 10.0.0.41 --backend kitty
 ```
 
 Fixture preview mode:

@@ -33,7 +33,7 @@ class FakePrimary:
 
 def test_pair_session_configs_assigns_one_timestamp_to_both_streams(tmp_path):
     wf, snd = pair_session_configs(
-        LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "wf.jsonl", timestamp=None),
+        LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=tmp_path / "wf.jsonl", timestamp=None),
         LiveSndPlaybackConfig(timestamp=None),
         clock=lambda: 123456.9,
     )
@@ -45,7 +45,7 @@ def test_pair_session_configs_assigns_one_timestamp_to_both_streams(tmp_path):
 
 def test_pair_session_configs_preserves_explicit_timestamp_and_rejects_mismatch(tmp_path):
     wf, snd = pair_session_configs(
-        LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "wf.jsonl", timestamp=777),
+        LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=tmp_path / "wf.jsonl", timestamp=777),
         LiveSndPlaybackConfig(timestamp=None),
         clock=lambda: 123456.9,
     )
@@ -53,7 +53,7 @@ def test_pair_session_configs_preserves_explicit_timestamp_and_rejects_mismatch(
 
     with pytest.raises(ValueError, match="timestamp"):
         pair_session_configs(
-            LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "bad.jsonl", timestamp=1),
+            LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=tmp_path / "bad.jsonl", timestamp=1),
             LiveSndPlaybackConfig(timestamp=2),
         )
 

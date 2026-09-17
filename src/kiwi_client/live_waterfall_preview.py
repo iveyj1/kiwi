@@ -44,7 +44,7 @@ def _websocket_connect_for_main() -> Callable[..., Any] | None:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Guarded short local KiwiSDR W/F ASCII preview")
-    parser.add_argument("--host", default="10.0.0.40")
+    parser.add_argument("--host", default="10.0.0.41")
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--center-khz", type=float, default=5000.0)
     parser.add_argument("--zoom", type=int, default=0)

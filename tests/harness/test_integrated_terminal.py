@@ -285,7 +285,7 @@ def test_controller_console_source_with_fake_operations_publishes_and_routes_cle
 
     operations = Operations()
     controller = ClientController(
-        state=ClientState(host="10.0.0.40", frequency_khz=110.0, duration_seconds=0, max_frames=0),
+        state=ClientState(host="10.0.0.42", frequency_khz=110.0, duration_seconds=0, max_frames=0),
         operations=operations,
     )
     controller.configure_waterfall_session(center_khz=110.0, zoom=0, speed=1, interp=13, history_rows=4)
@@ -333,7 +333,7 @@ def test_controller_console_source_exposes_failed_background_without_hanging_cle
             raise RuntimeError("synthetic W/F failure")
 
     controller = ClientController(
-        state=ClientState(host="10.0.0.40", duration_seconds=0, max_frames=0),
+        state=ClientState(host="10.0.0.42", duration_seconds=0, max_frames=0),
         operations=Operations(),
     )
     controller.configure_waterfall_session(center_khz=5000, zoom=0, speed=1, interp=13, history_rows=4)
@@ -406,14 +406,14 @@ def test_controller_console_source_audio_mode_omits_null_sink():
 
 def test_integrated_live_dry_run_requires_flag_but_does_not_connect(capsys):
     code = main([
-        "--allow-live", "--receiver", "10.0.0.40:8073",
+        "--allow-live", "--receiver", "10.0.0.42:8073",
         "--config", "config.toml", "--dry-run",
     ])
 
     assert code == 0
     result = json.loads(capsys.readouterr().out)
     assert result["network"] is False
-    assert result["receiver"] == "10.0.0.40:8073"
+    assert result["receiver"] == "10.0.0.42:8073"
     assert result["steps_khz"] == [1.0, 0.1]
     assert result["would_start"] == "radio-bg --allow-live --null-sink"
 

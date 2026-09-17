@@ -16,8 +16,9 @@ Prefer fixture-backed facts.
 
 ## Local receivers
 
-- `10.0.0.40:8073`
 - `10.0.0.41:8073`
+- `10.0.0.42:8073`
+- `10.0.0.43:8073`
 
 ## Connection/session notes
 

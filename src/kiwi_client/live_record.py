@@ -227,7 +227,7 @@ async def record_live_snd_wav(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Guarded short local KiwiSDR SND-to-WAV recording")
-    parser.add_argument("--host", default="10.0.0.40", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
+    parser.add_argument("--host", default="10.0.0.41", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--user", default="kiwi-client")

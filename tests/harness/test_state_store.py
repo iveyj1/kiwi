@@ -79,13 +79,13 @@ def test_save_and_load_presets_file(tmp_path):
     save_presets_file(
         path,
         presets={"a": full_preset(state), 1: minimal_preset(state)},
-        receiver_presets={"2": {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}},
+        receiver_presets={"2": {"receiver": "10.0.0.43:8073", "description": "Backup receiver"}},
     )
     loaded = load_presets_file(path)
 
     assert loaded["presets"]["a"]["frequency_khz"] == 7100.0
     assert loaded["presets"]["1"]["mode"] == "usb"
-    assert loaded["receiver_presets"]["2"] == {"receiver": "10.0.0.42:8073", "description": "Backup receiver"}
+    assert loaded["receiver_presets"]["2"] == {"receiver": "10.0.0.43:8073", "description": "Backup receiver"}
 
 
 def test_save_and_load_state_file_only_persists_last_state(tmp_path):

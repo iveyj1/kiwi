@@ -6,8 +6,8 @@ KiwiSDR provides capable browser-based HF/LF receiver access, but this project e
 
 ## Local receivers
 
-- Primary: `10.0.0.40:8073`
-- Fallback: `10.0.0.41:8073`
+- Primary: `10.0.0.41:8073`
+- Fallbacks: `10.0.0.42:8073`, `10.0.0.43:8073`
 
 ## Reference code
 

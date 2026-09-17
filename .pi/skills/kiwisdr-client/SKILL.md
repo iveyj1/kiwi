@@ -82,9 +82,9 @@ Test at minimum:
 
 Local receivers:
 
-- `10.0.0.40:8073`
-- `10.0.0.41:8073`
+- Primary: `10.0.0.41:8073`
+- Fallbacks: `10.0.0.42:8073`, `10.0.0.43:8073`
 
-Use `10.0.0.41:8073` if `10.0.0.40:8073` has max users.
+Use either fallback if the primary has max users.
 
 After useful live observations, create or update a fixture.

@@ -41,7 +41,7 @@ from kiwi_client.transport import ReplayTransport
 class LiveSndPlaybackConfig:
     """Configuration for one short guarded SND playback session."""
 
-    host: str = "10.0.0.40"
+    host: str = "10.0.0.41"
     port: int = 8073
     user: str = "kiwi-client"
     frequency_khz: float = 5000.0
@@ -444,7 +444,7 @@ async def play_live_snd(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Guarded short local KiwiSDR SND playback")
-    parser.add_argument("--host", default="10.0.0.40", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
+    parser.add_argument("--host", default="10.0.0.41", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--user", default="kiwi-client")
     parser.add_argument("--frequency-khz", type=float, default=5000.0)

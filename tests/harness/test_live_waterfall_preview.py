@@ -7,7 +7,7 @@ from tests.harness.test_live_waterfall import FakeConnect, WF_PAYLOAD
 
 def test_preview_live_waterfall_prints_ascii_rows_with_fake_websocket(tmp_path: Path):
     output = tmp_path / "wf.jsonl"
-    config = LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=output, timestamp=123456, max_frames=1)
+    config = LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=output, timestamp=123456, max_frames=1)
     fake_connect = FakeConnect([WF_PAYLOAD])
     rows = []
 
@@ -18,11 +18,11 @@ def test_preview_live_waterfall_prints_ascii_rows_with_fake_websocket(tmp_path: 
 
 
 def test_live_waterfall_preview_main_dry_run(capsys):
-    code = main(["--dry-run", "--host", "10.0.0.40", "--timestamp", "123456"])
+    code = main(["--dry-run", "--host", "10.0.0.42", "--timestamp", "123456"])
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/ws/kiwi/123456/W/F" in captured.out
+    assert "ws://10.0.0.42:8073/ws/kiwi/123456/W/F" in captured.out
     assert '"duration_seconds": 60.0' in captured.out
     assert '"max_frames": 50' in captured.out
 
@@ -35,7 +35,7 @@ def test_live_waterfall_preview_main_uses_save_fixture_with_fake_websocket(tmp_p
     code = main([
         "--allow-live",
         "--host",
-        "10.0.0.40",
+        "10.0.0.42",
         "--timestamp",
         "123456",
         "--max-frames",
@@ -58,7 +58,7 @@ def test_live_waterfall_preview_main_accepts_render_scale_with_fake_websocket(tm
     code = main([
         "--allow-live",
         "--host",
-        "10.0.0.40",
+        "10.0.0.42",
         "--timestamp",
         "123456",
         "--max-frames",

@@ -47,12 +47,12 @@ class FakeConnect:
 
 
 def test_live_waterfall_config_dry_run_plan(tmp_path: Path):
-    config = LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "wf.jsonl", timestamp=123456)
+    config = LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=tmp_path / "wf.jsonl", timestamp=123456)
 
     config.validate()
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
+    assert plan["websocket_uri"] == "ws://10.0.0.42:8073/ws/kiwi/123456/W/F"
     assert plan["render_mindb"] == -110
     assert plan["render_maxdb"] == 0
     assert plan["ascii_ramp"] == " .:-=+*#%@"
@@ -72,7 +72,7 @@ def test_live_waterfall_config_dry_run_plan(tmp_path: Path):
 
 def test_live_waterfall_config_rejects_unsupported_interpolation(tmp_path: Path):
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "wf.jsonl",
         interp=5,
@@ -93,7 +93,7 @@ def test_live_waterfall_cli_dry_run_does_not_require_allow_live(tmp_path: Path, 
     code = main([
         "--dry-run",
         "--host",
-        "10.0.0.40",
+        "10.0.0.42",
         "--output",
         str(tmp_path / "wf.jsonl"),
         "--timestamp",
@@ -102,19 +102,19 @@ def test_live_waterfall_cli_dry_run_does_not_require_allow_live(tmp_path: Path, 
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/ws/kiwi/123456/W/F" in captured.out
+    assert "ws://10.0.0.42:8073/ws/kiwi/123456/W/F" in captured.out
 
 
 def test_live_waterfall_cli_refuses_without_allow_live(tmp_path: Path):
     with pytest.raises(SystemExit) as exc:
-        main(["--host", "10.0.0.40", "--output", str(tmp_path / "wf.jsonl")])
+        main(["--host", "10.0.0.42", "--output", str(tmp_path / "wf.jsonl")])
 
     assert exc.value.code == 2
 
 
 def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Path):
     output = tmp_path / "wf.jsonl"
-    config = LiveWaterfallCaptureConfig(host="10.0.0.40", port=8073, output=output, timestamp=123456, max_frames=1)
+    config = LiveWaterfallCaptureConfig(host="10.0.0.42", port=8073, output=output, timestamp=123456, max_frames=1)
     fake_connect = FakeConnect([b"MSG wf_setup=1", WF_PAYLOAD])
     metrics = []
     frames = []
@@ -132,7 +132,7 @@ def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Pat
     events = load_jsonl_events(path)
     raw_events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert path == output
-    assert fake_connect.calls[0][0] == "ws://10.0.0.40:8073/ws/kiwi/123456/W/F"
+    assert fake_connect.calls[0][0] == "ws://10.0.0.42:8073/ws/kiwi/123456/W/F"
     assert fake_connect.calls[0][1]["ping_interval"] is None
     assert fake_connect.websocket.sent == config.dry_run_plan()["commands"]
     assert raw_events[0]["dir"] == "meta"
@@ -149,7 +149,7 @@ def test_capture_live_waterfall_writes_fixture_with_fake_websocket(tmp_path: Pat
 
 def test_capture_live_waterfall_sends_queued_navigation_command(tmp_path: Path):
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "wf-control.jsonl",
         timestamp=123456,
@@ -174,7 +174,7 @@ def test_capture_live_waterfall_sends_queued_navigation_command(tmp_path: Path):
 def test_capture_live_waterfall_reports_websocket_closure_without_raw_transport_error(tmp_path: Path):
     output = tmp_path / "wf.jsonl"
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=output,
         timestamp=123456,
@@ -204,7 +204,7 @@ def test_capture_live_waterfall_contextualizes_frequency_from_msg_metadata(tmp_p
         + bytes([100]) * 1024
     )
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=output,
         timestamp=123456,
@@ -236,7 +236,7 @@ def test_capture_live_waterfall_contextualizes_frequency_from_msg_metadata(tmp_p
 def test_streaming_waterfall_can_disable_unbounded_fixture_event_storage(tmp_path: Path):
     output = tmp_path / "unused.jsonl"
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=output,
         timestamp=123456,
@@ -258,7 +258,7 @@ def test_streaming_waterfall_can_disable_unbounded_fixture_event_storage(tmp_pat
 def test_capture_live_waterfall_uses_separate_ascii_render_scale(tmp_path: Path):
     output = tmp_path / "wf.jsonl"
     config = LiveWaterfallCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=output,
         timestamp=123456,

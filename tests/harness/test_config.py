@@ -19,7 +19,7 @@ def test_default_config_has_keymaps_and_steps():
     assert config.live.duration_seconds == 60.0
     assert config.live.max_frames == 1500
     assert config.receivers.restricted is True
-    assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.41:8073")
+    assert config.receivers.allowed == ("10.0.0.41:8073", "10.0.0.42:8073", "10.0.0.43:8073")
     assert config.presets.file == "presets.toml"
     assert config.tuning.cw_offset_hz == -800
     assert config.tuning.command_frequency_decimals == 3
@@ -198,19 +198,19 @@ def test_add_allowed_receiver_to_config_appends_missing_receiver(tmp_path: Path)
         """
 [receivers]
 restricted = true
-allowed = ["10.0.0.40:8073"]
+allowed = ["10.0.0.42:8073"]
 """.strip() + "\n",
         encoding="utf-8",
     )
 
-    changed = add_allowed_receiver_to_config(path, "10.0.0.42:8073")
-    unchanged = add_allowed_receiver_to_config(path, "10.0.0.42:8073")
+    changed = add_allowed_receiver_to_config(path, "10.0.0.43:8073")
+    unchanged = add_allowed_receiver_to_config(path, "10.0.0.43:8073")
     config = load_config(path)
 
     assert changed is True
     assert unchanged is False
-    assert config.receivers.allowed == ("10.0.0.40:8073", "10.0.0.42:8073")
-    assert path.read_text(encoding="utf-8").count("10.0.0.42:8073") == 1
+    assert config.receivers.allowed == ("10.0.0.42:8073", "10.0.0.43:8073")
+    assert path.read_text(encoding="utf-8").count("10.0.0.43:8073") == 1
 
 
 def test_discover_config_path_prefers_explicit_then_cwd_then_user(tmp_path: Path, monkeypatch):

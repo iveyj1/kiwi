@@ -25,7 +25,7 @@ from kiwi_client.protocol import parse_msg, parse_snd_uncompressed_mono
 from kiwi_client.receiver_model import ReceiverState
 from kiwi_client.session_bootstrap import KiwiBootstrapError, browser_websocket_uri, fallback_connection_timestamp, resolve_connection_timestamp
 
-LOCAL_RECEIVERS = {("10.0.0.40", 8073), ("10.0.0.41", 8073)}
+LOCAL_RECEIVERS = {("10.0.0.41", 8073), ("10.0.0.42", 8073), ("10.0.0.43", 8073)}
 MAX_DURATION_SECONDS = 60.0
 MAX_FRAMES = 1500
 WEBSOCKET_CLOSE_TIMEOUT_SECONDS = 1.0
@@ -300,7 +300,7 @@ async def capture_live_snd(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Guarded short local KiwiSDR SND capture")
-    parser.add_argument("--host", default="10.0.0.40", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
+    parser.add_argument("--host", default="10.0.0.41", choices=[host for host, _ in sorted(LOCAL_RECEIVERS)])
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--user", default="kiwi-client")

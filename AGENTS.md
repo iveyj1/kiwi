@@ -28,10 +28,10 @@ Before implementing protocol behavior, inspect:
 
 Available local receivers:
 
-- Primary: `10.0.0.40:8073`
-- Fallback: `10.0.0.41:8073`
+- Primary: `10.0.0.41:8073`
+- Fallbacks: `10.0.0.42:8073`, `10.0.0.43:8073`
 
-Receiver `10.0.0.40:8073` may occasionally have max users. If that happens, use `10.0.0.41:8073`.
+If the primary receiver has max users, use either fallback.
 
 Do not use public KiwiSDR receivers unless explicitly requested.
 
@@ -91,12 +91,12 @@ Do not bury protocol parsing inside UI code.
 
 ## Git workflow
 
-Until explicitly changed by the user:
+Current user direction: clean up and prepare the tested feature work for merge into `main`.
 
-- Treat `main` as closed; do not commit or merge work there.
-- Use short-lived feature branches for implementation work.
-- Merge tested feature branches into `wf1` at sensible integration points.
-- Keep `wf1` as the active integration branch.
+- Use feature branches for implementation and merge preparation.
+- `main` is the intended merge target; the prior `wf1` integration requirement is superseded.
+- Preparation is not execution: do not merge into or commit directly on `main` until the user requests the merge.
+- Keep untracked screenshots and local state out of commits.
 
 ## Development rhythm
 

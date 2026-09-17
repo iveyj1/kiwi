@@ -12,7 +12,7 @@ SND_PAYLOAD = bytes.fromhex("534e44000100000003528000ffff000000017fff")
 
 def _metadata() -> SndCaptureMetadata:
     return SndCaptureMetadata(
-        receiver="10.0.0.40:8073",
+        receiver="10.0.0.42:8073",
         utc_time="2026-06-13T00:00:00Z",
         local_time="2026-06-12T17:00:00-07:00",
         frequency_khz=4625.0,

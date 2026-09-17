@@ -1019,6 +1019,26 @@ The integrated console now checks its current fixture-backed W/F mapping after d
 
 Fixture regressions cover conditional direct-entry recentering and exact bidirectional one-span movement using the captured zoom-7 waterfall mapping.
 
+## 2026-09-08 — Local receiver address migration
+
+### Decision
+
+The active local receiver set is now `10.0.0.41:8073` (primary), `10.0.0.42:8073`, and `10.0.0.43:8073`. Updated runtime defaults, restricted live allowlists, checked-in configuration, persisted state, radio/receiver presets, browser links, helper scripts, tests, project agent/skill prompts, and current operational documentation. Historical `.40` fixture metadata and dated lab/protocol records remain unchanged because they identify the receiver actually used for those captures.
+
+### Test result
+
+Full harness: 389 tests passed in 4.59 seconds; `compileall` and `git diff --check` passed. No receiver connection was made.
+
+## 2026-09-17 — Cleanup and main merge preparation
+
+Consolidated TODO and handoff documentation around the current integrated console rather than the obsolete standalone-viewer/wf1 baseline. User now requests preparation for `main`; no merge is performed. Local `main` and cached `origin/main` both point to `0daae2f`, an ancestor of the feature branch (55 commits before this cleanup); remote refs have not been refreshed.
+
+Completed the local receiver migration, retaining the user's existing config/HTML edits. Added explicit offline checks for all three allowed hosts, retired-host rejection, CLI defaults, generated configuration, and local preset registers. Historical captures and `kiwiclient/` are unchanged; ignored local state was migrated separately. Screenshot remains untracked.
+
+Recorded `.43` as the preferred local NDB target, not a new general startup default. Public 8-channel operation remains an expected deployment case; exact zoom/cadence limitations require metadata-backed validation. SND/IQ will be the close-analysis source; W/F buffering/smoothing is deferred. Remaining lifecycle/guardrail audits and one unreproduced switching hang are documented rather than declared solved.
+
+Validation: 401 tests passed in 4.84 seconds using the project venv; compileall and diff checks passed. No live receivers contacted. Feature branch is prepared for review and a later explicitly requested merge into `main`.
+
 ## YYYY-MM-DD
 
 ### Finding

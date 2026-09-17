@@ -69,7 +69,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     async def exercise():
         task = asyncio.create_task(
             run_live_paired_session(
-                LiveWaterfallCaptureConfig("10.0.0.40", 8073, tmp_path / "wf.jsonl"),
+                LiveWaterfallCaptureConfig("10.0.0.41", 8073, tmp_path / "wf.jsonl"),
                 LiveSndPlaybackConfig(),
                 NullAudioSink(),
                 allow_live=True,
@@ -94,7 +94,7 @@ def test_headless_paired_session_routes_commands_and_publishes_status(tmp_path):
     result = asyncio.run(exercise())
 
     assert order == ["snd", "wf"]
-    assert resolved == [("10.0.0.40", 8073)]
+    assert resolved == [("10.0.0.41", 8073)]
     assert snd_commands == ["SET mod=am low_cut=-5000 high_cut=5000 freq=6000.000"]
     assert wf_commands == ["SET zoom=8 cf=6000.000"]
     assert {status.get("snd_status") for status in statuses} >= {"running"}

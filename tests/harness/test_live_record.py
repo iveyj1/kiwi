@@ -14,7 +14,7 @@ FIXTURE = Path("tests/fixtures/kiwi/local-snd-5000-am-10khz.jsonl")
 
 def _config(output: Path) -> LiveSndWavRecordConfig:
     return LiveSndWavRecordConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=output,
         frequency_khz=5000.0,
@@ -45,7 +45,7 @@ def test_record_replay_snd_wav_uses_live_fixture_command_flow(tmp_path: Path):
 
 def test_live_record_allows_about_one_minute(tmp_path: Path):
     config = LiveSndWavRecordConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "direct.wav",
         duration_seconds=60,
@@ -57,7 +57,7 @@ def test_live_record_allows_about_one_minute(tmp_path: Path):
 
 def test_live_record_dry_run_plan_has_wav_output_and_commands(tmp_path: Path):
     config = LiveSndWavRecordConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "direct.wav",
         frequency_khz=5000.0,
@@ -69,7 +69,7 @@ def test_live_record_dry_run_plan_has_wav_output_and_commands(tmp_path: Path):
 
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.42:8073/ws/kiwi/123456/SND"
     assert plan["output"].endswith("direct.wav")
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert "SET AR OK in=<audio_rate> out=44100" in plan["dynamic_commands"]
@@ -78,7 +78,7 @@ def test_live_record_dry_run_plan_has_wav_output_and_commands(tmp_path: Path):
 
 def test_live_record_cli_refuses_without_allow_live(tmp_path: Path):
     with pytest.raises(SystemExit) as exc:
-        main(["--host", "10.0.0.40", "--output", str(tmp_path / "direct.wav")])
+        main(["--host", "10.0.0.42", "--output", str(tmp_path / "direct.wav")])
 
     assert exc.value.code == 2
 
@@ -87,7 +87,7 @@ def test_live_record_cli_dry_run_does_not_connect(tmp_path: Path, capsys):
     code = main([
         "--dry-run",
         "--host",
-        "10.0.0.40",
+        "10.0.0.42",
         "--output",
         str(tmp_path / "direct.wav"),
         "--timestamp",
@@ -95,7 +95,7 @@ def test_live_record_cli_dry_run_does_not_connect(tmp_path: Path, capsys):
     ])
 
     assert code == 0
-    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
+    assert "ws://10.0.0.42:8073/ws/kiwi/123456/SND" in capsys.readouterr().out
 
 
 def test_live_record_rejects_non_allowed_receiver(tmp_path: Path):

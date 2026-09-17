@@ -14,26 +14,26 @@ from kiwi_client.live_capture import (
 
 
 def test_kiwi_busy_error_messages_are_user_facing():
-    assert kiwi_error_from_msg_params({"too_busy": "4"}, receiver="10.0.0.40:8073") == (
-        "server busy: all 4 client slots are taken on 10.0.0.40:8073"
+    assert kiwi_error_from_msg_params({"too_busy": "4"}, receiver="10.0.0.42:8073") == (
+        "server busy: all 4 client slots are taken on 10.0.0.42:8073"
     )
-    assert kiwi_error_from_msg_params({"badp": "1"}, receiver="10.0.0.40:8073") == (
-        "server busy or bad password: all no-password channels may be busy on 10.0.0.40:8073"
+    assert kiwi_error_from_msg_params({"badp": "1"}, receiver="10.0.0.42:8073") == (
+        "server busy or bad password: all no-password channels may be busy on 10.0.0.42:8073"
     )
-    assert kiwi_error_from_msg_params({"badp": "5"}, receiver="10.0.0.40:8073") == (
-        "authentication rejected by 10.0.0.40:8073: badp=5"
+    assert kiwi_error_from_msg_params({"badp": "5"}, receiver="10.0.0.42:8073") == (
+        "authentication rejected by 10.0.0.42:8073: badp=5"
     )
-    assert kiwi_error_from_msg_params({"badp": "0"}, receiver="10.0.0.40:8073") is None
-    assert kiwi_error_from_msg_params({"down": None}, receiver="10.0.0.40:8073") == "server down: 10.0.0.40:8073"
-    assert kiwi_error_from_msg_params({"redirect": "http://example.test:8073"}, receiver="10.0.0.40:8073") == (
-        "server redirected 10.0.0.40:8073 to http://example.test:8073"
+    assert kiwi_error_from_msg_params({"badp": "0"}, receiver="10.0.0.42:8073") is None
+    assert kiwi_error_from_msg_params({"down": None}, receiver="10.0.0.42:8073") == "server down: 10.0.0.42:8073"
+    assert kiwi_error_from_msg_params({"redirect": "http://example.test:8073"}, receiver="10.0.0.42:8073") == (
+        "server redirected 10.0.0.42:8073 to http://example.test:8073"
     )
-    assert kiwi_error_from_msg_params({"sample_rate": "12000"}, receiver="10.0.0.40:8073") is None
+    assert kiwi_error_from_msg_params({"sample_rate": "12000"}, receiver="10.0.0.42:8073") is None
 
 
 def test_raise_for_kiwi_error_raises_live_capture_error():
     with pytest.raises(LiveCaptureError, match="server busy"):
-        raise_for_kiwi_error({"too_busy": "4"}, receiver="10.0.0.40:8073")
+        raise_for_kiwi_error({"too_busy": "4"}, receiver="10.0.0.42:8073")
 
 
 def test_receive_poll_timeout_caps_unlimited_and_long_duration():
@@ -69,7 +69,7 @@ def test_live_capture_config_can_allow_unrestricted_receiver_and_unlimited_limit
 
 def test_live_capture_config_allows_about_one_minute(tmp_path: Path):
     config = LiveSndCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "x.jsonl",
         duration_seconds=60,
@@ -80,7 +80,7 @@ def test_live_capture_config_allows_about_one_minute(tmp_path: Path):
 
 
 def test_live_capture_config_rejects_negative_duration(tmp_path: Path):
-    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=tmp_path / "x.jsonl", duration_seconds=-1)
+    config = LiveSndCaptureConfig(host="10.0.0.42", port=8073, output=tmp_path / "x.jsonl", duration_seconds=-1)
 
     with pytest.raises(LiveCaptureError, match="duration"):
         config.validate()
@@ -89,7 +89,7 @@ def test_live_capture_config_rejects_negative_duration(tmp_path: Path):
 def test_live_capture_config_rejects_existing_output_without_overwrite(tmp_path: Path):
     output = tmp_path / "x.jsonl"
     output.write_text("", encoding="utf-8")
-    config = LiveSndCaptureConfig(host="10.0.0.40", port=8073, output=output)
+    config = LiveSndCaptureConfig(host="10.0.0.42", port=8073, output=output)
 
     with pytest.raises(LiveCaptureError, match="output already exists"):
         config.validate()
@@ -97,7 +97,7 @@ def test_live_capture_config_rejects_existing_output_without_overwrite(tmp_path:
 
 def test_live_capture_dry_run_plan_has_local_uri_and_fixture_tested_commands(tmp_path: Path):
     config = LiveSndCaptureConfig(
-        host="10.0.0.40",
+        host="10.0.0.42",
         port=8073,
         output=tmp_path / "capture.jsonl",
         timestamp=123456,
@@ -106,7 +106,7 @@ def test_live_capture_dry_run_plan_has_local_uri_and_fixture_tested_commands(tmp
     config.validate()
     plan = config.dry_run_plan()
 
-    assert plan["websocket_uri"] == "ws://10.0.0.40:8073/ws/kiwi/123456/SND"
+    assert plan["websocket_uri"] == "ws://10.0.0.42:8073/ws/kiwi/123456/SND"
     assert plan["initial_commands"] == ["SET auth t=kiwi p="]
     assert plan["dynamic_commands"] == [
         "SET AR OK in=<audio_rate> out=44100",
@@ -125,7 +125,7 @@ def test_live_capture_cli_dry_run_does_not_require_allow_live(tmp_path: Path, ca
     code = main([
         "--dry-run",
         "--host",
-        "10.0.0.40",
+        "10.0.0.42",
         "--output",
         str(tmp_path / "capture.jsonl"),
         "--timestamp",
@@ -134,11 +134,11 @@ def test_live_capture_cli_dry_run_does_not_require_allow_live(tmp_path: Path, ca
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "ws://10.0.0.40:8073/ws/kiwi/123456/SND" in captured.out
+    assert "ws://10.0.0.42:8073/ws/kiwi/123456/SND" in captured.out
 
 
 def test_live_capture_cli_refuses_without_allow_live(tmp_path: Path):
     with pytest.raises(SystemExit) as exc:
-        main(["--host", "10.0.0.40", "--output", str(tmp_path / "capture.jsonl")])
+        main(["--host", "10.0.0.42", "--output", str(tmp_path / "capture.jsonl")])
 
     assert exc.value.code == 2
