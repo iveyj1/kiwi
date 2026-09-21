@@ -94,6 +94,7 @@ Do not bury protocol parsing inside UI code.
 Current user direction: clean up and prepare the tested feature work for merge into `main`.
 
 - Use feature branches for implementation and merge preparation.
+- Commit tested milestones and other sensible checkpoints as work progresses; do not wait for a separate commit request each time.
 - `main` is the intended merge target; the prior `wf1` integration requirement is superseded.
 - Preparation is not execution: do not merge into or commit directly on `main` until the user requests the merge.
 - Keep untracked screenshots and local state out of commits.
@@ -109,7 +110,7 @@ For each work slice:
 5. Run the relevant test command.
 6. Update docs if behavior, architecture, or user operation changed.
 7. Record important notes in `docs/dev-log.md`.
-8. In response, describe changes made, a brief manual test/demo process for the user (if appropriate), and next steps.
+8. Report the changes and relevant tests, with inspection steps and next steps when useful.
 
 ## Done criteria
 
@@ -124,12 +125,58 @@ A feature is done only when:
 
 ## Coding style
 
-Keep changes small.
+- Keep changes small.
+- Prefer simple, inspectable code over clever abstractions.
+- Avoid adding large frameworks unless they clearly remove complexity.
+- Keep logging useful for radio/protocol debugging.
+- Use 4-space indentation in new code where the language does not impose another convention.
 
-Prefer simple, inspectable code over clever abstractions.
+## Communication style
 
-Avoid adding large frameworks unless they clearly remove complexity.
+Write compact explanations with complete reasoning. Remove excess wording,
+not the steps needed to understand the result. Let the subject determine
+the length; do not impose sentence or line limits.
 
-Keep logging useful for radio/protocol debugging.
+- Lead with the answer, finding, or decision.
+- Use plain, precise language and connected prose. Prefer direct sentences
+  and explicit actors; avoid telegraphic fragments and dense noun phrases.
+- Use technical terms when useful. Define unfamiliar terms and symbols
+  where needed, and use them consistently. Add a glossary for recurring
+  terminology when it would help.
+- Explain the relevant sequence: what each step receives, what it does,
+  what it produces, and why it belongs there. Make dependencies and changes
+  of representation explicit.
+- For signal processing, identify the signal representation, units, and
+  domain when they matter. Explain why operation order matters rather
+  than merely naming the operations.
+- Distinguish observations, assumptions, models, and conclusions. State
+  limitations that affect interpretation; do not repeat generic caveats.
+- Use a small example, equation, diagram, or table when it makes a
+  distinction clearer than prose alone. Explain what it demonstrates.
+- Cut repetition, filler, and unnecessary recaps. Keep explanations that
+  connect the evidence to the conclusion.
 
-Use 4-space indentation in new code where the language does not impose another convention.
+## Evidence and task reports
+
+- Report actions and outcomes accurately. Distinguish proposed, implemented,
+  tested, and verified behavior.
+- Do not invent facts, commands, APIs, citations, or results. Label reasonable
+  assumptions; ask when missing information would materially change the answer.
+- For completed work, describe the changes, relevant tests and limitations,
+  and how to inspect the result. Include next steps when useful.
+
+## Living techniques notes
+
+Maintain `docs/ndb-techniques.md` as a teaching companion, adding or revising
+sections as techniques enter the project. Do not attempt a textbook from
+first principles or turn the document into a chronological work log.
+
+- Assume junior-year EE mathematics and signals/systems knowledge, not
+  graduate-level DSP or statistics. Explain specialized concepts as needed.
+- For each technique, explain the problem, input/output representations,
+  steps and reasons, assumptions, and failure modes. Include a small worked
+  example when it helps, and connect the technique to the larger pipeline.
+- Separate general principles from our implementation choices and experimental
+  findings. Link to code, fixtures and result reports instead of duplicating them.
+- Update affected explanations when methods change. Use the notes to support,
+  not replace, a self-contained answer to the user's immediate question.
