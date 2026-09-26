@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import curses
 import json
+import math
 import os
 import sqlite3
 import sys
@@ -19,7 +20,7 @@ from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, recepti
 from kiwi_client.console_panels import main_panel_rows
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
-from kiwi_client.station_memory import passband_center_khz
+from kiwi_client.station_memory import passband_center_khz, catalogue_reference_khz
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
 from kiwi_client.waterfall_raster import RasterImage, encode_png
@@ -317,11 +318,11 @@ def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool 
     return set_console_frequency(model, model.session.state.selected_khz)
 
 
-CW_BANDWIDTHS_HZ = (10, 20, 30, 50, 100, 500)
+CW_BANDWIDTHS_HZ = (2, 5, 10, 20, 30, 50, 100, 500)
 
 
 def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controller=None) -> str:
-    """Change full CW bandwidth symmetrically around the existing audio midpoint."""
+    """Request a CW width centered on the same RF frequency, including odd widths."""
     if direction not in (-1, 1):
         raise ValueError("bandwidth direction must be -1 or 1")
     state = model.session.state
@@ -331,16 +332,29 @@ def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controll
     choices = [value for value in CW_BANDWIDTHS_HZ if (value - width) * direction > 0]
     if not choices:
         return f"CW bandwidth {width:g} Hz; {'minimum' if direction < 0 else 'maximum'} step reached"
-    new_width = max(choices) if direction < 0 else min(choices)
     midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
-    low, high = midpoint - new_width / 2, midpoint + new_width / 2
-    if not low.is_integer() or not high.is_integer():
-        raise ValueError("CW midpoint is half-Hz; integer-Hz filter cuts cannot preserve it with these widths")
-    if controller is not None:
-        controller.execute(f"filter {int(low)} {int(high)}")
+    ordered = sorted(choices, reverse=direction < 0)
+    for new_width in ordered:
+        # Canonical parity avoids cumulative half-Hz drift when toggling 2/5/10.
+        low = math.floor(midpoint) - new_width // 2
+        high = low + new_width
+        shift_hz = midpoint - (low + high) / 2
+        if shift_hz == 0 or state.frequency_decimals >= 4:
+            break
     else:
-        model.session.state = replace(state, low_cut_hz=int(low), high_cut_hz=int(high))
-    return f"CW bandwidth {new_width} Hz | passband {low:g}..{high:g} Hz | center {midpoint:g} Hz"
+        return 'No centered step available; 0.5 Hz compensation needs command_frequency_decimals >= 4'
+    frequency = state.frequency_khz + shift_hz / 1000
+    if controller is not None:
+        command = f"filter {low} {high}"
+        if shift_hz:
+            command += f"; tune {frequency:.9f}"
+        controller.execute(command)  # Atomic batch: one final modulation command.
+    else:
+        model.session.state = replace(state, low_cut_hz=low, high_cut_hz=high,
+                                      frequency_khz=frequency, selected_khz=state.selected_khz + shift_hz / 1000)
+    skipped = '' if new_width == ordered[0] else '; skipped half-Hz step: increase command_frequency_decimals to 4+'
+    return (f"CW bandwidth {new_width} Hz requested | passband {low}..{high} Hz | "
+            f"RF center {passband_center_khz(model.session.state):.6f} kHz{skipped}")
 
 
 def discard_console_mouse_event(key):
@@ -381,8 +395,9 @@ def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller
         controller.execute("mode cw")
     elif model.session.state.mode != "cw":
         model.session.state = replace(model.session.state, mode="cw", low_cut_hz=600, high_cut_hz=1000)
-    frequency_khz = component.frequency_khz
+    frequency_khz = catalogue_reference_khz(model.session.state, component.frequency_khz)
     if component.kind == "stored":
+        frequency_khz = component.frequency_khz
         stored = browser.memory.records[browser.selected.station.key]['stored']
         state = model.session.state
         midpoint = (state.low_cut_hz + state.high_cut_hz) / 2

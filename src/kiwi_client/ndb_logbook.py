@@ -15,7 +15,7 @@ import sqlite3
 import tomllib
 from zoneinfo import ZoneInfo
 
-from kiwi_client.station_memory import passband_center_khz
+from kiwi_client.station_memory import passband_center_khz, catalogue_reference_khz
 
 
 def utc_time(value: str) -> datetime:
@@ -36,7 +36,9 @@ def reception_draft(browser, state, *, receiver: str, source_kind: str, event: s
     if match is None or component is None:
         raise ValueError('select an RNA station first')
     actual_frequency = passband_center_khz(state) if component.kind == 'stored' else state.frequency_khz
-    if not math.isclose(actual_frequency, component.frequency_khz, abs_tol=.000001, rel_tol=0):
+    expected_frequency = (component.frequency_khz if component.kind == 'stored' else
+                          catalogue_reference_khz(state, component.frequency_khz))
+    if not math.isclose(actual_frequency, expected_frequency, abs_tol=.000001, rel_tol=0):
         raise ValueError('tune the selected RNA component with y before logging')
     site = browser.sites.get(receiver)
     return dict(schema=1, event=event, status='tentative', source_kind=source_kind,

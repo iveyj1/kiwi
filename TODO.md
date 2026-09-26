@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — 2/5 Hz CW bandwidth requests
+
+Goal: extend bandwidth ladder with 2 and 5 Hz, preserving RF passband center despite
+integer-Hz filter cuts. Odd/even transitions need a 0.5 Hz reference compensation;
+skip unrepresentable steps when command frequency precision is below four decimals.
+Completed: 2/5 Hz requested widths, RF-center compensation without parity drift,
+coarse-precision skipping, and consistent catalogue tuning/log association. Synthetic
+command fixture and regression coverage; 554 tests pass; compileall/diff checks pass.
+Shipped config uses four command decimals. No live radio used: command
+representability is not proof of the receiver's effective filter response.
+
 ## Current slice — not-heard/delete, nearby stations and editable screen examples
 
 Goal: log review can mark not-heard or explicitly confirm deletion (audit retained),

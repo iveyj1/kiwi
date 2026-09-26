@@ -1,5 +1,24 @@
 # Dev Log
 
+## 2026-09-26 — Requested 2 Hz and 5 Hz CW bandwidths
+
+Extended j/k ladder to 2,5,10,20,30,50,100,500 Hz. Integer filter cuts make odd/even
+transitions require a half-Hz receiver-reference compensation to preserve RF center.
+The existing atomic filter/tune batch emits one final modulation request; canonical
+integer/half-integer audio midpoints avoid drift when toggling widths repeatedly.
+At command precision below four decimals, incompatible steps are skipped with an
+explanation. The shipped config already uses four decimals. Catalogue retuning and
+log association account for the half-Hz correction; stored RF-center semantics
+remain unchanged. Normal even-width adjustments do not retune.
+
+Inspected local command/controller code and the original worktree's read-only
+kiwiclient set_mod reference. Added a synthetic narrow-command fixture, exact
+encoding checks, coarse precision behavior, and repeated 2/5/10 transitions with
+RF-center/log invariance at several audio midpoints. Updated protocol/user/technique
+notes. Full suite: 554 passed; compileall/diff checks passed. No live connection or
+claim that the receiver achieves 2/5 Hz effective bandwidth: firmware clamping,
+acceptance, filter shape and settling remain unverified. User files unchanged.
+
 ## 2026-09-26 — Not-heard/delete, nearby alternatives, current text mockup
 
 Log review now offers n=not-heard and d then uppercase D=delete. Not-heard keeps

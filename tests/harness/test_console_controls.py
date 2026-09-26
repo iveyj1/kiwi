@@ -17,22 +17,24 @@ FIXTURES = Path(__file__).parents[1] / 'fixtures'
 
 def cw_model(low=600, high=1000):
     model = WaterfallGuiModel(tuned_khz=378, selected_khz=378, main_step_hz=100, small_step_hz=10)
-    model.session.state = replace(model.session.state, mode='cw', low_cut_hz=low, high_cut_hz=high)
+    model.session.state = replace(model.session.state, mode='cw', low_cut_hz=low, high_cut_hz=high, frequency_decimals=4)
     return model
 
 
 def test_bandwidth_ladder_preserves_center_and_tuning():
     model = cw_model()
-    for expected in (100, 50, 30, 20, 10, 10):
+    from kiwi_client.station_memory import passband_center_khz
+    for expected in (100, 50, 30, 20, 10, 5, 2, 2):
         step_console_cw_bandwidth(model, -1)
         state = model.session.state
         assert state.high_cut_hz - state.low_cut_hz == expected
-        assert state.high_cut_hz + state.low_cut_hz == 1600
-        assert state.frequency_khz == state.selected_khz == 378
+        assert state.high_cut_hz + state.low_cut_hz == (1601 if expected == 5 else 1600)
+        assert passband_center_khz(state) == pytest.approx(378)
+        assert state.frequency_khz == state.selected_khz == pytest.approx(378 - (0.0005 if expected == 5 else 0))
     for expected in (*CW_BANDWIDTHS_HZ[1:], 500):
         step_console_cw_bandwidth(model, 1)
         assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == expected
-        assert model.session.state.high_cut_hz + model.session.state.low_cut_hz == 1600
+        assert passband_center_khz(model.session.state) == pytest.approx(378)
 
 
 @pytest.mark.parametrize('low,high', [(650, 1050), (-1000, -600)])
@@ -47,15 +49,17 @@ def test_controller_bandwidth_uses_actual_center_and_existing_filter_command(low
     assert controller.state.frequency_khz == 378
 
 
-def test_non_cw_and_half_hz_center_do_not_change_filter_or_volume():
+def test_non_cw_and_half_hz_center_with_coarse_precision():
     model = WaterfallGuiModel()
     original = model.session.state
     assert 'CW mode only' in step_console_cw_bandwidth(model, -1)
     assert model.session.state == original
     model = cw_model(600, 1001)
+    model.session.state = replace(model.session.state, frequency_decimals=3)
+    step_console_cw_bandwidth(model, -1)
+    assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == 5
     original = model.session.state
-    with pytest.raises(ValueError, match='half-Hz'):
-        step_console_cw_bandwidth(model, -1)
+    assert 'No centered step' in step_console_cw_bandwidth(model, -1)
     assert model.session.state == original
 
 

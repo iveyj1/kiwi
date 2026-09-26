@@ -1,0 +1,9 @@
+{
+  "evidence": "synthetic command encoding only; effective receiver bandwidth not measured",
+  "center_khz": 378.0,
+  "frequency_command_decimals": 4,
+  "commands": [
+    {"bandwidth_hz": 5, "command": "SET mod=cw low_cut=798 high_cut=803 freq=377.1995"},
+    {"bandwidth_hz": 2, "command": "SET mod=cw low_cut=799 high_cut=801 freq=377.2000"}
+  ]
+}

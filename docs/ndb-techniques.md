@@ -39,16 +39,27 @@ fixture `tests/fixtures/rna/catalogue.csv`.
 
 ## Symmetric CW bandwidth adjustment
 
-The console's `j/k` steps select full widths of 10, 20, 30, 50, 100 or 500 Hz.
+The console's `j/k` steps request full widths of 2, 5, 10, 20, 30, 50, 100 or 500 Hz.
 For current audio passband edges `low` and `high`, preserve midpoint
 `m = (low + high)/2` and set the new edges to `m - width/2` and `m + width/2`.
 Thus 600–1000 Hz (400 Hz wide, midpoint 800 Hz) narrows to 750–850 Hz at 100 Hz
-width. The receiver reference and selected RF component do not change; this avoids
-changing the listening pitch just to narrow the filter. This uses the existing
-receiver filter command, not local DSP. Very narrow filters can suppress keyed
-signal bandwidth or smear transitions; select width by listening rather than
-assuming the narrowest filter is always best. Integer-Hz command cuts cannot
-preserve a half-Hz midpoint with these even widths; that case is explicitly rejected.
+width. For even-to-even changes the receiver reference and selected RF component do not
+change. A 5 Hz width instead needs half-integer edges about an integer midpoint,
+but the command encodes integer-Hz cuts. Use cuts 798..803 Hz (midpoint 800.5 Hz)
+and lower the receiver reference by 0.5 Hz: the actual RF passband remains symmetric
+about the same RF center. A 2 Hz width uses 799..801 Hz and restores the reference.
+Canonical integer/half-integer midpoints avoid accumulating reference drift when
+cycling repeatedly. Catalogue retuning and logging account for this compensation.
+Four or more kHz command decimals are needed for the half-Hz reference adjustment;
+at coarser precision, incompatible ladder steps are skipped rather than shifting
+RF center silently.
+
+This uses existing receiver commands, not local DSP. The synthetic fixture
+`tests/fixtures/kiwi/cw-narrow-commands.json` proves command values and RF mapping,
+not receiver acceptance or effective 2/5 Hz selectivity. We have not measured
+firmware clamping, filter shape, settling time or achieved rejection at these
+widths. Very narrow filters can suppress keyed signal bandwidth or smear transitions;
+select width by listening rather than assuming the narrowest request is always best.
 
 ## Personal tuning versus catalogue frequencies
 

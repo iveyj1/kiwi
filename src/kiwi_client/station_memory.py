@@ -13,6 +13,14 @@ def passband_center_khz(state) -> float:
     return reference + (state.low_cut_hz + state.high_cut_hz) / 2000
 
 
+def catalogue_reference_khz(state, component_khz: float) -> float:
+    """Keep catalogue tuning stable across integer/half-integer audio midpoints."""
+    if state.mode != 'cw':
+        return component_khz
+    midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
+    return component_khz - (midpoint - math.floor(midpoint)) / 1000
+
+
 class StationMemory:
     def __init__(self, path: Path | None = None):
         self.path = path
