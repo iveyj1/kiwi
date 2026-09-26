@@ -15,6 +15,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
+from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
@@ -463,11 +464,18 @@ def run_fixture_shell(
     search_page: CallsignSearchPage | None = None
     catalogue_command: str | None = None
     log_draft: dict | None = None
+    log_original: dict | None = None
+    reception_index = ReceptionIndex(logbook_path)
+    next_history_refresh = 0.0
     log_entry: str | None = None
     pending_preset = False
     tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
     last_response = None
     message = "live paired session starting" if live_source is not None else "fixture-only; no receiver connection"
+
+    def station_log_status(station_key):
+        receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
+        return reception_index.status(station_key, receiver, log_event, "live" if live_source is not None else "fixture")
 
     def dispatch_tui_key(key) -> None:
         nonlocal last_response, message
@@ -508,6 +516,10 @@ def run_fixture_shell(
             now = time.monotonic()
             if demo_seconds is not None and now - started >= demo_seconds:
                 break
+            if logbook_path is not None and now >= next_history_refresh:
+                reception_index.refresh()
+                next_history_refresh = now + 1.0
+                dirty = True
             if timeline is not None and now >= next_source and not timeline.done:
                 timeline.advance(model.publisher)
                 next_source = now + 1.0 / source_fps
@@ -534,7 +546,8 @@ def run_fixture_shell(
                 if key == "\x1b":
                     log_draft = None
                     log_entry = None
-                    message = "logging cancelled; nothing saved"
+                    log_original = None
+                    message = "logging cancelled; no changes saved"
                 elif log_entry is not None:
                     if key in ("\n", "\r"):
                         timestamp, _separator, notes = log_entry.partition("|")
@@ -552,15 +565,23 @@ def run_fixture_shell(
                     try:
                         log_draft["status"] = "confirmed" if key == "y" else "tentative"
                         with Logbook(logbook_path) as book:
-                            log_id, duplicates = book.save(log_draft)
-                        message = f"Saved {log_draft['status']} log #{log_id}; {duplicates} previous entries for this station/event"
+                            if log_draft.get('log_id') is not None:
+                                log_id = log_draft['log_id']
+                                book.revise(log_id, status=log_draft['status'], heard_utc=log_draft['heard_utc'],
+                                            notes=log_draft['notes'], expected=log_original)
+                                message = f"Updated {log_draft['status']} log #{log_id}; original tuning evidence retained"
+                            else:
+                                log_id, duplicates = book.save(log_draft)
+                                message = f"Saved {log_draft['status']} log #{log_id}; {duplicates} previous entries for this station/event"
+                        reception_index.refresh()
                         log_draft = None
+                        log_original = None
                     except (OSError, ValueError, sqlite3.Error) as exc:
                         message = f"log NOT saved: {exc}; retry or Esc"
                 dirty = True
             elif search_entry is not None and key is not None:
                 if key in ("\n", "\r"):
-                    search_page = CallsignSearchPage(rna_browser, search_entry)
+                    search_page = CallsignSearchPage(rna_browser, search_entry, log_status=station_log_status)
                     search_entry = None
                     message = "Search includes hidden stations; Enter accepts and tunes; Esc cancels"
                 elif key == "\x1b":
@@ -665,15 +686,25 @@ def run_fixture_shell(
             elif rna_browser is not None and tui_input is None and key == ":":
                 catalogue_command = ""
                 dirty = True
-            elif rna_browser is not None and key == "w":
+            elif rna_browser is not None and key in ("w", "W"):
                 try:
                     if logbook_path is None:
                         raise ValueError("logging requires --logbook PATH")
                     receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
-                    log_draft = reception_draft(rna_browser, model.session.state, receiver=receiver,
-                                                source_kind="live" if live_source is not None else "fixture", event=log_event)
-                    log_entry = log_draft["heard_utc"] + " | "
-                    message = "Edit hearing time (UTC/offset) | notes; Enter then explicitly confirm copied ID"
+                    if rna_browser.selected is None:
+                        raise ValueError("select a station first")
+                    reception_index.refresh()
+                    source_kind = "live" if live_source is not None else "fixture"
+                    if reception_index.error:
+                        raise ValueError(reception_index.error)
+                    existing = (reception_index.latest(rna_browser.selected.station.key, receiver, log_event, source_kind)
+                                if key == "w" else None)
+                    log_original = None if existing is None else dict(existing)
+                    log_draft = existing if existing is not None else reception_draft(
+                        rna_browser, model.session.state, receiver=receiver, source_kind=source_kind, event=log_event)
+                    log_entry = log_draft["heard_utc"] + " | " + log_draft.get('notes', '')
+                    message = (f"Editing latest hearing #{log_draft['log_id']}; time/status/notes only; Esc cancels"
+                               if existing is not None else "New reception: edit actual hearing time | notes; Enter then confirm")
                 except ValueError as exc:
                     message = str(exc)
                 dirty = True
@@ -898,11 +929,13 @@ def run_fixture_shell(
                     f"Message: {message}",
                     prompt,
                 ]
-                database_rows = [] if rna_browser is None else [rna_browser.status(), rna_browser.filter_summary(), rna_browser.details()]
-                if layout.tui_rows < 12:
-                    database_rows = database_rows[:2]  # Keep filters and help visible at 24 lines.
+                database_rows = [] if rna_browser is None else [rna_browser.status(),
+                    station_log_status(rna_browser.selected.station.key) if rna_browser.selected else "No station selected",
+                    rna_browser.filter_summary(), rna_browser.details()]
+                if layout.tui_rows < 13:
+                    database_rows = database_rows[:3]  # Keep log status and filters; omit optional detail.
                 help_rows = [("/callsign :rna filters | " if rna_browser is not None else "") +
-                             "h/l ←/→ small H/L large j/k CW BW -/+ ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio u auto q quit"]
+                             "h/l ←/→ small H/L large j/k CW BW -/+ w log/edit W new ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio q quit"]
                 if rna_browser is not None:
                     help_rows.append("RNA /callsign n/N tune station v tune component y retune w log | :rna store / forget / range KM / power W / sort distance")
                 # Generic TUI key hints describe different bindings; show only its
@@ -915,8 +948,8 @@ def run_fixture_shell(
                                  else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 rows = sectioned_console_rows(general_rows, database_rows, help_rows, columns=columns)
                 if log_draft is not None:
-                    rows = [general_rows[0], f"LOG {log_draft['source_kind']} {log_draft['receiver']} {log_draft['event'] or 'general'} {log_draft['heard_utc']}",
-                            prompt, f"Message: {message}"]
+                    rows = logging_panel_rows(log_draft, prompt=prompt, message=message, history=reception_index.status(
+                        log_draft['station_key'], log_draft['receiver'], log_draft.get('event'), log_draft['source_kind']))
                 for offset, text in enumerate(rows[:layout.tui_rows]):
                     _safe_line(screen, layout.tui_top + offset, text, columns)
                 screen.noutrefresh()

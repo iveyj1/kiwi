@@ -129,18 +129,45 @@ Omit `--log-event` for general listening (those entries do not enter the CLE rep
 After listening and copying the ident:
 
 1. Select the correct catalogue station/component (search acceptance, n/N and v tune automatically); `y` retunes it.
-2. Press `w`. The draft snapshots station, nominal/component frequency, receiver,
-   site (if configured), mode/filter and catalogue fields/hash. Its initial time is
-   now, not when you first tuned; edit it to the actual hearing time if necessary.
+2. Press `w`. If this station has an entry for the current receiver, event and
+   source (LIVE versus fixture), the form edits the latest **hearing time** entry,
+   using the highest log ID to break ties. Its original time and notes are prefilled;
+   you can edit it even while tuned elsewhere. `EDIT LOG #N` identifies the record.
+   Otherwise `w` starts a `NEW RECEPTION` snapshot of station, nominal/component
+   frequency, receiver, site, mode/filter and catalogue fields/hash. Its initial
+   time is now, not when you first tuned; edit it to the actual hearing time.
+   Use uppercase `W` to deliberately add a repeat reception instead of editing.
 3. Edit `UTC timestamp | notes` with Backspace/typing; Enter accepts the fields.
    Timestamp needs `Z` or a UTC offset. There is no automatic ID confirmation.
 4. At the explicit copied-ID question, press `y` for confirmed, `t` for tentative,
    or Esc to cancel. Only a successful transaction reports a saved entry number.
 
-Browsing/tuning may update personal component preferences, but never writes a reception log. Duplicate receptions remain stored with a
-warning count. Fixture-mode entries remain practice even if manually confirmed;
+The main DATABASE section, callsign hits and logging form show status and full UTC
+hearing date/time for the selected station, plus the entry ID/count. If the latest
+entry is tentative or rejected but an older one is confirmed, the last confirmed
+time is also shown. This lookup is scoped to the current receiver, event and
+LIVE/fixture source: `NOT LOGGED` means not logged in that scope. A missing logbook
+is not created by viewing it; an unreadable one says `log unavailable`, not falsely
+`NOT LOGGED`. The read-only history index refreshes about once per second and after
+successful saves, so offline CLI edits become visible too.
+
+`w` changes the existing row's hearing time/status/notes with revision history;
+it never replaces original receiver, station, tuning, catalogue or source evidence
+with whatever is currently on screen. An external change while the form is open
+blocks saving stale edits; cancel and reopen. Esc makes no changes. To edit an
+older entry rather than the latest hearing, use its ID with the CLI below; a
+visual older-entry picker is a layout proposal, not yet implemented.
+
+Browsing/tuning may update personal component preferences, but never writes a reception log.
+Explicit `W` repeats remain stored with a warning count. Fixture-mode entries remain practice even if manually confirmed;
 they cannot enter the event report. Confirmation says what **you** heard, not what
 the catalogue predicts. Database activity is not proof of current reception.
+
+Layout alternatives with sample main/logging screens are in
+[`docs/ui-layout-workshop.txt`](ui-layout-workshop.txt): compact bands (A), fixed
+two-column blocks (B), and a station/history sidebar (C). These sketches are design
+options, not an already-applied full redesign. View with a monospace font, e.g.
+`less -S docs/ui-layout-workshop.txt`.
 
 Review or correct saved entries without a receiver connection:
 

@@ -1,5 +1,32 @@
 # Dev Log
 
+## 2026-09-26 — Log status, edit-on-w and screen layout workshop
+
+Added a read-only reception index scoped by station key, receiver, event and
+LIVE/fixture provenance. Main database panel, callsign hits and logging form show
+latest hearing/status/UTC and entry count; an older confirmed hearing remains
+visible when the latest row is tentative/rejected. Reads never create a logbook,
+and unavailable databases are distinguished from no reception. Refresh is once
+per second plus before forms/after saves, not a SQLite query per waterfall frame.
+w opens the latest hearing (UTC ordering, ID tie-break) for editing, preserving
+its original timestamp/notes. W explicitly creates a repeat. Edits change only
+hearing time/status/notes and keep frozen receiver/tuning/catalogue/source evidence.
+They do not require current tuning to match the old reception. Revision history
+is retained; optimistic payload checks reject external/concurrent changes instead
+of overwriting them. Cancellation leaves the row untouched.
+
+Seven new regression cases cover scope isolation, chronological selection, no-file
+creation/read-only bytes, last-confirmed status, search display, external refresh,
+corrupt input, stale edits, shell edit/cancel/repeat and frozen evidence panels.
+Full suite: 495 passed; compileall/diff checks passed. No radio access or user-data
+changes. User rna-sites.toml remains untracked and untouched.
+
+`docs/ui-layout-workshop.txt` contains three illustrative main/log screen pairs:
+A compact full-width bands, B fixed two-column blocks, C station/history sidebar.
+All sample rows checked at 94 characters with fixed vertical boundaries. Recommend
+A main + B logging editor as the first design to evaluate. Full boxed layouts,
+field navigation and an older-entry picker are proposals, not implemented claims.
+
 ## 2026-09-26 — Automatic station tuning and personal RF-center memories
 
 Search Enter, n/N and v now tune immediately through the existing CW path; search

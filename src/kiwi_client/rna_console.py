@@ -237,7 +237,8 @@ class RnaBrowser:
 
 class CallsignSearchPage:
     """All-catalogue ID hits; highlighting/selection never tunes or logs."""
-    def __init__(self, browser: RnaBrowser, term: str):
+    def __init__(self, browser: RnaBrowser, term: str, log_status=None):
+        self.log_status = log_status
         self.browser, self.term = browser, term
         self.hits = browser.search_callsigns(term)
         self.index = 0
@@ -255,15 +256,16 @@ class CallsignSearchPage:
         start = self.index // capacity * capacity
         rows = [f'CALLSIGN /{self.term} — {len(self.hits)} hits (all catalogue records)',
                 self.browser.filter_summary(),
-                '   ID       kHz       km       W  Location / visibility']
+                '   ID       kHz       km       W  Log / visibility / location']
         for index in range(start, min(len(self.hits), start + capacity)):
             hit = self.hits[index]
             s = hit.station
             distance = '?' if hit.distance_km is None else f'{hit.distance_km:.0f}'
             power = '?' if s.power_w is None else f'{s.power_w:g}'
             reason = self.browser.exclusion_reason(hit)
+            history = '' if self.log_status is None else self.log_status(s.key) + ' | '
             rows.append(f'{">" if index == self.index else " "} {s.ident:8} {s.carrier_khz:8g} {distance:>8} {power:>7} '
-                        f'{"HIDDEN: " + reason if reason else "visible"} | {s.location} {s.raw_fields.get("ITU", "")}')
+                        f'{history}{"HIDDEN: " + reason if reason else "visible"} | {s.location} {s.raw_fields.get("ITU", "")}')
         rows.append('↑/↓ j/k browse PgUp/PgDn page Enter select+tune / search : filters Esc close')
         return rows
 

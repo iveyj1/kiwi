@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — visible log history, edit-on-w and layout workshop
+
+Goal: show selected station's scoped logging status/date in main, search and log
+views; w edits the latest existing reception rather than duplicating it, W explicitly
+creates a repeat. Preserve original receiver/tuning/catalogue evidence on edits.
+Create a text workshop with several aligned, grouped main/log layouts; do not impose
+a full redesign before review. Completed: read-only indexed history/error handling, edit/cancel/repeat and scope
+regressions, stale-edit protection, three sample main/log layouts with verified
+94-column rows/aligned separators. 495 tests pass; compileall/diff checks pass.
+Full boxed redesign and older-entry picker remain proposals for review.
+No live radio or changes to user log/config files.
+
 ## Current slice — automatic station tuning and personal station memories
 
 Goal: search acceptance/n/N/v tune immediately, remember component per station,

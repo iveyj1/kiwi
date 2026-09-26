@@ -46,7 +46,11 @@ protocol behavior are unchanged.
 
 `ndb_logbook.py` stores explicit human decisions in SQLite with immutable catalogue
 snapshots and revision history. The console freezes a draft before confirmation;
-only committed writes report success. Offline report generation independently
+only committed writes report success. `reception_ui.py` reads existing logbooks
+without creating/upgrading them, indexes station/receiver/event/source scope and
+supplies main/search/form status. `w` revises the latest scoped hearing, while `W`
+explicitly creates a repeat. Form edits retain frozen evidence; optimistic checks
+reject stale edits when another writer has changed the record. Offline report generation independently
 validates event/source/time/channel/receiver constraints. Fixture receptions retain
 their provenance and cannot become live CLE evidence. There is no DSP, automatic
 station identification, database download, or email submission in this branch.

@@ -1,0 +1,174 @@
+RNA CONSOLE / LOGGING LAYOUT WORKSHOP
+===================================
+
+These are design sketches, not screenshots. All reception times, distances,
+levels and log IDs below are illustrative, not claims about your receptions.
+Read in a monospace font. Each screen uses fixed column boundaries; values
+change within their cells, never moving the vertical separators.
+
+Implemented now, independent of the proposed layout:
+  - Main page and callsign hits show log status and UTC hearing time.
+  - w edits the latest hearing for this station/receiver/event/source.
+  - W explicitly creates another reception; Esc cancels without writing.
+  - Editing retains original tuning, receiver and catalogue evidence.
+  - A newer tentative/rejected entry does not hide the last confirmed time.
+
+Still proposed in these sketches:
+  - The full boxed layouts, field-by-field forms and older-entry picker.
+  - A scrolling reception ledger and the sidebar arrangement.
+
+Recommendation: A for the main page at ordinary terminal sizes; B's editor
+for the logging window. Use B's main page when there is enough vertical room.
+C is attractive for extended logging sessions on a wide terminal, but costs
+waterfall width. Keep the same field names and key meanings in every layout.
+
+COMMON RULES
+------------
+RADIO means the current receiver settings; STATION means catalogue information;
+RECEPTION means saved evidence. Never mix these three frequency references.
+
+Keep station ID, nominal kHz, selected component and logging status in stable
+positions. Show full UTC dates, not a time alone. Label the current scope
+(receiver + event + LIVE/fixture), because a log from another receiver must not
+look like a reception from this one. Show NOT LOGGED or LOG UNAVAILABLE explicitly.
+
+Field labels occupy fixed columns. Numbers align on the right where practical.
+Long location names and notes wrap inside their block, not across a separator.
+Prompt/errors have a reserved footer so the display does not jump when typing.
+Hide optional telemetry before hiding station identity, log time or save errors.
+
+
+OPTION A — FULL-WIDTH BANDS, SHORT STATION/LOG SPLIT
+--------------------------------------------------
+Best for: keeping the waterfall wide and the essentials visible in 24–30 rows.
+Tradeoff: detailed offsets/period/notes need an expanded detail view.
+The waterfall takes the remaining height; the control deck has a fixed height.
+
++--------------------------------------------------------------------------------------------+
+| LIVE  10.0.0.43:8073   CW     378.4050 kHz     BW 50 Hz     RSSI -92 dBm                   |
+| [ WATERFALL — full width; station/component markers below ]                                |
+| [ 377.590 RJ:L                 378.000 RJ:C                  378.405 RJ:U ]                |
++---------------------------------------------+----------------------------------------------+
+| STATION / CATALOGUE                         | RECEPTION / THIS RECEIVER + CLE332           |
+| RJ     378 kHz     Roberval, QC, CAN        | CONFIRMED   2026-09-26 01:02:03 UTC          |
+| 450 km   500 W   active   period 10.3 s     | #17   2 receptions   w edits latest          |
+| Selected USB 378.4050   memory S available  | Center 378.4050   offset +405 Hz   BW 50 Hz  |
++---------------------------------------------+----------------------------------------------+
+| FILTERS  CLE332 on / active / range <=2000 km / power >=100 W / sort distance              |
+| ACTION   / find   n/N station   v component   w edit/log   W new   :rna store              |
+| MESSAGE  Updated reception #17; previous tuning evidence retained.                         |
++--------------------------------------------------------------------------------------------+
+
+A / LOG WINDOW — FIELD LABELS SHARE ONE VALUE COLUMN
+
++------------------+-------------------------------------------------------------------------+
+| EDIT LOG #17     | RJ / 378 kHz                  Existing: CONFIRMED                       |
+| Heard UTC *      | 2026-09-26 01:02:03                                                     |
+| Status *         | CONFIRMED                                                               |
+| Notes *          | Copied twice, clear ID                                                  |
+| Receiver (fixed) | 10.0.0.43:8073 / CLE332 / LIVE                                          |
+| Tuning (fixed)   | center 378.4050 kHz / offset +405 Hz / BW 50 Hz                         |
+| History          | 2 entries; latest hearing #17                                           |
+| Actions          | Save changes / Cancel / Choose older entry (proposal)                   |
++------------------+-------------------------------------------------------------------------+
+
+* Editable fields. Receiver/tuning/catalogue are displayed as read-only evidence.
+The New variant must say NEW RECEPTION, not EDIT, even for an already logged ID.
+A field editor would use Tab/Shift-Tab between UTC, status and notes; this is a
+proposal, not the current single-line timestamp/notes editor.
+
+
+OPTION B — FOUR RELATED BLOCKS IN A FIXED TWO-COLUMN DECK
+------------------------------------------------------
+Best for: a tall terminal, explicit labels, easy scanning between current radio
+and selected station. Tradeoff: more vertical space than A. Never stretch the
+left column based on its contents: every divider stays at the same x coordinate.
+
++--------------------------------------------------------------------------------------------+
+| LIVE  10.0.0.43:8073                                               CLE332                  |
+| [ WATERFALL — full width ]                                                                 |
+| [ RF scale / component markers ]                                                           |
++---------------------------------------------+----------------------------------------------+
+| RADIO                                       | STATION / RJ                                 |
+| Frequency   378.4050 kHz                    | Nominal     378 kHz                          |
+| Mode / BW   CW / 50 Hz                      | Location    Roberval, QC, CAN                |
+| Steps       10 / 100 Hz                     | Distance    450 km                           |
+| Audio       ON / 65%                        | Power       500 W / active                   |
+| RSSI        -92 dBm                         | Component   USB 378.4050 / S available       |
++---------------------------------------------+----------------------------------------------+
+| RECEPTION / #17                             | FILTERS                                      |
+| CONFIRMED   2026-09-26 01:02:03 UTC         | CLE332 on / active                           |
+| 2 entries   w edits latest; W adds          | Range <=2000 km / power >=100 W              |
+| Last note   Copied twice, clear ID          | Sort distance                                |
++---------------------------------------------+----------------------------------------------+
+| / find / n/N station / v component / w edit / W new / : commands                           |
+| Message: Updated reception #17.                                                            |
++--------------------------------------------------------------------------------------------+
+
+B / LOG WINDOW — EDITOR LEFT, IMMUTABLE EVIDENCE RIGHT
+
++---------------------------------------------+----------------------------------------------+
+| EDIT #17 / RJ                               | RECORDED EVIDENCE (read only)                |
+| UTC     2026-09-26 01:02:03                 | Nominal     378 kHz / RJ                     |
+| Status  CONFIRMED                           | Receiver    10.0.0.43:8073                   |
+| Notes   Copied twice, clear ID              | Source      LIVE / CLE332                    |
+|                                             | RF center   378.4050 kHz                     |
+|                                             | Offset      +405 Hz                          |
+|                                             | Bandwidth   50 Hz                            |
+| Save changes / Cancel                       | Catalogue   snapshot retained                |
++---------------------------------------------+----------------------------------------------+
+
+This arrangement makes it hard to mistake current receiver settings for the
+settings at the original hearing. An old entry may be edited while tuned elsewhere.
+An external edit while this form is open must report a conflict, not overwrite it.
+
+
+OPTION C — WATERFALL WITH A PERSISTENT STATION/LEDGER SIDEBAR
+----------------------------------------------------------
+Best for: a wide terminal and sessions focused on logging/review.
+Tradeoff: narrower waterfall and more layout/resize complexity than A or B.
+The right sidebar has a fixed character width. On narrow terminals, fall back to A
+rather than squeezing both columns until labels become unreadable.
+
++------------------------------------------------------------+-------------------------------+
+| RADIO  CW 378.4050 kHz  BW50  -92 dBm                      | SELECTED RJ / 378 kHz         |
+| [ WATERFALL ]                                              | Roberval, QC, CAN             |
+| [           ]                                              | 450 km / 500 W / active       |
+| [           ]                                              | USB 378.4050 / S available    |
+| [           ]                                              | LOGGED / CONFIRMED            |
+| [           ]                                              | 2026-09-26 01:02:03 UTC       |
+| [ RF scale ]                                               | #17 / 2 entries               |
++------------------------------------------------------------+-------------------------------+
+| FILTERS  CLE332 on / active / <=2000 km / >=100 W          | HISTORY (same scope)          |
+| SORT distance                                              | #17 26 01:02 confirmed        |
+| / find  n/N station  v component                           | #12 25 22:16 tentative        |
+| w edit latest  W new  : commands                           | Older-entry picker: proposed  |
++------------------------------------------------------------+-------------------------------+
+
+C / LOG WINDOW — FULL-WIDTH RECEPTION LEDGER + EDITOR
+
++--------------------------------------------------------------------------------------------+
+| RJ / 378 kHz     10.0.0.43:8073 / CLE332 / LIVE                                            |
+|  ID   HEARD UTC               STATUS      CENTER kHz     OFFSET     BW Hz                  |
+| >17   2026-09-26 01:02:03      confirmed   378.4050       +405 Hz    50                    |
+|  12   2026-09-25 22:16:00      tentative   378.4100       +410 Hz   100                    |
++--------------------------------------------------------------------------------------------+
+| EDIT #17  UTC: 2026-09-26 01:02:03       Status: CONFIRMED                                 |
+| Notes: Copied twice, clear ID                                                              |
+| Save changes / Cancel / New reception (never overwrite recorded evidence)                  |
++--------------------------------------------------------------------------------------------+
+
+A row highlights a specific historical reception. Enter would edit that row;
+w from the main page would continue to open the latest hearing automatically.
+This older-entry picker is the largest additional interaction feature of C.
+
+
+DECISIONS TO COMPARE
+--------------------
+1. A versus B for the normal main page: compact bands or labeled four-block deck?
+2. A versus B for logging: one form column or editable/frozen split?
+3. Is a persistent history list worth losing waterfall width (C)?
+4. Should the main log block show the latest hearing, latest confirmed hearing,
+   or both when they differ? Current implementation shows both when needed.
+5. Keep w = latest edit and W = explicit new reception; never silently replace
+   evidence with the current tuning or turn an old hearing into a new UTC time.

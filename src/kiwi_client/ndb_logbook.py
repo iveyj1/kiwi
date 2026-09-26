@@ -109,18 +109,22 @@ class Logbook:
             self._audit(key, payload)
         return key, duplicates
 
-    def revise(self, key: int, *, status=None, heard_utc=None, notes=None) -> None:
+    def revise(self, key: int, *, status=None, heard_utc=None, notes=None, expected: dict | None = None) -> None:
         with self.connection:
             row = self.connection.execute('SELECT payload FROM receptions WHERE id=?', (key,)).fetchone()
             if row is None:
                 raise ValueError(f'unknown log entry {key}')
             record = json.loads(row[0])
+            if expected is not None and dict(record, log_id=key) != expected:
+                raise ValueError('entry changed since the form opened; cancel and reopen with w')
             for field, value in [('status', status), ('heard_utc', heard_utc), ('notes', notes)]:
                 if value is not None:
                     record[field] = value
             validate_reception(record)
             payload = json.dumps(record, allow_nan=False, sort_keys=True)
-            self.connection.execute('UPDATE receptions SET payload=? WHERE id=?', (payload, key))
+            cursor = self.connection.execute('UPDATE receptions SET payload=? WHERE id=? AND payload=?', (payload, key, row[0]))
+            if cursor.rowcount != 1:
+                raise ValueError('entry changed concurrently; reopen before editing')
             self._audit(key, payload)
 
     def _audit(self, key, payload):
