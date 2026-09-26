@@ -1,5 +1,35 @@
 # Dev Log
 
+## 2026-09-26 — Assisted logging and final-advice CLE332 export
+
+Implemented explicit console `w` draft/time/notes and human confirmation, transactional
+SQLite saves, duplicate counts and revision-preserving offline edits. Frozen records
+include station/source/receiver/site/tuning/catalogue provenance. Fixture decisions
+remain fixture evidence and cannot become event receptions. CLE tagging is explicit.
+Report preview/new-file export uses the final announcement: nominal even channels,
+receiver-local noon window, UTC lines, earliest eligible reception per station,
+required operator/site/equipment metadata and single-receiver validation. Mixed
+receiver event entries block export; exclusions are reported, not silently dropped.
+No email is sent; deadline is printed for manual submission. Local state is ignored.
+
+26 additional tests cover persistence/reopen, failed-transaction rollback, revisions,
+nominal/component distinction, boundaries/UTC rollover, source/status/event exclusions,
+receiver-mixing rejection, metadata requirements, golden report, no-overwrite and
+console confirm/tentative/cancel paths, plus the optional `--rna-cle332` nominal-channel
+shortlist filter. Full suite: 455 passed; compileall/diff checks
+passed. A timed-key offline pseudo-terminal smoke exited 0 after rendering RNA,
+opening the confirmation form and saving one confirmed fixture-only reception in a
+temporary database. An initial burst-key smoke saved successfully but skipped the
+intermediate confirmation repaint, so its display assertion failed; spaced-key smoke
+verified that rendering. No radio connection or physical listening verification.
+
+Still required from operator: actual receiving-site/receiver metadata (example
+profiles are not operational configuration), user listening/UI evaluation, and
+review of a report made from real event receptions. Later UX refinements remain
+listed in the prior milestone; this is a keyboard-first live assistant, not the
+analysis branch. Use `PYTHONPATH=src` in `/home/user/kiwi-rna` when sharing the old
+worktree's Python environment, to avoid its editable install importing old code.
+
 ## 2026-09-26 — RNA tuning-line integration
 
 Added opt-in `--rna` console path, distinct carrier/LSB/USB scale annotations,

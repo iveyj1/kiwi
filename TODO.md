@@ -14,10 +14,19 @@ Milestones and done criteria:
   filters and fixture-backed tests; offline inspection command.
 - [x] UI: RNA scale markers, station selection/details and explicit component tuning;
   preserve nominal carrier and apply existing CW offset once; harness coverage.
-- [ ] Logbook: durable confirmed/tentative entries, editable hearing time, site/settings
+- [x] Logbook: durable confirmed/tentative entries, editable hearing time, site/settings
   snapshots and duplicate warnings; persistence/recovery tests.
-- [ ] CLE report: reviewed current announcement, configurable eligibility/time rules,
-  plain-text preview and export tests. Never submit automatically.
+- [x] CLE332 report: reviewed final announcement, event-specific channel rules and
+  configurable receiving-site timezone/metadata, plain-text preview and export tests.
+  Never submit automatically. Other CLE rule sets remain a future extension.
+
+Validation: 455 tests pass; compileall/diff checks pass; offline pseudo-terminal
+smoke exercised markers, tuning, explicit confirmation and SQLite persistence.
+No live-radio test or user listening verification. Before actual event export,
+configure the true receiver/site/timezone/locator/equipment/aerial, listen and
+confirm real receptions, then review the generated report. General-purpose event
+profiles, in-session filter editing, station table and mouse picking remain later
+refinements, not prerequisites for the implemented keyboard workflow.
 
 The final CLE332 announcement is supplied and reviewed; see
 `docs/cle332-live-logging.md` for source hash and confirmed rules. Older event data

@@ -6,6 +6,7 @@ import argparse
 import curses
 import json
 import os
+import sqlite3
 import sys
 import time
 from dataclasses import dataclass, replace
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
+from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
 from kiwi_client.rna_console import RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
@@ -372,6 +374,8 @@ def run_fixture_shell(
     scale_font_name: str = "DejaVuSansMono.ttf",
     demo_seconds: float | None = None,
     rna_browser: RnaBrowser | None = None,
+    logbook_path: Path | None = None,
+    log_event: str | None = None,
 ) -> None:
     """Run fixture publication, curses text, and Kitty presentation in one thread."""
     screen.nodelay(True)
@@ -399,6 +403,8 @@ def run_fixture_shell(
     dirty = True
     full_redraw = True
     entry: str | None = None
+    log_draft: dict | None = None
+    log_entry: str | None = None
     pending_preset = False
     tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
     last_response = None
@@ -451,6 +457,34 @@ def run_fixture_shell(
                 presenter.invalidate()
                 full_redraw = True
                 dirty = True
+            elif log_draft is not None and key is not None:
+                if key == "\x1b":
+                    log_draft = None
+                    log_entry = None
+                    message = "logging cancelled; nothing saved"
+                elif log_entry is not None:
+                    if key in ("\n", "\r"):
+                        timestamp, _separator, notes = log_entry.partition("|")
+                        try:
+                            log_draft["heard_utc"] = utc_time(timestamp.strip()).isoformat()
+                            log_draft["notes"] = notes.strip()
+                            log_entry = None
+                        except ValueError as exc:
+                            message = str(exc)
+                    elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+                        log_entry = log_entry[:-1]
+                    elif isinstance(key, str) and key.isprintable():
+                        log_entry += key
+                elif key in ("y", "t"):
+                    try:
+                        log_draft["status"] = "confirmed" if key == "y" else "tentative"
+                        with Logbook(logbook_path) as book:
+                            log_id, duplicates = book.save(log_draft)
+                        message = f"Saved {log_draft['status']} log #{log_id}; {duplicates} previous entries for this station/event"
+                        log_draft = None
+                    except (OSError, ValueError, sqlite3.Error) as exc:
+                        message = f"log NOT saved: {exc}; retry or Esc"
+                dirty = True
             elif entry is not None and key is not None:
                 if key in ("\n", "\r"):
                     try:
@@ -492,6 +526,18 @@ def run_fixture_shell(
                     _apply_preset(model, preset)
                     message = f"recalled preset {register} locally"
                     presenter.invalidate()
+                dirty = True
+            elif rna_browser is not None and key == "w":
+                try:
+                    if logbook_path is None:
+                        raise ValueError("logging requires --logbook PATH")
+                    receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
+                    log_draft = reception_draft(rna_browser, model.session.state, receiver=receiver,
+                                                source_kind="live" if live_source is not None else "fixture", event=log_event)
+                    log_entry = log_draft["heard_utc"] + " | "
+                    message = "Edit hearing time (UTC/offset) | notes; Enter then explicitly confirm copied ID"
+                except ValueError as exc:
+                    message = str(exc)
                 dirty = True
             elif rna_browser is not None and key in ("n", "N", "v", "y", "A"):
                 try:
@@ -660,7 +706,10 @@ def run_fixture_shell(
                         font_name=scale_font_name,
                     ).image
                 _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
-                if entry is not None:
+                if log_draft is not None:
+                    prompt = (f"Heard UTC | notes: {log_entry}_" if log_entry is not None else
+                              f"Copied {log_draft['ident']} on {log_draft['carrier_khz']:g}? y confirm / t tentative / Esc cancel")
+                elif entry is not None:
                     prompt = f"frequency kHz: {entry}_"
                 elif pending_preset:
                     prompt = "preset register: _"
@@ -689,7 +738,10 @@ def run_fixture_shell(
                 ]
                 if rna_browser is not None:
                     rows[3:3] = [rna_browser.status(), rna_browser.details(),
-                                 "RNA n/N browse v component y tune CW A activity; C/L/U markers; no automatic ID"]
+                                 "RNA n/N browse v component y tune CW A activity w log; C/L/U markers; no automatic ID"]
+                if log_draft is not None:
+                    rows = [rows[0], f"LOG {log_draft['source_kind']} {log_draft['receiver']} {log_draft['event'] or 'general'} {log_draft['heard_utc']}",
+                            prompt, f"Message: {message}"]
                 if tui_input is not None and tui_config is not None:
                     rows.extend(render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 for offset, text in enumerate(rows[:layout.tui_rows]):
@@ -716,6 +768,8 @@ def run_fixture_shell(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fixture-first integrated Kitty waterfall and terminal UI")
     add_rna_arguments(parser)
+    parser.add_argument("--logbook", type=Path, help="SQLite reception log; w opens an explicit confirmation form")
+    parser.add_argument("--log-event", choices=["CLE332"], help="tag new receptions for this event; omitted means general listening")
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--config", type=Path)
     parser.add_argument("--allow-live", action="store_true")
@@ -753,6 +807,10 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("choose either --fixture or --allow-live")
         if args.fixture is None and not args.allow_live:
             raise ValueError("provide --fixture or explicit --allow-live")
+        if args.logbook is not None and args.rna is None:
+            raise ValueError("--logbook requires --rna")
+        if args.log_event is not None and args.logbook is None:
+            raise ValueError("--log-event requires --logbook")
         rna_browser = browser_from_args(args)
         presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
         levels = WaterfallLevelController(
@@ -791,6 +849,8 @@ def main(argv: list[str] | None = None) -> int:
                     screen,
                     model=model,
                     rna_browser=rna_browser,
+                    logbook_path=args.logbook,
+                    log_event=args.log_event,
                     timeline=timeline,
                     live_source=None,
                     presets=presets,
@@ -872,6 +932,8 @@ def main(argv: list[str] | None = None) -> int:
                     screen,
                     model=model,
                     rna_browser=rna_browser,
+                    logbook_path=args.logbook,
+                    log_event=args.log_event,
                     timeline=None,
                     live_source=source,
                     presets=controller.presets,

@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 import tomllib
 
+from kiwi_client.ndb_logbook import cle332_eligible
 from kiwi_client.rna_catalogue import Catalogue, CatalogueFilter, ReceiverSite, load_catalogue, select_stations
 from kiwi_client.waterfall_scale import FrequencyAnnotation
 
@@ -27,7 +28,8 @@ def load_sites(path: Path | None) -> dict[str, ReceiverSite]:
 
 class RnaBrowser:
     def __init__(self, catalogue: Catalogue, *, filters: CatalogueFilter = CatalogueFilter(),
-                 sites: dict[str, ReceiverSite] | None = None):
+                 sites: dict[str, ReceiverSite] | None = None, cle332_only: bool = False):
+        self.cle332_only = cle332_only
         self.catalogue = catalogue
         self.filters = filters
         self.sites = dict(sites or {})
@@ -46,6 +48,9 @@ class RnaBrowser:
         old_key = self.selected.station.key if self.selected is not None else None
         try:
             self.matches = select_stations(self.catalogue, site=self.sites.get(self.receiver), filters=self.filters)
+            if self.cle332_only:
+                self.matches = tuple(match for match in self.matches
+                                     if cle332_eligible(match.station.carrier_khz, match.station.ident))
             self.error = ''
         except ValueError as exc:
             # Never apply the old receiver's distance filter at a new/unknown site.
@@ -112,6 +117,7 @@ class RnaBrowser:
 
 def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--rna', type=Path, help='local RNA CSV; enable station markers and browsing')
+    parser.add_argument('--rna-cle332', action='store_true', help='show only identified NDB catalogue rows on even nominal channels 190..530 kHz')
     parser.add_argument('--rna-sites', type=Path, help='TOML receiving sites keyed by host:port')
     parser.add_argument('--rna-activity', choices=['active', 'active-unknown', 'all'], default='active-unknown')
     parser.add_argument('--rna-distance-km', type=float, help='maximum distance; requires matching receiver site')
@@ -125,6 +131,6 @@ def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
 def browser_from_args(args) -> RnaBrowser | None:
     if args.rna is None:
         return None
-    return RnaBrowser(load_catalogue(args.rna), sites=load_sites(args.rna_sites), filters=CatalogueFilter(
+    return RnaBrowser(load_catalogue(args.rna), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
         args.rna_activity, args.rna_min_khz, args.rna_max_khz, args.rna_distance_km,
         not args.rna_exclude_unknown_distance, args.rna_search, args.rna_sort))

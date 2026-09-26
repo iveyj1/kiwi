@@ -17,6 +17,8 @@ activity, offsets, period/format and last logged date. Selection is NOT receptio
 CLI filters: `--rna-search`, `--rna-min-khz`, `--rna-max-khz`, `--rna-activity`,
 `--rna-distance-km`, `--rna-sort frequency|distance`, and
 `--rna-exclude-unknown-distance`. Frequency limits apply to nominal carriers.
+`--rna-cle332` additionally keeps only even nominal channels 190–530 kHz and known
+catalogue IDs; sidebands are not required to lie on even channels.
 
 For distance filtering, create a sites file using `docs/rna-sites.example.toml`
 as a template, replacing its example coordinates. Pass `--rna-sites sites.toml`.
@@ -32,6 +34,66 @@ PYTHONPATH=src python -m kiwi_client.integrated_terminal \
 Remove `--dry-run` only for deliberate live listening; add `--audio` for sound.
 The existing session duration/configuration rules still apply. For CLE332, do not
 combine loggings from multiple receivers; see the event-specific rules below.
+
+## Assisted reception log and CLE332 report
+
+Add `--logbook receptions.sqlite --log-event CLE332` to the RNA console command.
+Omit `--log-event` for general listening (those entries do not enter the CLE report).
+After listening and copying the ident:
+
+1. Select the correct catalogue station/component and tune it with `y`.
+2. Press `w`. The draft snapshots station, nominal/component frequency, receiver,
+   site (if configured), mode/filter and catalogue fields/hash. Its initial time is
+   now, not when you first tuned; edit it to the actual hearing time if necessary.
+3. Edit `UTC timestamp | notes` with Backspace/typing; Enter accepts the fields.
+   Timestamp needs `Z` or a UTC offset. There is no automatic ID confirmation.
+4. At the explicit copied-ID question, press `y` for confirmed, `t` for tentative,
+   or Esc to cancel. Only a successful transaction reports a saved entry number.
+
+Browsing/tuning never writes a log. Duplicate receptions remain stored with a
+warning count. Fixture-mode entries remain practice even if manually confirmed;
+they cannot enter the event report. Confirmation says what **you** heard, not what
+the catalogue predicts. Database activity is not proof of current reception.
+
+Review or correct saved entries without a receiver connection:
+
+```bash
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite list
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    edit 1 --heard-utc 2026-09-26T00:15:00Z --notes 'Copied twice'
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    edit 1 --status tentative
+```
+
+Changes retain revision history. To correct a mistaken station association, reject
+that entry and make a new reception; catalogue snapshots are not silently rewritten.
+Back up the SQLite database while the console is closed.
+
+Copy `docs/cle332-profile.example.toml` to `cle332-profile.toml` and replace the
+listener, receiver, actual receiving-site timezone, six-character locator, location,
+equipment/aerial and remote/public fields. Example metadata is rejected by export.
+A publicly available remote receiver also requires its web address.
+
+```bash
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    export-cle332 --profile cle332-profile.toml
+# Write a new file instead of previewing stdout; never overwrite an existing report:
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    export-cle332 --profile cle332-profile.toml --output cle332-final.txt
+```
+
+The exporter selects confirmed LIVE entries explicitly tagged CLE332, uses the
+receiver-local noon window (start inclusive, end exclusive), tests even nominal
+channels 190–530 kHz and excludes UNIDs. It keeps the earliest eligible reception
+per catalogue station and explains exclusions/repeats on stderr. It refuses mixed
+receiver event logs rather than quietly dropping another receiver. Review incorrect
+event entries and mark them tentative/rejected; do not use that mechanism to conceal
+noncompliant listening. All original receptions remain in the logbook.
+
+Review the draft, copy its body into a plain-text email, and use `CLE332 FINAL` as
+the subject. Nothing sends mail. Arrival deadline: **2026-09-30 08:00 UTC**.
+The operator must check actual site/profile metadata and the log before submission.
+Local logbooks, sites/profile files and the default report filename are git-ignored.
 
 ## RNA catalogue (offline inspection)
 

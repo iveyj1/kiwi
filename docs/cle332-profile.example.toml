@@ -1,0 +1,14 @@
+# Copy to cle332-profile.toml and replace all EXAMPLE metadata before export.
+# Match the receiving antenna, not the computer running this client.
+listener = "EXAMPLE listener name/callsign"
+receiver = "10.0.0.43:8073"
+timezone = "America/Toronto"
+locator = "FN25aa"
+location = "EXAMPLE receiving location"
+equipment = "KiwiSDR - add relevant details"
+aerial = "EXAMPLE aerial description"
+# Set these explicitly for your actual setup. A network-connected Kiwi at your
+# home listening site does not by itself imply a remotely located antenna.
+remote = false
+public = false
+web_address = ""

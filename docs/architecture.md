@@ -30,6 +30,22 @@ Live transport startup follows the current Kiwi browser bootstrap: fetch `/VER` 
 
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md). The standalone combined viewer coordinates separate W/F and SND tasks through exact selected-frequency state and command queues; it does not merge their transport lifecycles or parsers. `WaterfallSnapshotPublisher` provides bounded immutable numeric history snapshots, preserving each row's original frequency mapping while coalescing slow consumers onto the latest generation.
 
+## Live RNA reception assistant
+
+`rna_catalogue.py` loads immutable NDB records and source provenance, computes RF
+components and site distances, and applies catalogue filters without UI/network
+access. `rna_console.py` owns browsing/selection and receiver-to-site association;
+selection never changes reception evidence. The integrated shell passes generic
+frequency annotations to `waterfall_scale.py` and uses the existing controller
+for explicit CW tuning. Transport and protocol behavior are unchanged.
+
+`ndb_logbook.py` stores explicit human decisions in SQLite with immutable catalogue
+snapshots and revision history. The console freezes a draft before confirmation;
+only committed writes report success. Offline report generation independently
+validates event/source/time/channel/receiver constraints. Fixture receptions retain
+their provenance and cannot become live CLE evidence. There is no DSP, automatic
+station identification, database download, or email submission in this branch.
+
 ## Suggested modules
 
 ```text

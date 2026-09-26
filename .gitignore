@@ -5,6 +5,11 @@ kiwiclient/
 recordings/
 artifacts/
 state.json
+*.sqlite
+*.sqlite-*
+sites.toml
+cle332-profile.toml
+cle332-final.txt
 *egg-info/
 build/
 nohup.out

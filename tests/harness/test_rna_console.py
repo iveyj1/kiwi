@@ -114,6 +114,15 @@ def test_site_file(tmp_path):
         load_sites(path)
 
 
+def test_cle_filter_uses_nominal_frequency_not_components(tmp_path):
+    path = tmp_path / 'event.csv'
+    path.write_text('KHz,ID,Type,Active,USB\n378,RJ,NDB,Y,405\n379,ODD,NDB,Y,1000\n380,UNID,NDB,Y,400\n')
+    b = RnaBrowser(load_catalogue(path), cle332_only=True)
+    b.set_receiver('fixture', 378)
+    assert [m.station.ident for m in b.matches] == ['RJ']
+    assert {a.frequency_khz for a in b.annotations(377, 381)} == {378, 378.405}
+
+
 def test_console_rna_dry_run_never_connects(capsys):
     import json
     assert main(['--allow-live', '--receiver', '10.0.0.43:8073', '--dry-run', '--rna', str(FIXTURE)]) == 0

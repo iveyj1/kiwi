@@ -28,6 +28,34 @@ branch is a live, human-confirmed assistant; no automatic identification or mail
 submission is planned. The supplied announcement does not give the List's posting
 address; do not substitute the coordinator's question/contact address.
 
+## Implemented keyboard workflow
+
+All four milestones below are implemented with offline regressions. Start the new
+worktree explicitly (the old editable Python installation otherwise targets the
+analysis branch):
+
+```bash
+cd /home/user/kiwi-rna
+PYTHONPATH=src ../kiwi/.kiwi-venv/bin/python -m kiwi_client.integrated_terminal \
+    --allow-live --receiver 10.0.0.43:8073 --audio \
+    --rna rna-signals.csv --rna-cle332 \
+    --logbook receptions.sqlite --log-event CLE332
+```
+
+This command deliberately connects to .43 when run; it was **not** used for live
+validation during development. Add `--dry-run` to inspect without connecting.
+`--rna-cle332` limits the shortlist to even nominal channels and known catalogue IDs;
+this does not confirm reception. The report independently checks eligibility. Use `--rna-sites sites.toml --rna-distance-km N` after
+configuring actual receiving coordinates. No location has been guessed for the
+local receivers. Choose the one receiver/setup for your event before collecting
+loggings, and do not mix fallback receivers into that event log.
+
+`n/N` browses stations, `v` chooses carrier/sideband, `y` tunes CW, `A` changes
+activity policy, and `w` opens the hearing-time/notes and explicit confirmation form.
+See [User guide](user-guide.md) for edits/export and profile examples. Report checks
+cannot verify that a human really copied an ident or that the supplied site is
+correct; these remain operator responsibilities.
+
 ## Implementation sequence
 
 1. Independent local RNA import/filter model and regression fixtures.
