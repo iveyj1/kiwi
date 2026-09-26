@@ -39,6 +39,14 @@ class Station:
         return self.raw_fields.get("'Name' and Location", '')
 
     @property
+    def power_w(self) -> float | None:
+        try:
+            value = float(self.raw_fields.get('Pwr', ''))
+            return value if math.isfinite(value) and value >= 0 else None
+        except ValueError:
+            return None
+
+    @property
     def components(self) -> tuple[Component, ...]:
         result = [Component('carrier', self.carrier_khz)]
         for kind, offset, sign in [('lsb', self.lsb_hz, -1), ('usb', self.usb_hz, 1)]:
@@ -164,13 +172,14 @@ class CatalogueFilter:
     include_unknown_distance: bool = True
     search: str = ''
     sort: str = 'frequency'
+    min_power_w: float | None = None
 
     def __post_init__(self):
         if self.activity not in {'active', 'active-unknown', 'all'}:
             raise ValueError('activity must be active, active-unknown or all')
         if self.sort not in {'frequency', 'distance'}:
             raise ValueError('sort must be frequency or distance')
-        for value in (self.min_khz, self.max_khz, self.max_distance_km):
+        for value in (self.min_khz, self.max_khz, self.max_distance_km, self.min_power_w):
             if value is not None and (not math.isfinite(value) or value < 0):
                 raise ValueError('filter limits must be finite and nonnegative')
         if self.min_khz is not None and self.max_khz is not None and self.min_khz > self.max_khz:
@@ -196,6 +205,8 @@ def select_stations(catalogue: Catalogue, *, site: ReceiverSite | None = None,
         if filters.min_khz is not None and station.carrier_khz < filters.min_khz:
             continue
         if filters.max_khz is not None and station.carrier_khz > filters.max_khz:
+            continue
+        if filters.min_power_w is not None and (station.power_w is None or station.power_w < filters.min_power_w):
             continue
         searchable = ' '.join([station.ident, station.location, station.raw_fields.get('SP', ''), station.raw_fields.get('ITU', '')])
         if filters.search.casefold() not in searchable.casefold():
@@ -224,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--longitude', type=float)
     parser.add_argument('--timezone', default='UTC')
     parser.add_argument('--max-distance-km', type=float)
+    parser.add_argument('--min-power-w', type=float)
     parser.add_argument('--exclude-unknown-distance', action='store_true')
     parser.add_argument('--min-khz', type=float)
     parser.add_argument('--max-khz', type=float)
@@ -236,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         site = None if args.latitude is None else ReceiverSite('CLI receiver', args.latitude, args.longitude, args.timezone)
         catalogue = load_catalogue(args.catalogue)
         filters = CatalogueFilter(args.activity, args.min_khz, args.max_khz, args.max_distance_km,
-                                  not args.exclude_unknown_distance, args.search, args.sort)
+                                  not args.exclude_unknown_distance, args.search, args.sort, args.min_power_w)
         matches = select_stations(catalogue, site=site, filters=filters)
         print(json.dumps(dict(source=catalogue.source, sha256=catalogue.sha256,
                               loaded_utc=catalogue.loaded_utc, network=False, warnings=catalogue.warnings,

@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — callsign search and runtime catalogue filters
+
+Goal: /callsign opens a keyboard-selectable hits page, including excluded catalogue
+rows with reasons; Enter selects without tuning. Add :rna range (<= km), power
+(>= W), sort distance/frequency, cle on/off and site configuration commands.
+Completed: inclusive thresholds/unknown handling, ID-only case-insensitive search,
+atomic invalid commands, hidden MT209/CLE regression, fixture/live-editor shell input
+coverage, updated docs. 479 tests pass; compileall/diff checks pass. No live radio
+tests; running user session is untouched. Runtime filters/sites are session-only;
+CLI and sites TOML remain startup configuration.
+
 ## Current slice — console bandwidth keys and section dividers
 
 Goal: j/k decrease/increase CW full bandwidth through 10,20,30,50,100,500 Hz,

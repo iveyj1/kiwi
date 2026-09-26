@@ -15,7 +15,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
-from kiwi_client.rna_console import RnaBrowser, add_rna_arguments, browser_from_args
+from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
@@ -439,6 +439,9 @@ def run_fixture_shell(
     dirty = True
     full_redraw = True
     entry: str | None = None
+    search_entry: str | None = None
+    search_page: CallsignSearchPage | None = None
+    catalogue_command: str | None = None
     log_draft: dict | None = None
     log_entry: str | None = None
     pending_preset = False
@@ -457,6 +460,20 @@ def run_fixture_shell(
         elif isinstance(key, int):
             ch = key
         else:
+            return
+        command = tui_input.command.strip()
+        if rna_browser is not None and ch in (10, 13) and tui_input.mode == InputMode.COMMAND and (
+            command == "rna" or command.startswith("rna ")
+        ):
+            tui_input.command = ""
+            tui_input.history_index = None
+            tui_input.mode = InputMode.KEYMAP
+            tui_input.history.append(command)
+            try:
+                message = rna_browser.command(command, model.session.state.frequency_khz)
+            except ValueError as exc:
+                message = f"error: {exc}"
+            presenter.invalidate()
             return
         response, new_message = handle_tui_key(ch, tui_input, tui_controller, tui_config)
         if response is not None:
@@ -521,6 +538,65 @@ def run_fixture_shell(
                     except (OSError, ValueError, sqlite3.Error) as exc:
                         message = f"log NOT saved: {exc}; retry or Esc"
                 dirty = True
+            elif search_entry is not None and key is not None:
+                if key in ("\n", "\r"):
+                    search_page = CallsignSearchPage(rna_browser, search_entry)
+                    search_entry = None
+                    message = "Search includes hidden stations; Enter selects only, y tunes after closing"
+                elif key == "\x1b":
+                    search_entry = None
+                    full_redraw = True
+                    presenter.invalidate()
+                elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+                    search_entry = search_entry[:-1]
+                elif isinstance(key, str) and key.isprintable():
+                    search_entry += key
+                dirty = True
+            elif search_page is not None and key is not None:
+                page_size = max(1, screen.getmaxyx()[0] - 5)
+                if key in ("j", curses.KEY_DOWN):
+                    search_page.move(1)
+                elif key in ("k", curses.KEY_UP):
+                    search_page.move(-1)
+                elif key == curses.KEY_NPAGE:
+                    search_page.move(page_size)
+                elif key == curses.KEY_PPAGE:
+                    search_page.move(-page_size)
+                elif key == "/":
+                    search_page = None
+                    search_entry = ""
+                elif key in ("\n", "\r"):
+                    try:
+                        search_page.select()
+                        search_page = None
+                        message = rna_browser.status() + "; y to tune"
+                    except ValueError as exc:
+                        message = str(exc)
+                elif key in ("\x1b", ":"):
+                    search_page = None
+                    if key == ":":
+                        if tui_input is not None:
+                            dispatch_tui_key(":")
+                        else:
+                            catalogue_command = ""
+                full_redraw = True
+                presenter.invalidate()
+                dirty = True
+            elif catalogue_command is not None and key is not None:
+                if key in ("\n", "\r"):
+                    try:
+                        message = rna_browser.command(catalogue_command, model.session.state.frequency_khz)
+                    except ValueError as exc:
+                        message = f"error: {exc}"
+                    catalogue_command = None
+                    presenter.invalidate()
+                elif key == "\x1b":
+                    catalogue_command = None
+                elif key in ("\b", "\x7f", curses.KEY_BACKSPACE):
+                    catalogue_command = catalogue_command[:-1]
+                elif isinstance(key, str) and key.isprintable():
+                    catalogue_command += key
+                dirty = True
             elif entry is not None and key is not None:
                 if key in ("\n", "\r"):
                     try:
@@ -562,6 +638,12 @@ def run_fixture_shell(
                     _apply_preset(model, preset)
                     message = f"recalled preset {register} locally"
                     presenter.invalidate()
+                dirty = True
+            elif rna_browser is not None and key == "/":
+                search_entry = ""
+                dirty = True
+            elif rna_browser is not None and tui_input is None and key == ":":
+                catalogue_command = ""
                 dirty = True
             elif rna_browser is not None and key == "w":
                 try:
@@ -695,6 +777,21 @@ def run_fixture_shell(
 
             if dirty and now >= next_refresh:
                 lines, columns = screen.getmaxyx()
+                if search_entry is not None or search_page is not None:
+                    presenter.clear()
+                    screen.erase()
+                    page_rows = ([f"NDB callsign: /{search_entry}_", "Enter searches all catalogue IDs; Esc cancels"]
+                                 if search_entry is not None else search_page.rows(lines))
+                    for row, text in enumerate(page_rows[:max(0, lines - 1)]):
+                        _safe_line(screen, row, text, columns)
+                    _safe_line(screen, lines - 1, message, columns)
+                    screen.noutrefresh()
+                    curses.doupdate()
+                    next_refresh = now + 1.0 / refresh_hz
+                    dirty = False
+                    full_redraw = True
+                    time.sleep(0.005)
+                    continue
                 try:
                     layout = IntegratedTerminalLayout.compute(columns=columns, lines=lines)
                 except ValueError as exc:
@@ -752,6 +849,8 @@ def run_fixture_shell(
                 if log_draft is not None:
                     prompt = (f"Heard UTC | notes: {log_entry}_" if log_entry is not None else
                               f"Copied {log_draft['ident']} on {log_draft['carrier_khz']:g}? y confirm / t tentative / Esc cancel")
+                elif catalogue_command is not None:
+                    prompt = f":{catalogue_command}_"
                 elif entry is not None:
                     prompt = f"frequency kHz: {entry}_"
                 elif pending_preset:
@@ -779,16 +878,21 @@ def run_fixture_shell(
                     f"Message: {message}",
                     prompt,
                 ]
-                database_rows = [] if rna_browser is None else [rna_browser.status(), rna_browser.details()]
-                help_rows = ["h/l ←/→ small H/L large j/k CW BW -/+ ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio u auto q quit"]
+                database_rows = [] if rna_browser is None else [rna_browser.status(), rna_browser.filter_summary(), rna_browser.details()]
+                if layout.tui_rows < 12:
+                    database_rows = database_rows[:2]  # Keep filters and help visible at 24 lines.
+                help_rows = [("/callsign :rna filters | " if rna_browser is not None else "") +
+                             "h/l ←/→ small H/L large j/k CW BW -/+ ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio u auto q quit"]
                 if rna_browser is not None:
-                    help_rows.append("RNA n/N browse v component y tune CW A activity w log | :volume N | p/s/S presets r receiver")
+                    help_rows.append("RNA /callsign n/N browse v component y tune A activity w log | :rna range KM / power W / sort distance / cle off")
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (
                     tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
                 ):
-                    help_rows = render_tui_hints(tui_input, tui_config, tui_controller).splitlines()
+                    help_rows = (["rna range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
+                                 if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
+                                 else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 rows = sectioned_console_rows(general_rows, database_rows, help_rows, columns=columns)
                 if log_draft is not None:
                     rows = [general_rows[0], f"LOG {log_draft['source_kind']} {log_draft['receiver']} {log_draft['event'] or 'general'} {log_draft['heard_utc']}",

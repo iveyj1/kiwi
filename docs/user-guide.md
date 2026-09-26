@@ -35,6 +35,62 @@ Remove `--dry-run` only for deliberate live listening; add `--audio` for sound.
 The existing session duration/configuration rules still apply. For CLE332, do not
 combine loggings from multiple receivers; see the event-specific rules below.
 
+### Callsign search and runtime catalogue commands
+
+Type `/MT` then Enter to open a full-screen hits page. Search is case-insensitive
+and matches the **ID field only**, including partial IDs; exact IDs appear first.
+It searches all NDB catalogue rows, including ones hidden by current filters, and
+shows nominal kHz, distance, power, location and exclusion reasons. This search does
+not modify the marker filters. Up/Down or j/k moves the highlight, PgUp/PgDn pages,
+and Enter selects a visible hit **without tuning or logging**. Then `v` selects its
+component and `y` tunes. Esc returns to reception; `/` starts another search. For a
+hidden hit, `:` leaves the page to edit filters, then repeat `/MT` to select it.
+
+Runtime commands (also available in the fixture console with `--rna`):
+
+```text
+:rna                         show active filters
+:rna range 2000              distance <= 2000 km (unknown distance excluded)
+:rna range off               remove distance limit; retain unknown distances
+:rna power 500               catalogue power >= 500 W (unknown power excluded)
+:rna power off               remove power limit
+:rna sort distance           nearest first; unknown distances last
+:rna sort frequency          nominal frequency order
+:rna cle off                 show non-CLE channels too
+:rna cle on                  restrict to CLE332 nominal channels/IDs
+:rna activity active         require active status (also: active-unknown, all)
+:rna search off              clear the startup text filter
+:rna site LAT LON TIMEZONE   set this receiver's antenna coordinates/timezone
+```
+
+Replace LAT/LON with actual coordinates in degrees and TIMEZONE with an IANA name
+such as `America/Toronto`. Distance filtering/sorting requires a site for the exact
+connected receiver; it never guesses one. `--rna-sites FILE` supplies persistent
+site configuration. Runtime site/filter changes last only for this console session;
+use CLI/site settings to reproduce them on restart. Invalid commands leave existing
+settings unchanged. Sorting preserves the selected station while changing browsing
+order. Callsign hits use the chosen sort within the exact/partial-ID groups.
+`--rna-min-power-w N` supplies the power threshold at startup. The existing startup
+`--rna-distance-km` policy may retain unknown distances unless
+`--rna-exclude-unknown-distance` is supplied; the explicit runtime `range N` command
+always applies a strict known-distance <= N test.
+
+### Which stations appear on the tuning line?
+
+The display uses catalogue hypotheses, not signal detection. Activity, nominal
+frequency bounds, optional text/distance/power filters and optional CLE eligibility
+produce a shortlist. Every shortlisted station's known carrier/LSB/USB component
+inside the visible waterfall frequency span gets a stem. Labels may be suppressed
+when they collide; the selected component's label has priority. A carrier outside
+the viewport does not suppress an in-view sideband. The DATABASE section now shows
+the active CLE/activity/range/power/sort settings explicitly.
+
+For example, **MT (Chibougamau)** has nominal **209 kHz**, USB **209.410 kHz** and
+500 W listed power. With `--rna-cle332`, MT is hidden because 209 is odd; **ARX** at
+nominal 210 kHz passes the even-channel test. `:rna cle off` permits MT markers and
+selection for general listening. This does **not** change CLE332 report rules:
+MT at nominal 209 remains ineligible, regardless of the sideband being heard.
+
 ## Assisted reception log and CLE332 report
 
 Add `--logbook receptions.sqlite --log-event CLE332` to the RNA console command.

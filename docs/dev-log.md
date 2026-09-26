@@ -1,5 +1,26 @@
 # Dev Log
 
+## 2026-09-26 — Callsign hits page and runtime RNA filters
+
+Observed the user's running command includes --rna-cle332. Local RNA lists MT at
+nominal209/USB209.410 kHz, active, 500 W; ARX nominal210 is even. This explains MT's
+exclusion without a radio/DSP issue. Do not modify the active user session.
+Added /ID case-insensitive all-catalogue search (ID only, exact hits first), paged
+keyboard hits with distance/power/location and exclusion reasons, Enter selection
+without tune/log, and explicit refusal to select hidden rows until filters change.
+Added :rna range KM|off (strict <=, unknown excluded), power W|off (>=, unknown
+excluded), sort distance|frequency, cle on|off, activity/search, and per-receiver
+site LAT LON TIMEZONE. Commands validate before mutation and use the live command
+editor/history without reaching the radio parser; fixtures have an equivalent
+RNA-only command entry. Runtime settings are session-only. CLI power threshold
+also available. DATABASE now exposes CLE/activity/range/power/sort so hidden
+stations have an inspectable explanation. Marker collision behavior is unchanged.
+Report eligibility is independent: disabling the marker CLE filter does not make
+an odd-channel station eligible for submission.
+13 new regressions cover MT/ARX, search grouping/paging/empty results, thresholds,
+unknowns, sorting, site requirements, atomic invalid edits and both shell command
+paths. Full suite 479 passed; compileall/diff checks passed. No receiver access.
+
 ## 2026-09-26 — Console bandwidth and section controls
 
 Integrated-console j/k now steps CW full bandwidth down/up through 10,20,30,50,100,

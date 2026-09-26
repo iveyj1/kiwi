@@ -59,7 +59,12 @@ propagation, antenna response, local noise and station power still matter.
 Coordinates refer to the receiving site even when the operator controls it remotely.
 A receiver change must not reuse the previous site's location.
 
-Missing coordinates produce an unknown distance, retained by default. RNA activity
+Missing coordinates produce an unknown distance, retained by default. The runtime
+`:rna range N` command instead requests a strict known-distance `<= N` test, so it
+excludes unknown distances. `:rna power N` similarly requires known catalogue
+power `>= N` watts; it does not estimate received power or signal strength. Distance
+sort puts unknown distances last. Callsign search still shows excluded rows with
+reasons, helping distinguish catalogue absence from an active shortlist filter. RNA activity
 is a catalogue assertion, distinct from its last logged date and from a reception
 being confirmed now. Filtering out inactive stations is convenient but can miss
 reactivations or catalogue errors; the UI allows an all-records view. Neither
