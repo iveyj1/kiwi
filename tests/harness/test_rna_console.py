@@ -21,8 +21,6 @@ def browser(**kwargs):
 def test_browsing_and_component_selection_do_not_tune():
     b = browser()
     model = WaterfallGuiModel(tuned_khz=378, selected_khz=378)
-    b.cycle_component()
-    b.cycle_component()
     assert b.component.frequency_khz == 378.405
     assert model.session.state.frequency_khz == 378
     assert b.selected.station.carrier_khz == 378
@@ -35,8 +33,6 @@ def test_browsing_and_component_selection_do_not_tune():
 
 def test_selected_usb_tunes_component_not_nominal_or_offset_frequency():
     b = browser()
-    b.cycle_component()
-    b.cycle_component()
     model = WaterfallGuiModel(tuned_khz=378, selected_khz=378)
     tune_rna_component(b, model)
     state = model.session.state
@@ -54,8 +50,6 @@ def test_controller_tuning_uses_existing_cw_command_path():
     model.session = controller.paired_session
     model.action_dispatch = controller.dispatch_session_action
     b = browser()
-    b.cycle_component()
-    b.cycle_component()
     tune_rna_component(b, model, controller)
     assert controller.state.mode == 'cw'
     assert controller.state.frequency_khz == 378.405
@@ -96,8 +90,8 @@ def test_marker_geometry_offscreen_and_collisions():
         index = (y * annotated.width + x) * 3
         return tuple(annotated.rgb[index:index + 3])
     assert pixel(90, plain.height) == (100, 220, 180)
-    assert pixel(500, plain.height) == (255, 255, 255)
-    assert pixel(905, plain.height) == (100, 220, 180)
+    assert pixel(500, plain.height) == (100, 220, 180)
+    assert pixel(905, plain.height) == (255, 255, 255)
     assert pixel(905, plain.height + 4) == (0, 0, 0)
     # Tiny viewport, many coincident labels and offscreen annotations remain safe.
     result = compose_waterfall_scale(RasterImage(10, 1, b'\0' * 30), 378, 378.01,

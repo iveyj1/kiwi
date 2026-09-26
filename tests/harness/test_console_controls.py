@@ -71,7 +71,8 @@ def test_section_dividers_and_prompt_before_help():
 
 
 @pytest.mark.parametrize('key,frequency,width', [('h', 377.990, 400), ('l', 378.010, 400),
-    ('H', 377.900, 400), ('L', 378.100, 400), ('j', 378, 100), ('k', 378, 500)])
+    ('H', 377.900, 400), ('L', 378.100, 400), ('j', 378, 100), ('k', 378, 500),
+    ('n', 380, 400), ('N', 384, 400), ('v', 378, 400)])
 def test_shell_key_bindings_and_section_text(monkeypatch, key, frequency, width):
     import kiwi_client.integrated_terminal as shell
     for name in ('mousemask', 'curs_set', 'doupdate'):

@@ -17,6 +17,7 @@ PROFILE = dict(listener='Test Listener', receiver='10.0.0.43:8073', timezone='Am
 def draft():
     browser = RnaBrowser(load_catalogue(FIXTURE))
     browser.set_receiver(PROFILE['receiver'], 378)
+    browser.cycle_component()  # Explicit carrier choice; first-time choice is now USB.
     state = WaterfallGuiModel(tuned_khz=378, selected_khz=378).session.state
     return reception_draft(browser, state, receiver=PROFILE['receiver'], source_kind='live',
                            event='CLE332', heard_utc='2026-09-25T16:00:00Z')
@@ -62,7 +63,6 @@ def test_logging_requires_current_component_and_freezes_catalogue():
     b = RnaBrowser(load_catalogue(FIXTURE))
     b.set_receiver(PROFILE['receiver'], 378)
     state = WaterfallGuiModel(tuned_khz=378, selected_khz=378).session.state
-    b.cycle_component()
     with pytest.raises(ValueError, match='tune'):
         reception_draft(b, state, receiver=PROFILE['receiver'], source_kind='live', event=None)
     record = draft()
@@ -79,11 +79,13 @@ def test_eligibility_is_nominal_channel(frequency, ident, eligible):
 
 
 def test_golden_report_uses_utc_nominal_and_excludes_repeats():
-    first = confirmed(component_khz=378.405, tuned_khz=378.405, component='usb')
+    first = confirmed(component_khz=378.405, tuned_khz=378.405, component='usb',
+                      rf_center_khz=378.405, carrier_offset_hz=405, bandwidth_hz=100)
     second = dict(first, heard_utc='2026-09-26T01:00:00Z')
     text, warnings = cle332_report([second, first], PROFILE)
     assert text == (Path(__file__).parents[1] / 'fixtures/rna/cle332-report.txt').read_text()
-    assert '378.405' not in text
+    assert '  378  RJ ' in text
+    assert 'center 378.405000 kHz; offset +405.0 Hz; BW 100 Hz' in text
     assert len(warnings) == 1 and 'repeat' in warnings[0]
 
 
@@ -134,6 +136,15 @@ def test_cli_export_and_no_overwrite(tmp_path, capsys):
     assert 'Draft only' in capsys.readouterr().err
     with pytest.raises(SystemExit):
         main(args)
+
+
+def test_legacy_report_reconstructs_actual_center_and_includes_notes():
+    entry = confirmed(tuned_khz=378.375, mode='cw', low_cut_hz=825, high_cut_hz=875,
+                      cw_offset_hz=-800, notes='Copied twice\nclear')
+    for name in ('rf_center_khz', 'carrier_offset_hz', 'bandwidth_hz'):
+        entry.pop(name)
+    text, warnings = cle332_report([entry], PROFILE)
+    assert 'center 378.425000 kHz; offset +425.0 Hz; BW 50 Hz; Copied twice clear' in text
 
 
 def test_future_schema_not_modified(tmp_path):

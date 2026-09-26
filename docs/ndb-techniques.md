@@ -50,6 +50,25 @@ signal bandwidth or smear transitions; select width by listening rather than
 assuming the narrowest filter is always best. Integer-Hz command cuts cannot
 preserve a half-Hz midpoint with these even widths; that case is explicitly rejected.
 
+## Personal tuning versus catalogue frequencies
+
+Fine tuning may favor a center different from a catalogue sideband. Keep that
+observation in personal station state, not as a correction to RNA. Store signed
+offset `1000 * (RF_center_kHz - nominal_carrier_kHz)` and full bandwidth in Hz.
+The RF center is `UI_frequency + cw_offset/1000 + (low_cut+high_cut)/2000` in CW.
+For UI 378.375 kHz, CW offset -800 Hz and cuts 825..875 Hz, center is 378.425 kHz:
++425 Hz from nominal 378, at 50 Hz bandwidth. Recall restores the requested width
+and computes the CW UI reference required for that same RF center. It does not
+assume the audio midpoint equals the magnitude of the configured CW offset.
+
+These memories reflect a listener's preference/observation, not calibrated carrier
+offset measurements: interference, propagation, receiver reference errors and
+filter preference may all contribute. They are stored separately in
+`station_memory.py`, and immutable reception snapshots supply report comments.
+Later personal tuning changes must not retroactively alter previous loggings.
+The submitted main frequency column remains nominal; center/offset/BW go in
+optional comments after the required date/time/frequency/ID fields.
+
 ## Distance and activity as listening aids
 
 Distance is the great-circle distance between the receiving antenna's coordinates

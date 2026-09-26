@@ -130,6 +130,8 @@ def test_shell_search_and_colon_commands(browser, monkeypatch, tmp_path, live_ed
         from kiwi_client.client_app import ClientController, ClientState
         from kiwi_client.config import default_config
         controller = ClientController(state=ClientState(frequency_khz=210))
+        model.session = controller.paired_session
+        model.action_dispatch = controller.dispatch_session_action
         config = default_config()
         config = replace(config, startup=replace(config.startup, state_file=str(tmp_path / 'state.json')),
                          presets=replace(config.presets, file=str(tmp_path / 'presets.toml')))
@@ -143,9 +145,9 @@ def test_shell_search_and_colon_commands(browser, monkeypatch, tmp_path, live_ed
                             live_source=None, presets={}, presenter=Presenter(), levels=WaterfallLevelController(),
                             tui_controller=controller, tui_config=config, source_fps=20, refresh_hz=10000,
                             scale_font_backend='bitmap', rna_browser=browser)
-    assert not forwarded  # RNA commands never reach the radio command parser.
+    assert all(not command.startswith('rna') for command in forwarded)
     assert not browser.cle332_only
     assert browser.selected.station.carrier_khz == 209
-    assert model.session.state.frequency_khz == 210
+    assert model.session.state.frequency_khz == 209.410
     assert any('CALLSIGN /MT' in row for row in drawn)
     assert any('NDB callsign: /' in row for row in drawn)

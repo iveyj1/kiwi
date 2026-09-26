@@ -386,11 +386,31 @@ def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller
         raise ValueError("no RNA station selected")
     if controller is not None:
         controller.execute("mode cw")
-    else:
+    elif model.session.state.mode != "cw":
+        model.session.state = replace(model.session.state, mode="cw", low_cut_hz=600, high_cut_hz=1000)
+    frequency_khz = component.frequency_khz
+    if component.kind == "stored":
+        stored = browser.memory.records[browser.selected.station.key]['stored']
         state = model.session.state
-        model.session.state = replace(state, mode="cw", low_cut_hz=600, high_cut_hz=1000)
-    set_console_frequency(model, component.frequency_khz)
+        midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
+        low = round(midpoint - stored['bandwidth_hz'] / 2)
+        high = low + int(stored['bandwidth_hz'])
+        if controller is not None:
+            controller.execute(f"filter {low} {high}")
+        else:
+            model.session.state = replace(state, low_cut_hz=low, high_cut_hz=high)
+        # A stored frequency means actual RF passband center, not the CW UI reference.
+        frequency_khz -= (model.session.state.cw_offset_hz + (low + high) / 2) / 1000
+    set_console_frequency(model, frequency_khz)
     return f"RNA {browser.selected.station.ident} {component.kind} {component.frequency_khz:.3f} kHz; ID not confirmed"
+
+
+def execute_console_rna_command(browser: RnaBrowser, command: str, model: WaterfallGuiModel) -> str:
+    if command.strip() == "rna store":
+        return browser.store_tuning(model.session.state)
+    if command.strip() == "rna forget":
+        return browser.forget_tuning()
+    return browser.command(command, model.session.state.frequency_khz)
 
 
 def run_fixture_shell(
@@ -470,8 +490,8 @@ def run_fixture_shell(
             tui_input.mode = InputMode.KEYMAP
             tui_input.history.append(command)
             try:
-                message = rna_browser.command(command, model.session.state.frequency_khz)
-            except ValueError as exc:
+                message = execute_console_rna_command(rna_browser, command, model)
+            except (ValueError, OSError) as exc:
                 message = f"error: {exc}"
             presenter.invalidate()
             return
@@ -542,7 +562,7 @@ def run_fixture_shell(
                 if key in ("\n", "\r"):
                     search_page = CallsignSearchPage(rna_browser, search_entry)
                     search_entry = None
-                    message = "Search includes hidden stations; Enter selects only, y tunes after closing"
+                    message = "Search includes hidden stations; Enter accepts and tunes; Esc cancels"
                 elif key == "\x1b":
                     search_entry = None
                     full_redraw = True
@@ -568,9 +588,9 @@ def run_fixture_shell(
                 elif key in ("\n", "\r"):
                     try:
                         search_page.select()
+                        message = tune_rna_component(rna_browser, model, tui_controller)
                         search_page = None
-                        message = rna_browser.status() + "; y to tune"
-                    except ValueError as exc:
+                    except (ValueError, RuntimeError, OSError) as exc:
                         message = str(exc)
                 elif key in ("\x1b", ":"):
                     search_page = None
@@ -585,8 +605,8 @@ def run_fixture_shell(
             elif catalogue_command is not None and key is not None:
                 if key in ("\n", "\r"):
                     try:
-                        message = rna_browser.command(catalogue_command, model.session.state.frequency_khz)
-                    except ValueError as exc:
+                        message = execute_console_rna_command(rna_browser, catalogue_command, model)
+                    except (ValueError, OSError) as exc:
                         message = f"error: {exc}"
                     catalogue_command = None
                     presenter.invalidate()
@@ -665,11 +685,11 @@ def run_fixture_shell(
                         rna_browser.cycle_component()
                     elif key == "A":
                         rna_browser.cycle_activity(model.session.state.frequency_khz)
-                    else:
+                    if key != "A":
                         message = tune_rna_component(rna_browser, model, tui_controller)
-                    if key != "y":
+                    else:
                         message = rna_browser.status()
-                except (ValueError, RuntimeError) as exc:
+                except (ValueError, RuntimeError, OSError) as exc:
                     message = str(exc)
                 presenter.invalidate()
                 dirty = True
@@ -884,13 +904,13 @@ def run_fixture_shell(
                 help_rows = [("/callsign :rna filters | " if rna_browser is not None else "") +
                              "h/l ←/→ small H/L large j/k CW BW -/+ ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio u auto q quit"]
                 if rna_browser is not None:
-                    help_rows.append("RNA /callsign n/N browse v component y tune A activity w log | :rna range KM / power W / sort distance / cle off")
+                    help_rows.append("RNA /callsign n/N tune station v tune component y retune w log | :rna store / forget / range KM / power W / sort distance")
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (
                     tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
                 ):
-                    help_rows = (["rna range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
+                    help_rows = (["rna store / forget; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
                                  if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
                                  else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 rows = sectioned_console_rows(general_rows, database_rows, help_rows, columns=columns)

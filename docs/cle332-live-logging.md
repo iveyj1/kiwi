@@ -50,7 +50,8 @@ configuring actual receiving coordinates. No location has been guessed for the
 local receivers. Choose the one receiver/setup for your event before collecting
 loggings, and do not mix fallback receivers into that event log.
 
-`n/N` browses stations, `v` chooses carrier/sideband, `y` tunes CW, `A` changes
+`n/N` selects and tunes stations, search Enter accepts and tunes, `v` cycles/tunes
+carrier/sideband/stored, `y` retunes CW, `:rna store` saves personal center/width, `A` changes
 activity policy, and `w` opens the hearing-time/notes and explicit confirmation form.
 See [User guide](user-guide.md) for edits/export and profile examples. Report checks
 cannot verify that a human really copied an ident or that the supplied site is

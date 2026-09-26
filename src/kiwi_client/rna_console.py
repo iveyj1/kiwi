@@ -8,7 +8,8 @@ from pathlib import Path
 import tomllib
 
 from kiwi_client.ndb_logbook import cle332_eligible
-from kiwi_client.rna_catalogue import Catalogue, CatalogueFilter, ReceiverSite, load_catalogue, select_stations
+from kiwi_client.rna_catalogue import Catalogue, CatalogueFilter, Component, ReceiverSite, load_catalogue, select_stations
+from kiwi_client.station_memory import StationMemory, passband_center_khz
 from kiwi_client.waterfall_scale import FrequencyAnnotation
 
 
@@ -29,7 +30,9 @@ def load_sites(path: Path | None) -> dict[str, ReceiverSite]:
 
 class RnaBrowser:
     def __init__(self, catalogue: Catalogue, *, filters: CatalogueFilter = CatalogueFilter(),
-                 sites: dict[str, ReceiverSite] | None = None, cle332_only: bool = False):
+                 sites: dict[str, ReceiverSite] | None = None, cle332_only: bool = False,
+                 memory: StationMemory | None = None):
+        self.memory = memory if memory is not None else StationMemory()
         self.cle332_only = cle332_only
         self.catalogue = catalogue
         self.filters = filters
@@ -37,7 +40,6 @@ class RnaBrowser:
         self.receiver = None
         self.matches = ()
         self.index = 0
-        self.component_index = 0
         self.error = ''
 
     def set_receiver(self, receiver: str, frequency_khz: float) -> None:
@@ -58,7 +60,6 @@ class RnaBrowser:
             self.matches = ()
             self.error = str(exc)
         self.index = 0
-        self.component_index = 0
         if self.matches:
             self.index = min(range(len(self.matches)), key=lambda i: (
                 self.matches[i].station.key != old_key,
@@ -69,17 +70,50 @@ class RnaBrowser:
         return self.matches[self.index] if self.matches else None
 
     @property
+    def components(self):
+        if self.selected is None:
+            return ()
+        station = self.selected.station
+        components = station.components
+        stored = self.memory.records.get(station.key, {}).get('stored')
+        if stored is not None:
+            components += (Component('stored', station.carrier_khz + stored['offset_hz'] / 1000),)
+        return components
+
+    @property
     def component(self):
-        return self.selected.station.components[self.component_index] if self.selected is not None else None
+        if self.selected is None:
+            return None
+        default = 'usb' if self.selected.station.usb_hz is not None else 'carrier'
+        choice = self.memory.records.get(self.selected.station.key, {}).get('choice', default)
+        return next((c for c in self.components if c.kind == choice), self.components[0])
+
+    def store_tuning(self, state) -> str:
+        if self.selected is None or state.mode != 'cw':
+            raise ValueError('select a station and use CW before storing tuning')
+        station = self.selected.station
+        self.memory.update(station.key, dict(choice='stored', stored=dict(
+            carrier_khz=station.carrier_khz, offset_hz=(passband_center_khz(state) - station.carrier_khz) * 1000,
+            bandwidth_hz=state.high_cut_hz - state.low_cut_hz)))
+        return f'Stored {station.ident}: center {self.component.frequency_khz:.6f} kHz, BW {state.high_cut_hz - state.low_cut_hz:g} Hz'
+
+    def forget_tuning(self) -> str:
+        if self.selected is None:
+            raise ValueError('no station selected')
+        station = self.selected.station
+        self.memory.update(station.key, dict(choice='usb' if station.usb_hz is not None else 'carrier'))
+        return f'Forgot personal tuning for {station.ident}'
 
     def move(self, direction: int) -> None:
         if self.matches:
             self.index = (self.index + direction) % len(self.matches)
-            self.component_index = 0
 
     def cycle_component(self) -> None:
         if self.selected is not None:
-            self.component_index = (self.component_index + 1) % len(self.selected.station.components)
+            components = self.components
+            component = components[(components.index(self.component) + 1) % len(components)]
+            record = dict(self.memory.records.get(self.selected.station.key, {}), choice=component.kind)
+            self.memory.update(self.selected.station.key, record)
 
     def cycle_activity(self, frequency_khz: float) -> None:
         choices = ('active-unknown', 'active', 'all')
@@ -163,16 +197,20 @@ class RnaBrowser:
             raise ValueError('Hidden: ' + reason + '; change :rna filters first')
         for index, row in enumerate(self.matches):
             if row.station.key == match.station.key:
-                self.index, self.component_index = index, 0
+                self.index = index
                 return
         raise ValueError('station is not in the current shortlist')
 
     def annotations(self, start_khz: float, end_khz: float) -> tuple[FrequencyAnnotation, ...]:
         result = []
         for match in self.matches:
-            for component in match.station.components:
+            components = match.station.components
+            stored = self.memory.records.get(match.station.key, {}).get('stored')
+            if stored is not None:
+                components += (Component('stored', match.station.carrier_khz + stored['offset_hz'] / 1000),)
+            for component in components:
                 if start_khz <= component.frequency_khz <= end_khz:
-                    suffix = {'carrier': 'C', 'lsb': 'L', 'usb': 'U'}[component.kind]
+                    suffix = {'carrier': 'C', 'lsb': 'L', 'usb': 'U', 'stored': 'S'}[component.kind]
                     result.append(FrequencyAnnotation(component.frequency_khz, f'{match.station.ident}:{suffix}',
                                                       component.kind, match == self.selected and component == self.component))
         return tuple(result)
@@ -226,11 +264,12 @@ class CallsignSearchPage:
             reason = self.browser.exclusion_reason(hit)
             rows.append(f'{">" if index == self.index else " "} {s.ident:8} {s.carrier_khz:8g} {distance:>8} {power:>7} '
                         f'{"HIDDEN: " + reason if reason else "visible"} | {s.location} {s.raw_fields.get("ITU", "")}')
-        rows.append('↑/↓ j/k browse PgUp/PgDn page Enter select (no tune) / search : filters Esc close')
+        rows.append('↑/↓ j/k browse PgUp/PgDn page Enter select+tune / search : filters Esc close')
         return rows
 
 
 def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--rna-memory', type=Path, default=Path('rna-stations.json'), help='personal component choices and stored center/bandwidth, separate from RNA')
     parser.add_argument('--rna', type=Path, help='local RNA CSV; enable station markers and browsing')
     parser.add_argument('--rna-cle332', action='store_true', help='show only identified NDB catalogue rows on even nominal channels 190..530 kHz')
     parser.add_argument('--rna-sites', type=Path, help='TOML receiving sites keyed by host:port')
@@ -247,6 +286,6 @@ def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
 def browser_from_args(args) -> RnaBrowser | None:
     if args.rna is None:
         return None
-    return RnaBrowser(load_catalogue(args.rna), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
+    return RnaBrowser(load_catalogue(args.rna), memory=StationMemory(args.rna_memory), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
         args.rna_activity, args.rna_min_khz, args.rna_max_khz, args.rna_distance_km,
         not args.rna_exclude_unknown_distance, args.rna_search, args.rna_sort, args.rna_min_power_w))

@@ -37,7 +37,12 @@ components and site distances, and applies catalogue filters without UI/network
 access. `rna_console.py` owns browsing/selection and receiver-to-site association;
 selection never changes reception evidence. The integrated shell passes generic
 frequency annotations to `waterfall_scale.py` and uses the existing controller
-for explicit CW tuning. Transport and protocol behavior are unchanged.
+for explicit CW tuning, including search acceptance and next/previous selection.
+`station_memory.py` maintains atomic personal JSON component choices and RF-center
+plus bandwidth settings keyed by station identity, independently of immutable RNA
+records. Stored-center recall converts RF passband center back to the existing CW
+UI reference before dispatching ordinary tuning/filter commands. Transport and
+protocol behavior are unchanged.
 
 `ndb_logbook.py` stores explicit human decisions in SQLite with immutable catalogue
 snapshots and revision history. The console freezes a draft before confirmation;

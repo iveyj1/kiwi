@@ -1,5 +1,29 @@
 # Dev Log
 
+## 2026-09-26 — Automatic station tuning and personal RF-center memories
+
+Search Enter, n/N and v now tune immediately through the existing CW path; search
+highlighting alone still does not tune. Per-station component choice persists in
+an atomic separate JSON file (default rna-stations.json, --rna-memory override).
+First visits use known USB, falling back to carrier. :rna store explicitly saves
+current actual RF-center offset from nominal plus full bandwidth and selects the
+new stored component; :rna forget removes it and resets preference. C/L/U/S cycle
+and S marker preserve RNA fields. Stored recall restores width and compensates
+for the actual audio midpoint/CW offset when computing the UI tuning reference.
+A 378.375 UI reference with -800 offset and 825..875 cuts stores center378.425,
+offset+425 Hz and BW50, not the UI reference or the Kiwi oscillator frequency.
+New reception snapshots retain actual center, signed nominal-carrier offset and
+bandwidth; report comments include center/offset/BW and human notes. Legacy rows
+reconstruct centers from their frozen tuning settings. Nominal report frequency
+and eligibility remain unchanged; changing memories cannot rewrite historical logs.
+Nine additional tests and updated navigation/default/golden expectations cover
+restart, cycle/forget, controller center/width, failed atomic replacement, invalid
+files, n/N/v shell actions and legacy report comments. Full suite: 488 passed;
+compileall/diff checks passed. No radio access. User rna-sites.toml remains untracked
+and untouched; no production station memory or reception data was created.
+One personal-memory writer per file is supported; memories are station-wide rather
+than automatic per-receiver calibration corrections.
+
 ## 2026-09-26 — Callsign hits page and runtime RNA filters
 
 Observed the user's running command includes --rna-cle332. Local RNA lists MT at

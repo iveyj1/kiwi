@@ -15,6 +15,8 @@ import sqlite3
 import tomllib
 from zoneinfo import ZoneInfo
 
+from kiwi_client.station_memory import passband_center_khz
+
 
 def utc_time(value: str) -> datetime:
     result = datetime.fromisoformat(value.replace('Z', '+00:00'))
@@ -33,7 +35,8 @@ def reception_draft(browser, state, *, receiver: str, source_kind: str, event: s
     component = browser.component
     if match is None or component is None:
         raise ValueError('select an RNA station first')
-    if not math.isclose(state.frequency_khz, component.frequency_khz, abs_tol=.000001, rel_tol=0):
+    actual_frequency = passband_center_khz(state) if component.kind == 'stored' else state.frequency_khz
+    if not math.isclose(actual_frequency, component.frequency_khz, abs_tol=.000001, rel_tol=0):
         raise ValueError('tune the selected RNA component with y before logging')
     site = browser.sites.get(receiver)
     return dict(schema=1, event=event, status='tentative', source_kind=source_kind,
@@ -42,6 +45,9 @@ def reception_draft(browser, state, *, receiver: str, source_kind: str, event: s
                 station_key=match.station.key, ident=match.station.ident,
                 carrier_khz=match.station.carrier_khz, component=component.kind,
                 component_khz=component.frequency_khz, tuned_khz=state.frequency_khz,
+                rf_center_khz=passband_center_khz(state),
+                carrier_offset_hz=(passband_center_khz(state) - match.station.carrier_khz) * 1000,
+                bandwidth_hz=state.high_cut_hz - state.low_cut_hz,
                 mode=state.mode, low_cut_hz=state.low_cut_hz, high_cut_hz=state.high_cut_hz,
                 cw_offset_hz=state.cw_offset_hz, distance_km=match.distance_km,
                 catalogue_sha256=browser.catalogue.sha256,
@@ -176,7 +182,18 @@ def cle332_report(entries: list[dict], profile: dict) -> tuple[str, tuple[str, .
         seen.add(entry['station_key'])
         fields = entry['catalogue_fields']
         optional = clean_text(' '.join([fields.get("'Name' and Location", ''), fields.get('SP', ''), fields.get('ITU', '')]))
-        lines.append(f'{when:%Y-%m-%d %H:%M}  {entry["carrier_khz"]:g}  {clean_text(entry["ident"])}  {optional}'.rstrip())
+        # Older logs lack explicit centers; recover them from their frozen tuning settings.
+        center = entry.get('rf_center_khz')
+        if center is None:
+            center = entry['tuned_khz'] + ((entry.get('cw_offset_hz', 0) if entry['mode'] == 'cw' else 0)
+                                           + (entry['low_cut_hz'] + entry['high_cut_hz']) / 2) / 1000
+        offset = (center - entry['carrier_khz']) * 1000
+        width = entry.get('bandwidth_hz', entry['high_cut_hz'] - entry['low_cut_hz'])
+        comment = f'center {center:.6f} kHz; offset {offset:+.1f} Hz; BW {width:g} Hz'
+        notes = clean_text(entry.get('notes', ''))
+        if notes:
+            comment += '; ' + notes
+        lines.append(f'{when:%Y-%m-%d %H:%M}  {entry["carrier_khz"]:g}  {clean_text(entry["ident"])}  {optional} ; {comment}'.rstrip())
     if not lines:
         raise ValueError('no eligible confirmed live receptions for CLE332')
     header = ['Subject: CLE332 FINAL', '', clean_text(profile['listener']),

@@ -7,9 +7,11 @@ for nominal carriers and `ID:L`/`ID:U` for catalogued sidebands. Carrier stems
 are taller; sideband caps point left/right. Labels that collide are suppressed,
 not moved to false frequencies; browse co-channel stations with the keyboard.
 
-- `n` / `N`: next/previous filtered station, without retuning or confirming an ID.
-- `v`: select carrier/LSB/USB, skipping unknown offsets, without retuning.
-- `y`: explicitly tune the selected component in CW using the existing CW offset.
+- `n` / `N`: select and immediately tune the next/previous filtered station in CW.
+- `v`: cycle and immediately tune carrier/LSB/USB/stored, skipping unavailable entries.
+- `y`: retune the selected component in CW using the existing CW offset.
+- A station remembers its last component choice; first visits choose USB if known,
+  otherwise carrier. Highlighting a search row alone still does not tune.
 - `A`: cycle active-plus-unknown, active-only, and all activity policies.
 
 The details panel shows nominal and component frequencies, location, distance,
@@ -42,8 +44,9 @@ and matches the **ID field only**, including partial IDs; exact IDs appear first
 It searches all NDB catalogue rows, including ones hidden by current filters, and
 shows nominal kHz, distance, power, location and exclusion reasons. This search does
 not modify the marker filters. Up/Down or j/k moves the highlight, PgUp/PgDn pages,
-and Enter selects a visible hit **without tuning or logging**. Then `v` selects its
-component and `y` tunes. Esc returns to reception; `/` starts another search. For a
+and Enter accepts a visible hit and **immediately tunes** its remembered component
+(or USB on first visit, carrier if USB is unknown). No ID is logged automatically.
+Esc returns to reception; `/` starts another search. For a
 hidden hit, `:` leaves the page to edit filters, then repeat `/MT` to select it.
 
 Runtime commands (also available in the fixture console with `--rna`):
@@ -91,13 +94,41 @@ nominal 210 kHz passes the even-channel test. `:rna cle off` permits MT markers 
 selection for general listening. This does **not** change CLE332 report rules:
 MT at nominal 209 remains ineligible, regardless of the sideband being heard.
 
+### Personal station tuning memories
+
+After selecting a station, fine-tune and adjust CW bandwidth with h/l, H/L and j/k.
+`:rna store` saves the **current actual RF passband center offset from that station's
+nominal carrier and the full bandwidth**. This selects a new `stored` component,
+shown as `ID:S` on the scale. It is independent of, and never overwrites, RNA data.
+`:rna forget` removes that station's stored tuning and resets its preferred component
+to USB (carrier if USB is unknown). `v` cycles carrier, LSB, USB and stored where
+available. Returning to stored restores both its RF center and width; choosing a
+catalogue component retains the current width. Storing is explicit, not automatic
+on every fine-tuning or bandwidth change. Store again to replace an existing memory.
+
+Choices and stored settings persist in `rna-stations.json` (git-ignored); override
+with `--rna-memory PATH`. One personal memory per catalogue station is shared across
+receivers; receiver-specific calibration is not inferred. Only run one writer per
+memory file. Writes are atomic; invalid/unwritable files produce errors rather than
+silently discarding settings. Memories follow the existing station identity key
+(carrier/ID/location), not mutable activity or log dates.
+
+“Center” here is **receiver reference + midpoint of the audio passband**, not
+necessarily the displayed CW tuning reference. With a -800 Hz CW offset and cuts
+825..875 Hz, a UI frequency of 378.375 kHz means an RF center of 378.425 kHz, offset
++425 Hz from nominal 378 kHz, with 50 Hz bandwidth. Stored recall accounts for this
+difference rather than applying the CW offset twice. Fresh receptions snapshot
+that RF center/offset/width. Report comments include these values and your notes;
+older logs reconstruct the center from their saved tuning settings. Later changes
+to station memories do not rewrite reception history or CLE nominal frequencies.
+
 ## Assisted reception log and CLE332 report
 
 Add `--logbook receptions.sqlite --log-event CLE332` to the RNA console command.
 Omit `--log-event` for general listening (those entries do not enter the CLE report).
 After listening and copying the ident:
 
-1. Select the correct catalogue station/component and tune it with `y`.
+1. Select the correct catalogue station/component (search acceptance, n/N and v tune automatically); `y` retunes it.
 2. Press `w`. The draft snapshots station, nominal/component frequency, receiver,
    site (if configured), mode/filter and catalogue fields/hash. Its initial time is
    now, not when you first tuned; edit it to the actual hearing time if necessary.
@@ -106,7 +137,7 @@ After listening and copying the ident:
 4. At the explicit copied-ID question, press `y` for confirmed, `t` for tentative,
    or Esc to cancel. Only a successful transaction reports a saved entry number.
 
-Browsing/tuning never writes a log. Duplicate receptions remain stored with a
+Browsing/tuning may update personal component preferences, but never writes a reception log. Duplicate receptions remain stored with a
 warning count. Fixture-mode entries remain practice even if manually confirmed;
 they cannot enter the event report. Confirmation says what **you** heard, not what
 the catalogue predicts. Database activity is not proof of current reception.

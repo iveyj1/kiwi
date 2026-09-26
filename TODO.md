@@ -1,5 +1,18 @@
 # TODO
 
+## Current slice — automatic station tuning and personal station memories
+
+Goal: search acceptance/n/N/v tune immediately, remember component per station,
+first choice USB (carrier if unknown). Add explicit :rna store / forget for a
+personal center-offset/full-bandwidth memory in a separate atomic JSON file;
+include stored component in v cycle. Logs snapshot actual RF passband center,
+nominal-carrier offset and width and export them as comments alongside notes.
+Completed: atomic personal memory/restart/error tests, actual RF-center/CW midpoint
+mapping, immediate navigation/search/component tuning regressions and report
+snapshots. 488 tests passed, compileall/diff checks passed. No radio access;
+local rna-sites.toml and RNA catalogue unchanged. :rna store / forget is explicit;
+station choices/memories persist in rna-stations.json (--rna-memory override).
+
 ## Current slice — callsign search and runtime catalogue filters
 
 Goal: /callsign opens a keyboard-selectable hits page, including excluded catalogue
