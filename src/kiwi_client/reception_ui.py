@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from kiwi_client.ndb_logbook import utc_time, validate_reception
+from kiwi_client.console_panels import log_panel_rows
 
 
 def scope_key(station_key, receiver, event, source_kind):
@@ -71,7 +72,22 @@ class ReceptionIndex:
         return text
 
 
-def logging_panel_rows(draft: dict, *, prompt: str, message: str, history: str) -> list[str]:
+def reception_panel_lines(index: ReceptionIndex, station_key, receiver, event, source_kind) -> list[str]:
+    records = index.matching(station_key, receiver, event, source_kind)
+    if not records or index.error:
+        return [index.status(station_key, receiver, event, source_kind), f'{event or "general"} / {source_kind}', receiver]
+    latest = records[0]
+    lines = [f"{latest['status'].upper()} {utc_time(latest['heard_utc']):%Y-%m-%d %H:%M:%SZ}"]
+    confirmed = next((r for r in records if r['status'] == 'confirmed'), None)
+    if confirmed is not None and latest['status'] != 'confirmed':
+        lines.append(f"CONFIRMED {utc_time(confirmed['heard_utc']):%Y-%m-%d %H:%M:%SZ}")
+    lines.extend([f"#{latest['log_id']} / {len(records)} entries / {event or 'general'} / {source_kind}",
+                  receiver, 'Note: ' + latest.get('notes', ''), 'w edit latest / W new reception'])
+    return lines
+
+
+def logging_panel_rows(draft: dict, *, prompt: str, message: str, history: str,
+                       columns: int = 100, height: int = 24, entry: str | None = None) -> list[str]:
     editing = draft.get('log_id')
     title = f"EDIT LOG #{editing}" if editing is not None else 'NEW RECEPTION'
     center = draft.get('rf_center_khz')
@@ -79,9 +95,17 @@ def logging_panel_rows(draft: dict, *, prompt: str, message: str, history: str) 
         center = draft['tuned_khz'] + ((draft.get('cw_offset_hz', 0) if draft['mode'] == 'cw' else 0)
                                       + (draft['low_cut_hz'] + draft['high_cut_hz']) / 2) / 1000
     width = draft['high_cut_hz'] - draft['low_cut_hz']
-    return [f"{title} | {draft['ident']} | nominal {draft['carrier_khz']:g} kHz | {draft['status'].upper()}",
-            prompt, f'Message: {message}',
-            f"HEARD {utc_time(draft['heard_utc']):%Y-%m-%d %H:%M:%SZ} | {history}",
-            f"SOURCE {draft['source_kind']} | {draft['receiver']} | {draft.get('event') or 'general'}",
-            f"SNAPSHOT center {center:.6f} kHz | offset {(center - draft['carrier_khz']) * 1000:+.1f} Hz | BW {width:g} Hz",
-            'Editing changes time/status/notes only; receiver and tuning evidence stay unchanged.']
+    timestamp, notes = draft['heard_utc'], draft.get('notes', '')
+    if entry is not None:
+        timestamp, _, notes = entry.partition('|')
+    editable = [f'UTC    {timestamp.strip()}', f"Status {draft['status'].upper()}",
+                'Notes  ' + notes.strip(), '', 'Edit UTC | notes in the input below.',
+                'Enter reviews; y/t explicitly saves.']
+    evidence = [f"Station    {draft['ident']} / {draft['carrier_khz']:g} kHz",
+                f"Receiver   {draft['receiver']}", f"Source     {draft['source_kind']} / {draft.get('event') or 'general'}",
+                f'RF center  {center:.6f} kHz', f'Offset     {(center - draft["carrier_khz"]) * 1000:+.1f} Hz',
+                f'Bandwidth  {width:g} Hz', 'Catalogue  snapshot retained']
+    return log_panel_rows(columns=columns, height=height,
+                          title=f"{title} / {draft['ident']} / {draft['carrier_khz']:g} kHz",
+                          editable=editable, evidence=evidence, prompt=prompt,
+                          message=message, history=history)

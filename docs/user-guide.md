@@ -1,5 +1,29 @@
 # User Guide
 
+## Main and logging page layout
+
+The console now uses **A main + B logging** from the layout workshop, with Unicode
+box-drawing borders (`╭─╮`, `├┬┤`, `│`, `╰─╯`) and fixed vertical separators.
+Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration).
+
+- The main page keeps the waterfall full width. Below it: a radio/status band,
+  station/catalogue on the left and reception/log on the right, then filters,
+  keys and messages. Column positions depend on terminal width, not field contents.
+- `w`/`W` opens a **full-screen logging page**: editable UTC/status/notes on the left,
+  frozen station/receiver/source/center/offset/bandwidth evidence on the right.
+  The waterfall placement is hidden while the form is open; receiver/audio workers
+  keep their existing lifecycle. Save/cancel returns to the waterfall with a full
+  repaint. The form never relabels current tuning as old reception evidence.
+- The existing `UTC timestamp | notes` input remains in the bottom edit band;
+  Enter reviews it, `y` confirms, `t` saves tentative, Esc cancels. This is the new
+  layout, not yet a Tab-driven field editor or an older-entry picker.
+- At narrow widths, panels stack instead of squeezing two columns. Small windows
+  retain identity, log state and input; optional details/telemetry are omitted.
+  Long values are clipped with an ellipsis inside their cells, and long input
+  scrolls left to keep its insertion end visible. Resizing retains the draft.
+  The supported minimum remains 40 columns by 12 rows.
+
+
 ## RNA markers and live station browsing
 
 Add `--rna rna-signals.csv` to the console command. The RNA row uses `ID:C`
@@ -85,7 +109,7 @@ frequency bounds, optional text/distance/power filters and optional CLE eligibil
 produce a shortlist. Every shortlisted station's known carrier/LSB/USB component
 inside the visible waterfall frequency span gets a stem. Labels may be suppressed
 when they collide; the selected component's label has priority. A carrier outside
-the viewport does not suppress an in-view sideband. The DATABASE section now shows
+the viewport does not suppress an in-view sideband. The FILTERS band now shows
 the active CLE/activity/range/power/sort settings explicitly.
 
 For example, **MT (Chibougamau)** has nominal **209 kHz**, USB **209.410 kHz** and
@@ -142,7 +166,7 @@ After listening and copying the ident:
 4. At the explicit copied-ID question, press `y` for confirmed, `t` for tentative,
    or Esc to cancel. Only a successful transaction reports a saved entry number.
 
-The main DATABASE section, callsign hits and logging form show status and full UTC
+The main RECEPTION panel, callsign hits and logging form show status and full UTC
 hearing date/time for the selected station, plus the entry ID/count. If the latest
 entry is tentative or rejected but an older one is confirmed, the last confirmed
 time is also shown. This lookup is scoped to the current receiver, event and
@@ -165,8 +189,9 @@ the catalogue predicts. Database activity is not proof of current reception.
 
 Layout alternatives with sample main/logging screens are in
 [`docs/ui-layout-workshop.txt`](ui-layout-workshop.txt): compact bands (A), fixed
-two-column blocks (B), and a station/history sidebar (C). These sketches are design
-options, not an already-applied full redesign. View with a monospace font, e.g.
+two-column blocks (B), and a station/history sidebar (C). A main and B logging
+are now implemented with Unicode borders; the remaining alternatives and richer
+form/ledger interactions are still proposals. View with a monospace font, e.g.
 `less -S docs/ui-layout-workshop.txt`.
 
 Review or correct saved entries without a receiver connection:
@@ -857,7 +882,7 @@ Fixture/live tuning defaults to simple immediate mode with 1.0/0.1 kHz main/fine
 
 Mouse input is intentionally ignored in the integrated console. In particular, wheel events are consumed instead of being allowed to fall back to terminal up/down arrow sequences and accidentally change volume.
 
-In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through **10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. Both edges move equally around the existing passband midpoint, preserving CW pitch and tuned frequency. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. These keys do nothing outside CW except display a message; a half-Hz midpoint is rejected because integer-Hz cuts cannot preserve it with the requested even widths. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, RNA database details, and help are separated by horizontal dividers. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
+In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through **10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. Both edges move equally around the existing passband midpoint, preserving CW pitch and tuned frequency. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. These keys do nothing outside CW except display a message; a half-Hz midpoint is rejected because integer-Hz cuts cannot preserve it with the requested even widths. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, station/reception and filter/help bands use the boxed A layout described above. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
 
 Display levels start from `--render-min-db` / `--render-max-db`. `u` toggles smoothed percentile auto-scale; `[`/`]` lower/raise the manual minimum by 5 dB and `{`/`}` lower/raise the manual maximum. Any manual adjustment disables auto mode. Current mode and limits are shown in status.
 

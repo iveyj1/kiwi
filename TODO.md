@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — boxed A main page and B logging page
+
+Goal: implement the chosen compact A main page with fixed station/reception columns,
+and B full-screen editable/frozen-evidence logging view, using Unicode box drawing.
+Preserve all radio/logging actions, resize safety and explicit save/cancel behavior.
+Completed: pure layout/cell-width and updated shell regressions; offline Kitty/curses
+pseudo-terminal smoke exercised A main, B new/edit, confirm/cancel and waterfall
+return. Full suite 539 passed; compileall/diff checks passed. Guide/workshop updated.
+No live-radio access or user-data changes. Existing timestamp | notes input remains;
+Tab-based field navigation and older-entry picking are separate future features.
+
 ## Current slice — visible log history, edit-on-w and layout workshop
 
 Goal: show selected station's scoped logging status/date in main, search and log

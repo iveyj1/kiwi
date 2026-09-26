@@ -6,7 +6,7 @@ import pytest
 from kiwi_client.client_app import ClientController, ClientState
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.integrated_terminal import (
-    CW_BANDWIDTHS_HZ, run_fixture_shell, sectioned_console_rows, step_console_cw_bandwidth,
+    CW_BANDWIDTHS_HZ, run_fixture_shell, step_console_cw_bandwidth,
 )
 from kiwi_client.rna_catalogue import load_catalogue
 from kiwi_client.rna_console import RnaBrowser
@@ -59,17 +59,6 @@ def test_non_cw_and_half_hz_center_do_not_change_filter_or_volume():
     assert model.session.state == original
 
 
-def test_section_dividers_and_prompt_before_help():
-    rows = sectioned_console_rows(['radio', 'message', ':'], ['station', 'details'], ['keys'], columns=60)
-    assert rows[:3] == ['radio', 'message', ':']
-    assert rows[3].startswith('─ DATABASE ') and len(rows[3]) == 60
-    assert rows[4:6] == ['station', 'details']
-    assert rows[6].startswith('─ HELP ') and len(rows[6]) == 60
-    assert rows[7] == 'keys'
-    no_database = sectioned_console_rows(['radio'], [], ['keys'], columns=40)
-    assert len(no_database) == 3 and 'HELP' in no_database[1]
-
-
 @pytest.mark.parametrize('key,frequency,width', [('h', 377.990, 400), ('l', 378.010, 400),
     ('H', 377.900, 400), ('L', 378.100, 400), ('j', 378, 100), ('k', 378, 500),
     ('n', 380, 400), ('N', 384, 400), ('v', 378, 400)])
@@ -104,6 +93,6 @@ def test_shell_key_bindings_and_section_text(monkeypatch, key, frequency, width)
                       scale_font_backend='bitmap', rna_browser=browser)
     assert model.session.state.frequency_khz == pytest.approx(frequency)
     assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == width
-    assert any('─ DATABASE ' in row for row in drawn)
-    assert any('─ HELP ' in row for row in drawn)
-    assert any('h/l ←/→ small H/L large j/k CW BW' in row for row in drawn)
+    assert any('STATION / CATALOGUE' in row and 'RECEPTION / LOG' in row for row in drawn)
+    assert any(row.startswith('╭') for row in drawn)
+    assert any('h/l small H/L large j/k BW' in row for row in drawn)

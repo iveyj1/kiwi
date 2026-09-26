@@ -48,7 +48,11 @@ protocol behavior are unchanged.
 snapshots and revision history. The console freezes a draft before confirmation;
 only committed writes report success. `reception_ui.py` reads existing logbooks
 without creating/upgrading them, indexes station/receiver/event/source scope and
-supplies main/search/form status. `w` revises the latest scoped hearing, while `W`
+supplies main/search/form status. `console_panels.py` is the network-independent,
+cell-width-aware Unicode renderer for the A main bands and B split logging page.
+It clips within fixed columns and adapts to narrow/short terminals. Full-screen
+forms clear only the Kitty placement, leaving source workers running, and trigger
+a full console repaint on return. `w` revises the latest scoped hearing, while `W`
 explicitly creates a repeat. Form edits retain frozen evidence; optimistic checks
 reject stale edits when another writer has changed the record. Offline report generation independently
 validates event/source/time/channel/receiver constraints. Fixture receptions retain

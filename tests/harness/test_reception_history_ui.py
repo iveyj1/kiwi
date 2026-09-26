@@ -132,5 +132,6 @@ def test_logging_panel_identifies_frozen_record_and_edit_mode():
     record = dict(sample()[2], log_id=17)
     rows = logging_panel_rows(record, prompt='time | notes', message='test', history='CONFIRMED yesterday')
     assert 'EDIT LOG #17' in rows[0]
-    assert any('SNAPSHOT center' in row for row in rows)
+    assert any('RF center' in row for row in rows)
+    assert any('RECORDED EVIDENCE' in row for row in rows)
     assert any('CONFIRMED yesterday' in row for row in rows)

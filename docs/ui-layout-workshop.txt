@@ -1,6 +1,12 @@
 RNA CONSOLE / LOGGING LAYOUT WORKSHOP
 ===================================
 
+SELECTION: A main page + B logging page now implemented with Unicode box-drawing
+and responsive fixed columns. The sketches below remain the original design
+references, not screenshots of the exact adaptive renderer. Current controls still
+use the timestamp | notes input followed by explicit y/t confirmation; field-by-field
+Tab navigation and an older-entry picker are not yet implemented.
+
 These are design sketches, not screenshots. All reception times, distances,
 levels and log IDs below are illustrative, not claims about your receptions.
 Read in a monospace font. Each screen uses fixed column boundaries; values
@@ -14,8 +20,8 @@ Implemented now, independent of the proposed layout:
   - A newer tentative/rejected entry does not hide the last confirmed time.
 
 Still proposed in these sketches:
-  - The full boxed layouts, field-by-field forms and older-entry picker.
-  - A scrolling reception ledger and the sidebar arrangement.
+  - Field-by-field forms and the older-entry picker.
+  - B main, A logging, a scrolling reception ledger and the C sidebar arrangement.
 
 Recommendation: A for the main page at ordinary terminal sizes; B's editor
 for the logging window. Use B's main page when there is enough vertical room.

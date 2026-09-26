@@ -1,5 +1,27 @@
 # Dev Log
 
+## 2026-09-26 — A main and B logging with Unicode boxes
+
+Implemented the selected layout pair. Main uses full-width radio/header/footer
+bands and fixed station/catalogue versus reception/log columns beneath the full
+waterfall. B logging is a full-screen boxed page with editable fields on the left
+and frozen reception evidence on the right; it clears only the Kitty placement,
+not the source worker. Save/cancel forces a full repaint and restores the waterfall.
+Unicode rounded corners, joins and fixed separators use cell-aware clipping,
+including common wide/combining characters. Narrow panels stack; short panels
+prioritize station/log/input and omit optional details. The final terminal column
+is reserved so curses does not clip the right border or wrap unexpectedly.
+Long input displays its insertion end. Existing timestamp | notes and explicit
+y/t confirmation controls remain unchanged; no Tab-field editor is claimed.
+
+Added 45 pure width/height/prompt/Unicode cases, replaced the obsolete section-only
+layout test, and updated shell assertions for the new headings. Full suite: 539
+passed; compileall/diff checks passed. Offline pseudo-terminal smoke at 120x30
+verified box characters, A main, B new/edit forms, confirmation, cancellation,
+return to the waterfall and one fixture-only reception with one revision in a
+temporary database. No radio connection or user-log/site changes. Physical user
+listening/visual acceptance remains to be checked after restarting the console.
+
 ## 2026-09-26 — Log status, edit-on-w and screen layout workshop
 
 Added a read-only reception index scoped by station key, receiver, event and

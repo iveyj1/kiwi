@@ -15,7 +15,8 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
-from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows
+from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines
+from kiwi_client.console_panels import main_panel_rows
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
@@ -341,16 +342,6 @@ def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controll
     return f"CW bandwidth {new_width} Hz | passband {low:g}..{high:g} Hz | center {midpoint:g} Hz"
 
 
-def sectioned_console_rows(general: list[str], database: list[str], help_rows: list[str], *, columns: int) -> list[str]:
-    def divider(label):
-        return f"─ {label} ".ljust(columns, "─")[:columns]
-    rows = list(general)
-    if database:
-        rows.extend([divider("DATABASE"), *database])
-    rows.extend([divider("HELP"), *help_rows])
-    return rows
-
-
 def discard_console_mouse_event(key):
     """Consume reported mouse input so wheel motion cannot masquerade as arrow keys."""
     if key != curses.KEY_MOUSE:
@@ -548,6 +539,8 @@ def run_fixture_shell(
                     log_entry = None
                     log_original = None
                     message = "logging cancelled; no changes saved"
+                    full_redraw = True
+                    presenter.invalidate()
                 elif log_entry is not None:
                     if key in ("\n", "\r"):
                         timestamp, _separator, notes = log_entry.partition("|")
@@ -576,6 +569,8 @@ def run_fixture_shell(
                         reception_index.refresh()
                         log_draft = None
                         log_original = None
+                        full_redraw = True
+                        presenter.invalidate()
                     except (OSError, ValueError, sqlite3.Error) as exc:
                         message = f"log NOT saved: {exc}; retry or Esc"
                 dirty = True
@@ -843,6 +838,29 @@ def run_fixture_shell(
                     full_redraw = True
                     time.sleep(0.005)
                     continue
+                if log_draft is not None:
+                    presenter.clear()
+                    screen.erase()
+                    if columns < 40 or lines < 12:
+                        _safe_line(screen, 0, 'Logging page needs at least 40 columns / 12 rows', columns)
+                        screen.refresh()
+                        time.sleep(0.03)
+                        continue
+                    prompt = (f"UTC | notes: {log_entry}_" if log_entry is not None else
+                              f"Copied {log_draft['ident']}? y confirm / t tentative / Esc cancel")
+                    rows = logging_panel_rows(log_draft, prompt=prompt, message=message,
+                        history=reception_index.status(log_draft['station_key'], log_draft['receiver'],
+                                                       log_draft.get('event'), log_draft['source_kind']),
+                        columns=columns, height=lines, entry=log_entry)
+                    for row_index, text in enumerate(rows[:lines]):
+                        _safe_line(screen, row_index, text, columns)
+                    screen.noutrefresh()
+                    curses.doupdate()
+                    next_refresh = now + 1.0 / refresh_hz
+                    dirty = False
+                    full_redraw = True
+                    time.sleep(0.005)
+                    continue
                 try:
                     layout = IntegratedTerminalLayout.compute(columns=columns, lines=lines)
                 except ValueError as exc:
@@ -896,11 +914,7 @@ def run_fixture_shell(
                         font_backend=scale_font_backend,
                         font_name=scale_font_name,
                     ).image
-                _safe_line(screen, layout.divider_row, "─" * columns, columns, curses.A_DIM)
-                if log_draft is not None:
-                    prompt = (f"Heard UTC | notes: {log_entry}_" if log_entry is not None else
-                              f"Copied {log_draft['ident']} on {log_draft['carrier_khz']:g}? y confirm / t tentative / Esc cancel")
-                elif catalogue_command is not None:
+                if catalogue_command is not None:
                     prompt = f":{catalogue_command}_"
                 elif entry is not None:
                     prompt = f"frequency kHz: {entry}_"
@@ -918,26 +932,35 @@ def run_fixture_shell(
                     if state.mode == "cw"
                     else state.frequency_khz
                 )
-                tuning_status = f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz"
-                if state.mode == "cw":
-                    tuning_status = f"CW nominal {state.frequency_khz:.3f} kHz | RX {radio_frequency_khz:.3f} kHz"
-                tuning_status += f" | BW {state.high_cut_hz - state.low_cut_hz:g} Hz"
-                general_rows = [
-                    f"{tuning_status} | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
-                    f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
-                    f"{levels.status_text()} | {transport_status}",
-                    f"Message: {message}",
-                    prompt,
-                ]
-                database_rows = [] if rna_browser is None else [rna_browser.status(),
-                    station_log_status(rna_browser.selected.station.key) if rna_browser.selected else "No station selected",
-                    rna_browser.filter_summary(), rna_browser.details()]
-                if layout.tui_rows < 13:
-                    database_rows = database_rows[:3]  # Keep log status and filters; omit optional detail.
-                help_rows = [("/callsign :rna filters | " if rna_browser is not None else "") +
-                             "h/l ←/→ small H/L large j/k CW BW -/+ w log/edit W new ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio q quit"]
+                rssi = metrics.get('rssi_db')
+                volume = tui_controller.state.volume_percent if tui_controller is not None else 0
+                rssi_text = '?' if rssi is None else f'{rssi:.0f}'
+                radio = (f"{state.mode.upper():3} {state.frequency_khz:10.4f} kHz  BW {state.high_cut_hz - state.low_cut_hz:4g} Hz  "
+                         f"RSSI {rssi_text:>4} dBm  audio {'ON' if state.audio_enabled else 'MUTED'} {volume}%  "
+                         f"step {model.small_step_hz:g}/{model.main_step_hz:g} Hz")
+                station_rows = ['No RNA station selected']
+                receiver = tui_controller.state.receiver if tui_controller is not None else 'fixture'
+                reception_rows = [f'{log_event or "general"} / {"live" if live_source else "fixture"}', receiver]
+                filters = 'RNA disabled' if rna_browser is None else rna_browser.filter_summary()
+                if rna_browser is not None and rna_browser.selected is not None:
+                    match = rna_browser.selected
+                    station = match.station
+                    component = rna_browser.component
+                    station_rows = [f'{station.ident} / {station.carrier_khz:g} kHz / {rna_browser.index + 1} of {len(rna_browser.matches)}',
+                        f'{component.kind.upper()} {component.frequency_khz:.6f} kHz',
+                        f'{"?" if match.distance_km is None else f"{match.distance_km:.0f}"} km / '
+                        f'{"?" if station.power_w is None else f"{station.power_w:g}"} W / {station.activity}',
+                        f'{station.location} {station.raw_fields.get("SP", "")} {station.raw_fields.get("ITU", "")}',
+                        rna_browser.details()]
+                    reception_rows = reception_panel_lines(reception_index, station.key, receiver, log_event,
+                                                           'live' if live_source is not None else 'fixture')
+                elif rna_browser is not None:
+                    station_rows = [rna_browser.status()]
+                help_rows = [("/ find n/N station v band " if rna_browser is not None else "") +
+                             "h/l small H/L large j/k BW w edit W new q quit"]
                 if rna_browser is not None:
-                    help_rows.append("RNA /callsign n/N tune station v tune component y retune w log | :rna store / forget / range KM / power W / sort distance")
+                    help_rows.append("f freq m mode t/T steps c center +/- zoom a audio u auto : commands")
+                    help_rows.append("RNA :rna store / forget / range KM / power W / sort distance")
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (
@@ -946,12 +969,13 @@ def run_fixture_shell(
                     help_rows = (["rna store / forget; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
                                  if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
                                  else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
-                rows = sectioned_console_rows(general_rows, database_rows, help_rows, columns=columns)
-                if log_draft is not None:
-                    rows = logging_panel_rows(log_draft, prompt=prompt, message=message, history=reception_index.status(
-                        log_draft['station_key'], log_draft['receiver'], log_draft.get('event'), log_draft['source_kind']))
-                for offset, text in enumerate(rows[:layout.tui_rows]):
-                    _safe_line(screen, layout.tui_top + offset, text, columns)
+                rows = main_panel_rows(columns=columns, height=layout.tui_rows + 1, radio=radio,
+                    radio_title='RADIO / ' + transport_status,
+                    station=station_rows, reception=reception_rows, filters=filters,
+                    help_rows=help_rows, message=message, prompt=prompt,
+                    telemetry=f'{levels.status_text()} | RX {radio_frequency_khz:.4f} | {transport_status}')
+                for offset, text in enumerate(rows[:layout.tui_rows + 1]):
+                    _safe_line(screen, layout.divider_row + offset, text, columns)
                 screen.noutrefresh()
                 curses.doupdate()
                 if image is not None and snapshot is not None:
