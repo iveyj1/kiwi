@@ -12,7 +12,7 @@ Milestones and done criteria:
 - [x] Catalogue: immutable parsed records, raw-field/provenance retention, independent
   carrier/LSB/USB frequencies, explicit unknowns, receiver-site distances, validated
   filters and fixture-backed tests; offline inspection command.
-- [ ] UI: RNA scale markers, station selection/details and explicit component tuning;
+- [x] UI: RNA scale markers, station selection/details and explicit component tuning;
   preserve nominal carrier and apply existing CW offset once; harness coverage.
 - [ ] Logbook: durable confirmed/tentative entries, editable hearing time, site/settings
   snapshots and duplicate warnings; persistence/recovery tests.

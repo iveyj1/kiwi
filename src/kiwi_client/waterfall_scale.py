@@ -178,6 +178,14 @@ def scale_text_renderer(
 
 
 @dataclass(frozen=True)
+class FrequencyAnnotation:
+    frequency_khz: float
+    label: str
+    kind: str = "carrier"
+    selected: bool = False
+
+
+@dataclass(frozen=True)
 class GraphicalScaleResult:
     image: RasterImage
     frequency_labels: tuple[str, ...]
@@ -210,6 +218,7 @@ def compose_waterfall_scale(
     low_cut_hz: int,
     high_cut_hz: int,
     presets: Mapping[str, Mapping[str, Any]],
+    annotations: tuple[FrequencyAnnotation, ...] = (),
     passband_reference_khz: float | None = None,
     label_target_pixels: int = 150,
     font_scale: int = 2,
@@ -226,6 +235,8 @@ def compose_waterfall_scale(
     preset_stem_height = 5
     preset_label_height = text_renderer.line_height + 2
     footer_height = tuning_height + tick_height + label_height + preset_stem_height + preset_label_height
+    if annotations:
+        footer_height += preset_stem_height + preset_label_height
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
     tuning_top = waterfall.height
@@ -330,6 +341,30 @@ def compose_waterfall_scale(
         ))
         preset_occupied.append(interval)
         preset_labels.append(label)
+
+    if annotations:
+        annotation_top = preset_stem_top + preset_stem_height + preset_label_height
+        occupied_annotations: list[tuple[int, int]] = []
+        # Selected labels win collisions; all visible stems survive label suppression.
+        for annotation in sorted(annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
+            column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
+            if column is None:
+                continue
+            color = (255, 255, 255) if annotation.selected else (100, 220, 180)
+            stem_height = 5 if annotation.kind == "carrier" else 3
+            for y in range(annotation_top, annotation_top + stem_height):
+                _set_pixel(rgb, waterfall.width, column, y, color)
+            # Sideband stems have a left/right cap as well as the L/U text suffix.
+            direction = -1 if annotation.kind == "lsb" else 1 if annotation.kind == "usb" else 0
+            if direction:
+                _set_pixel(rgb, waterfall.width, column + direction, annotation_top, color)
+            label_width = text_renderer.width(annotation.label)
+            label_x = min(max(0, column - label_width // 2), max(0, waterfall.width - label_width))
+            interval = (label_x, label_x + label_width)
+            if any(interval[0] < used[1] + font_scale and interval[1] + font_scale > used[0] for used in occupied_annotations):
+                continue
+            text_labels.append((label_x, annotation_top + preset_stem_height + 1, annotation.label, color))
+            occupied_annotations.append(interval)
 
     rendered_rgb = text_renderer.render(rgb, waterfall.width, output_height, text_labels)
     return GraphicalScaleResult(

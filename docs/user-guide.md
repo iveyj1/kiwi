@@ -1,5 +1,38 @@
 # User Guide
 
+## RNA markers and live station browsing
+
+Add `--rna rna-signals.csv` to the console command. The RNA row uses `ID:C`
+for nominal carriers and `ID:L`/`ID:U` for catalogued sidebands. Carrier stems
+are taller; sideband caps point left/right. Labels that collide are suppressed,
+not moved to false frequencies; browse co-channel stations with the keyboard.
+
+- `n` / `N`: next/previous filtered station, without retuning or confirming an ID.
+- `v`: select carrier/LSB/USB, skipping unknown offsets, without retuning.
+- `y`: explicitly tune the selected component in CW using the existing CW offset.
+- `A`: cycle active-plus-unknown, active-only, and all activity policies.
+
+The details panel shows nominal and component frequencies, location, distance,
+activity, offsets, period/format and last logged date. Selection is NOT reception.
+CLI filters: `--rna-search`, `--rna-min-khz`, `--rna-max-khz`, `--rna-activity`,
+`--rna-distance-km`, `--rna-sort frequency|distance`, and
+`--rna-exclude-unknown-distance`. Frequency limits apply to nominal carriers.
+
+For distance filtering, create a sites file using `docs/rna-sites.example.toml`
+as a template, replacing its example coordinates. Pass `--rna-sites sites.toml`.
+Each receiving site's key is its exact `host:port`; switching receivers recalculates
+distances. A missing site disables a distance-constrained shortlist with an explicit
+error instead of reusing another antenna's location. No receiver access occurs in:
+
+```bash
+PYTHONPATH=src python -m kiwi_client.integrated_terminal \
+    --allow-live --receiver 10.0.0.43:8073 --dry-run --rna rna-signals.csv
+```
+
+Remove `--dry-run` only for deliberate live listening; add `--audio` for sound.
+The existing session duration/configuration rules still apply. For CLE332, do not
+combine loggings from multiple receivers; see the event-specific rules below.
+
 ## RNA catalogue (offline inspection)
 
 From the pre-analysis `feature/rna-live-logging` worktree:

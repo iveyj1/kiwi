@@ -1,0 +1,8 @@
+# Copy to a local sites TOML and replace the EXAMPLE coordinates/timezone.
+# Keys must exactly match the connected receiver host:port.
+# Never assume different receiver addresses have the same antenna location.
+[sites."10.0.0.43:8073"]
+name = "EXAMPLE ONLY - replace with actual receiving site"
+latitude = 45.0
+longitude = -75.0
+timezone = "America/Toronto"

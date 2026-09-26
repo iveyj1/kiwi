@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
+from kiwi_client.rna_console import RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
@@ -340,6 +341,20 @@ def _apply_preset(model: WaterfallGuiModel, preset: Mapping[str, Any]) -> None:
         model.session.state = replace(state, **changes)
 
 
+def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller=None) -> str:
+    """Pass the RF component to normal tuning; never pre-apply the CW offset."""
+    component = browser.component
+    if component is None:
+        raise ValueError("no RNA station selected")
+    if controller is not None:
+        controller.execute("mode cw")
+    else:
+        state = model.session.state
+        model.session.state = replace(state, mode="cw", low_cut_hz=600, high_cut_hz=1000)
+    set_console_frequency(model, component.frequency_khz)
+    return f"RNA {browser.selected.station.ident} {component.kind} {component.frequency_khz:.3f} kHz; ID not confirmed"
+
+
 def run_fixture_shell(
     screen,
     *,
@@ -356,6 +371,7 @@ def run_fixture_shell(
     scale_font_backend: str = "auto",
     scale_font_name: str = "DejaVuSansMono.ttf",
     demo_seconds: float | None = None,
+    rna_browser: RnaBrowser | None = None,
 ) -> None:
     """Run fixture publication, curses text, and Kitty presentation in one thread."""
     screen.nodelay(True)
@@ -422,6 +438,10 @@ def run_fixture_shell(
                     next_source = now + 0.25
                     dirty = True
 
+            if rna_browser is not None:
+                receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
+                rna_browser.set_receiver(receiver, model.session.state.frequency_khz)
+
             try:
                 key = screen.get_wch()
             except curses.error:
@@ -472,6 +492,22 @@ def run_fixture_shell(
                     _apply_preset(model, preset)
                     message = f"recalled preset {register} locally"
                     presenter.invalidate()
+                dirty = True
+            elif rna_browser is not None and key in ("n", "N", "v", "y", "A"):
+                try:
+                    if key in ("n", "N"):
+                        rna_browser.move(1 if key == "n" else -1)
+                    elif key == "v":
+                        rna_browser.cycle_component()
+                    elif key == "A":
+                        rna_browser.cycle_activity(model.session.state.frequency_khz)
+                    else:
+                        message = tune_rna_component(rna_browser, model, tui_controller)
+                    if key != "y":
+                        message = rna_browser.status()
+                except (ValueError, RuntimeError) as exc:
+                    message = str(exc)
+                presenter.invalidate()
                 dirty = True
             elif key in ("q", "Q"):
                 if tui_input is not None:
@@ -619,6 +655,7 @@ def run_fixture_shell(
                         low_cut_hz=state.low_cut_hz,
                         high_cut_hz=state.high_cut_hz,
                         presets=presets,
+                        annotations=() if rna_browser is None else rna_browser.annotations(start_khz, end_khz),
                         font_backend=scale_font_backend,
                         font_name=scale_font_name,
                     ).image
@@ -650,6 +687,9 @@ def run_fixture_shell(
                     "h/l or ←/→ tune H/L fine ↑/↓ screen t/T step m mode Enter retune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
                     prompt,
                 ]
+                if rna_browser is not None:
+                    rows[3:3] = [rna_browser.status(), rna_browser.details(),
+                                 "RNA n/N browse v component y tune CW A activity; C/L/U markers; no automatic ID"]
                 if tui_input is not None and tui_config is not None:
                     rows.extend(render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 for offset, text in enumerate(rows[:layout.tui_rows]):
@@ -675,6 +715,7 @@ def run_fixture_shell(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fixture-first integrated Kitty waterfall and terminal UI")
+    add_rna_arguments(parser)
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--config", type=Path)
     parser.add_argument("--allow-live", action="store_true")
@@ -712,6 +753,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("choose either --fixture or --allow-live")
         if args.fixture is None and not args.allow_live:
             raise ValueError("provide --fixture or explicit --allow-live")
+        rna_browser = browser_from_args(args)
         presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
         levels = WaterfallLevelController(
             min_dbm=args.render_min_db,
@@ -729,12 +771,15 @@ def main(argv: list[str] | None = None) -> int:
             )
             timeline = FixtureWaterfallTimeline.from_fixture(args.fixture, repeat=args.repeat)
             presets = load_presets_file(args.presets)["presets"]
+            if rna_browser is not None:
+                rna_browser.set_receiver("fixture", model.session.state.frequency_khz)
             if args.dry_run:
                 timeline.advance(model.publisher)
                 start_khz, end_khz = model.display_frequency_range()
                 print(json.dumps({
                     "backend": "kitty+curses",
                     "fixture_frames": timeline.total_frames,
+                    "rna": None if rna_browser is None else rna_browser.status(),
                     "frequency": [start_khz, end_khz],
                     "presets_visible": format_preset_ruler(presets, start_khz, end_khz, columns=120).strip(),
                     "network": False,
@@ -745,6 +790,7 @@ def main(argv: list[str] | None = None) -> int:
                 lambda screen: run_fixture_shell(
                     screen,
                     model=model,
+                    rna_browser=rna_browser,
                     timeline=timeline,
                     live_source=None,
                     presets=presets,
@@ -806,10 +852,13 @@ def main(argv: list[str] | None = None) -> int:
             frequency_decimals=config.display.frequency_decimals,
         )
         source = ControllerConsoleSource(controller, model=model, audio=args.audio)
+        if rna_browser is not None:
+            rna_browser.set_receiver(state.receiver, state.frequency_khz)
         if args.dry_run:
             print(json.dumps({
                 "backend": "kitty+curses",
                 "receiver": state.receiver,
+                "rna": None if rna_browser is None else rna_browser.status(),
                 "audio": args.audio,
                 "network": False,
                 "steps_khz": [args.main_step_khz, args.small_step_khz],
@@ -822,6 +871,7 @@ def main(argv: list[str] | None = None) -> int:
                 lambda screen: run_fixture_shell(
                     screen,
                     model=model,
+                    rna_browser=rna_browser,
                     timeline=None,
                     live_source=source,
                     presets=controller.presets,

@@ -1,5 +1,18 @@
 # Dev Log
 
+## 2026-09-26 — RNA tuning-line integration
+
+Added opt-in `--rna` console path, distinct carrier/LSB/USB scale annotations,
+collision suppression, selected label priority, keyboard station/component browsing,
+activity cycling, explicit CW tuning and catalogue details. Sites TOML maps exact
+receiver addresses to antenna coordinates/timezone; missing sites cannot inherit
+another receiver's distance filter. Startup CLI includes search/range/distance/sort.
+Eight added harness cases cover marker geometry, browsing, site switching, and
+controller-backed CW tuning with the offset applied only by the existing path.
+Full suite: 429 passed. No live receiver access or physical terminal verification.
+Remaining UX refinements: selectable table, in-session filter editing, mouse picking,
+and wide-view channel aggregation. Basic marker/browse milestone is implemented.
+
 ## 2026-09-26 — Pre-analysis RNA branch and catalogue foundation
 
 Created `/home/user/kiwi-rna` on `feature/rna-live-logging` from `05698f6`.
