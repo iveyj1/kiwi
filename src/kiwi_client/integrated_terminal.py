@@ -314,6 +314,42 @@ def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool 
     return set_console_frequency(model, model.session.state.selected_khz)
 
 
+CW_BANDWIDTHS_HZ = (10, 20, 30, 50, 100, 500)
+
+
+def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controller=None) -> str:
+    """Change full CW bandwidth symmetrically around the existing audio midpoint."""
+    if direction not in (-1, 1):
+        raise ValueError("bandwidth direction must be -1 or 1")
+    state = model.session.state
+    if state.mode != "cw":
+        return "j/k bandwidth steps are available in CW mode only"
+    width = state.high_cut_hz - state.low_cut_hz
+    choices = [value for value in CW_BANDWIDTHS_HZ if (value - width) * direction > 0]
+    if not choices:
+        return f"CW bandwidth {width:g} Hz; {'minimum' if direction < 0 else 'maximum'} step reached"
+    new_width = max(choices) if direction < 0 else min(choices)
+    midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
+    low, high = midpoint - new_width / 2, midpoint + new_width / 2
+    if not low.is_integer() or not high.is_integer():
+        raise ValueError("CW midpoint is half-Hz; integer-Hz filter cuts cannot preserve it with these widths")
+    if controller is not None:
+        controller.execute(f"filter {int(low)} {int(high)}")
+    else:
+        model.session.state = replace(state, low_cut_hz=int(low), high_cut_hz=int(high))
+    return f"CW bandwidth {new_width} Hz | passband {low:g}..{high:g} Hz | center {midpoint:g} Hz"
+
+
+def sectioned_console_rows(general: list[str], database: list[str], help_rows: list[str], *, columns: int) -> list[str]:
+    def divider(label):
+        return f"─ {label} ".ljust(columns, "─")[:columns]
+    rows = list(general)
+    if database:
+        rows.extend([divider("DATABASE"), *database])
+    rows.extend([divider("HELP"), *help_rows])
+    return rows
+
+
 def discard_console_mouse_event(key):
     """Consume reported mouse input so wheel motion cannot masquerade as arrow keys."""
     if key != curses.KEY_MOUSE:
@@ -589,20 +625,27 @@ def run_fixture_shell(
                     message = str(exc)
                 presenter.invalidate()
                 dirty = True
+            elif key in ("j", "k"):
+                try:
+                    message = step_console_cw_bandwidth(model, -1 if key == "j" else 1, tui_controller)
+                except (ValueError, RuntimeError) as exc:
+                    message = str(exc)
+                presenter.invalidate()
+                dirty = True
             elif key in ("h", curses.KEY_LEFT):
-                tune_console_selection(model, -1)
-                presenter.invalidate()
-                dirty = True
-            elif key in ("l", curses.KEY_RIGHT):
-                tune_console_selection(model, 1)
-                presenter.invalidate()
-                dirty = True
-            elif key == "H":
                 tune_console_selection(model, -1, small=True)
                 presenter.invalidate()
                 dirty = True
-            elif key == "L":
+            elif key in ("l", curses.KEY_RIGHT):
                 tune_console_selection(model, 1, small=True)
+                presenter.invalidate()
+                dirty = True
+            elif key in ("H", curses.KEY_SLEFT):
+                tune_console_selection(model, -1)
+                presenter.invalidate()
+                dirty = True
+            elif key in ("L", curses.KEY_SRIGHT):
+                tune_console_selection(model, 1)
                 presenter.invalidate()
                 dirty = True
             elif key in ("\n", "\r"):
@@ -728,22 +771,28 @@ def run_fixture_shell(
                 tuning_status = f"{state.mode.upper()} tuned {state.frequency_khz:.3f} kHz"
                 if state.mode == "cw":
                     tuning_status = f"CW nominal {state.frequency_khz:.3f} kHz | RX {radio_frequency_khz:.3f} kHz"
-                rows = [
+                tuning_status += f" | BW {state.high_cut_hz - state.low_cut_hz:g} Hz"
+                general_rows = [
                     f"{tuning_status} | selected {state.selected_khz:.3f} kHz | step {model.main_step_hz / 1000:g}/{model.small_step_hz / 1000:g} kHz | zoom {state.waterfall_zoom} | audio {'ON' if state.audio_enabled else 'MUTED'}",
                     f"{format_rssi_indicator(metrics.get('rssi_db'))} | volume {tui_controller.state.volume_percent if tui_controller is not None else 0}% | W/F {0 if snapshot is None else snapshot.generation}/{model.rasterizer.presented_generation}",
                     f"{levels.status_text()} | {transport_status}",
                     f"Message: {message}",
-                    "h/l or ←/→ tune H/L fine ↑/↓ screen t/T step m mode Enter retune c center +/- zoom f freq p preset a audio k/j vol u auto q quit",
                     prompt,
                 ]
+                database_rows = [] if rna_browser is None else [rna_browser.status(), rna_browser.details()]
+                help_rows = ["h/l ←/→ small H/L large j/k CW BW -/+ ↑/↓ screen t/T step m mode f freq c center +/- zoom a audio u auto q quit"]
                 if rna_browser is not None:
-                    rows[3:3] = [rna_browser.status(), rna_browser.details(),
-                                 "RNA n/N browse v component y tune CW A activity w log; C/L/U markers; no automatic ID"]
+                    help_rows.append("RNA n/N browse v component y tune CW A activity w log | :volume N | p/s/S presets r receiver")
+                # Generic TUI key hints describe different bindings; show only its
+                # contextual command/prefix hints in the integrated console.
+                if tui_input is not None and tui_config is not None and (
+                    tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
+                ):
+                    help_rows = render_tui_hints(tui_input, tui_config, tui_controller).splitlines()
+                rows = sectioned_console_rows(general_rows, database_rows, help_rows, columns=columns)
                 if log_draft is not None:
-                    rows = [rows[0], f"LOG {log_draft['source_kind']} {log_draft['receiver']} {log_draft['event'] or 'general'} {log_draft['heard_utc']}",
+                    rows = [general_rows[0], f"LOG {log_draft['source_kind']} {log_draft['receiver']} {log_draft['event'] or 'general'} {log_draft['heard_utc']}",
                             prompt, f"Message: {message}"]
-                if tui_input is not None and tui_config is not None:
-                    rows.extend(render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 for offset, text in enumerate(rows[:layout.tui_rows]):
                     _safe_line(screen, layout.tui_top + offset, text, columns)
                 screen.noutrefresh()

@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — console bandwidth keys and section dividers
+
+Goal: j/k decrease/increase CW full bandwidth through 10,20,30,50,100,500 Hz,
+keeping the current passband midpoint fixed; h/l small steps and H/L large steps.
+Separate general, database and help panels with horizontal dividers.
+Completed: fixture/controller and shell-key/layout regressions, updated help/docs,
+and 466 passing tests. j/k is CW-only and no longer changes volume. Command/prefix
+input keeps priority; contextual hints remain, conflicting standalone key hints do
+not. BW appears in status. Full widths preserve midpoint; unsupported half-Hz centers
+are rejected explicitly. Compileall/diff checks pass. No live receiver access.
+
 ## Current slice — RNA live reception and logging
 
 Branch/worktree: `feature/rna-live-logging`, `/home/user/kiwi-rna`, based on

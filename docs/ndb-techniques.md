@@ -37,6 +37,19 @@ a diagnostic rather than becoming an exact marker. Raw catalogue fields are kept
 for review. See `rna_catalogue.py`, `rna_console.py` and the asymmetric-offset
 fixture `tests/fixtures/rna/catalogue.csv`.
 
+## Symmetric CW bandwidth adjustment
+
+The console's `j/k` steps select full widths of 10, 20, 30, 50, 100 or 500 Hz.
+For current audio passband edges `low` and `high`, preserve midpoint
+`m = (low + high)/2` and set the new edges to `m - width/2` and `m + width/2`.
+Thus 600–1000 Hz (400 Hz wide, midpoint 800 Hz) narrows to 750–850 Hz at 100 Hz
+width. The receiver reference and selected RF component do not change; this avoids
+changing the listening pitch just to narrow the filter. This uses the existing
+receiver filter command, not local DSP. Very narrow filters can suppress keyed
+signal bandwidth or smear transitions; select width by listening rather than
+assuming the narrowest filter is always best. Integer-Hz command cuts cannot
+preserve a half-Hz midpoint with these even widths; that case is explicitly rejected.
+
 ## Distance and activity as listening aids
 
 Distance is the great-circle distance between the receiving antenna's coordinates

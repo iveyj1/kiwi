@@ -1,5 +1,21 @@
 # Dev Log
 
+## 2026-09-26 — Console bandwidth and section controls
+
+Integrated-console j/k now steps CW full bandwidth down/up through 10,20,30,50,100,
+500 Hz, preserving current audio passband midpoint, frequency and CW reference.
+The live path uses the existing controller filter command; fixtures change local
+state. Unlisted widths use the nearest step in the requested direction, with no
+wrapping. Other modes leave filters/volume alone; half-Hz midpoint cases fail
+explicitly rather than silently shift the center with integer-Hz cuts.
+Reversed h/l to small and H/L to large steps, including corresponding arrows.
+Added DATABASE/HELP horizontal dividers, kept prompt/messages above the database,
+and suppressed conflicting generic TUI hints while retaining contextual hints.
+Bandwidth is visible in general status. Volume remains accessible via commands.
+11 new regression cases cover the ladder, controller midpoint preservation
+(including negative cuts), no-op/error cases, section layout and actual shell keys.
+Full suite: 466 passed; compileall and diff checks passed. No live radio access.
+
 ## 2026-09-26 — Assisted logging and final-advice CLE332 export
 
 Implemented explicit console `w` draft/time/notes and human confirmation, transactional
