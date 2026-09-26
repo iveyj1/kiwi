@@ -69,6 +69,27 @@ Later personal tuning changes must not retroactively alter previous loggings.
 The submitted main frequency column remains nominal; center/offset/BW go in
 optional comments after the required date/time/frequency/ID fields.
 
+## Comparing nearby station hypotheses
+
+Nearby identification assistance compares the actual RF passband center with each
+shortlisted station's known carrier, LSB, USB and optional personal stored center.
+Take the closest component per station within a user-selected radius in Hz, then
+order stations by absolute RF separation. A station appears only once even if
+several components overlap the window. This does not estimate an ident or confidence:
+two AM NDB sidebands may be almost coincident, and distance/power/activity are only
+catalogue aids. Missing offsets remain unknown, and active shortlist filters still
+apply, including event eligibility if enabled.
+
+Keep the search anchor fixed while cycling. For example, at 300.000 kHz with a
+100 Hz radius, components at 300.000 and 300.090 qualify but 300.180 does not.
+Retuning to 300.090 must not silently shift the window to admit 300.180; repeated
+cycling should compare the same hypotheses. Manual retuning or a changed filter,
+receiver or radius starts a fresh window. `RnaBrowser.nearby_components` and
+`cycle_nearby` implement this, with synthetic regressions in
+`tests/harness/test_nearby_and_log_removal.py`. Human listening and explicit log
+review remain necessary; a wrong prior ID can be marked not-heard without erasing
+its historical tuning evidence.
+
 ## Distance and activity as listening aids
 
 Distance is the great-circle distance between the receiving antenna's coordinates

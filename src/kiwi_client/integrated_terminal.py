@@ -19,6 +19,7 @@ from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, recepti
 from kiwi_client.console_panels import main_panel_rows
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
+from kiwi_client.station_memory import passband_center_khz
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
 from kiwi_client.waterfall_raster import RasterImage, encode_png
@@ -456,6 +457,7 @@ def run_fixture_shell(
     catalogue_command: str | None = None
     log_draft: dict | None = None
     log_original: dict | None = None
+    log_delete_pending = False
     reception_index = ReceptionIndex(logbook_path)
     next_history_refresh = 0.0
     log_entry: str | None = None
@@ -538,9 +540,23 @@ def run_fixture_shell(
                     log_draft = None
                     log_entry = None
                     log_original = None
+                    log_delete_pending = False
                     message = "logging cancelled; no changes saved"
                     full_redraw = True
                     presenter.invalidate()
+                elif log_delete_pending:
+                    if key == "D":
+                        try:
+                            with Logbook(logbook_path) as book:
+                                book.delete(log_draft['log_id'], expected=log_original)
+                            message = f"Deleted log #{log_draft['log_id']}; audit history retained"
+                            log_draft = log_original = None
+                            log_delete_pending = False
+                            reception_index.refresh()
+                            full_redraw = True
+                            presenter.invalidate()
+                        except (OSError, ValueError, sqlite3.Error) as exc:
+                            message = f"log NOT deleted: {exc}; Esc cancels"
                 elif log_entry is not None:
                     if key in ("\n", "\r"):
                         timestamp, _separator, notes = log_entry.partition("|")
@@ -554,9 +570,15 @@ def run_fixture_shell(
                         log_entry = log_entry[:-1]
                     elif isinstance(key, str) and key.isprintable():
                         log_entry += key
-                elif key in ("y", "t"):
+                elif key == "d":
+                    if log_draft.get('log_id') is None:
+                        message = "Unsaved reception; Esc cancels it"
+                    else:
+                        log_delete_pending = True
+                        message = "Deletion removes this reception from logs/reports; audit history remains"
+                elif key in ("y", "t", "n"):
                     try:
-                        log_draft["status"] = "confirmed" if key == "y" else "tentative"
+                        log_draft["status"] = {"y": "confirmed", "t": "tentative", "n": "not-heard"}[key]
                         with Logbook(logbook_path) as book:
                             if log_draft.get('log_id') is not None:
                                 log_id = log_draft['log_id']
@@ -694,6 +716,7 @@ def run_fixture_shell(
                         raise ValueError(reception_index.error)
                     existing = (reception_index.latest(rna_browser.selected.station.key, receiver, log_event, source_kind)
                                 if key == "w" else None)
+                    log_delete_pending = False
                     log_original = None if existing is None else dict(existing)
                     log_draft = existing if existing is not None else reception_draft(
                         rna_browser, model.session.state, receiver=receiver, source_kind=source_kind, event=log_event)
@@ -702,6 +725,15 @@ def run_fixture_shell(
                                if existing is not None else "New reception: edit actual hearing time | notes; Enter then confirm")
                 except ValueError as exc:
                     message = str(exc)
+                dirty = True
+            elif rna_browser is not None and key in (",", "."):
+                try:
+                    message = rna_browser.cycle_nearby(passband_center_khz(model.session.state), -1 if key == "," else 1)
+                    tune_rna_component(rna_browser, model, tui_controller)
+                    rna_browser.nearby_tuned(passband_center_khz(model.session.state))
+                except (ValueError, RuntimeError, OSError) as exc:
+                    message = str(exc)
+                presenter.invalidate()
                 dirty = True
             elif rna_browser is not None and key in ("n", "N", "v", "y", "A"):
                 try:
@@ -846,8 +878,9 @@ def run_fixture_shell(
                         screen.refresh()
                         time.sleep(0.03)
                         continue
-                    prompt = (f"UTC | notes: {log_entry}_" if log_entry is not None else
-                              f"Copied {log_draft['ident']}? y confirm / t tentative / Esc cancel")
+                    prompt = (f"DELETE #{log_draft['log_id']} {log_draft['ident']}? D confirms / Esc cancels" if log_delete_pending else
+                              f"UTC | notes: {log_entry}_" if log_entry is not None else
+                              f"{log_draft['ident']}: y confirmed / t tentative / n not heard / d delete / Esc cancel")
                     rows = logging_panel_rows(log_draft, prompt=prompt, message=message,
                         history=reception_index.status(log_draft['station_key'], log_draft['receiver'],
                                                        log_draft.get('event'), log_draft['source_kind']),
@@ -956,17 +989,17 @@ def run_fixture_shell(
                                                            'live' if live_source is not None else 'fixture')
                 elif rna_browser is not None:
                     station_rows = [rna_browser.status()]
-                help_rows = [("/ find n/N station v band " if rna_browser is not None else "") +
+                help_rows = [("/ find n/N station ,/. nearby v band " if rna_browser is not None else "") +
                              "h/l small H/L large j/k BW w edit W new q quit"]
                 if rna_browser is not None:
                     help_rows.append("f freq m mode t/T steps c center +/- zoom a audio u auto : commands")
-                    help_rows.append("RNA :rna store / forget / range KM / power W / sort distance")
+                    help_rows.append("RNA :rna store / forget / near HZ / range KM / power W / sort distance")
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (
                     tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
                 ):
-                    help_rows = (["rna store / forget; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
+                    help_rows = (["rna store / forget; near HZ; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
                                  if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
                                  else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
                 rows = main_panel_rows(columns=columns, height=layout.tui_rows + 1, radio=radio,

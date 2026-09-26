@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — not-heard/delete, nearby stations and editable screen examples
+
+Goal: log review can mark not-heard or explicitly confirm deletion (audit retained),
+cycle nearby catalogue components with ,/. around a fixed RF-center anchor, and
+provide a current-renderer text example file for user edits. Nearby radius is in Hz,
+current shortlist filters remain explicit; tuning must not walk the search anchor.
+Completed: audited deletion/conflict/rollback and non-reused IDs, not-heard report
+exclusion, nearby/component/fixed-anchor and shell regressions, CLI confirmation,
+current-renderer editable examples and overwrite protection. 549 tests passed;
+compileall/diff checks passed. No live radio or actual user reception/site edits.
+Nearby cycle defaults ±200 Hz and honors the current RNA shortlist filters.
+
 ## Current slice — boxed A main page and B logging page
 
 Goal: implement the chosen compact A main page with fixed station/reception columns,

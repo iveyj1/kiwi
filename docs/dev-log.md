@@ -1,5 +1,38 @@
 # Dev Log
 
+## 2026-09-26 — Not-heard/delete, nearby alternatives, current text mockup
+
+Log review now offers n=not-heard and d then uppercase D=delete. Not-heard keeps
+frozen evidence but cannot enter the CLE export. Delete removes the active row,
+retains revision/deletion audit, and checks the form's original snapshot to reject
+stale changes. Explicit CLI --yes is required for deletion. New reception IDs
+advance beyond both live rows and audit IDs so deleting the highest ID cannot
+reuse it and mix unrelated histories. Esc cancels without mutation.
+
+Comma/period cycle previous/next shortlisted station whose closest known carrier,
+sideband or personal stored center is within ±200 Hz (default) of actual RF center.
+`:rna near HZ` / `--rna-near-hz` sets the radius.
+The anchor stays fixed through automatic candidate retunes; manual retuning or
+receiver/filter/radius changes start a fresh neighborhood. Each station appears
+once. Current RNA filters remain in force and are called out in the message.
+Offline inspection of the supplied CSV shows PH332 USB333.035 and multiple other
+catalogue components nearby; no identification or reception was inferred.
+
+`docs/ui-layout-current.txt` is an editable current-renderer mockup (main, logging,
+review/not-heard and deletion confirmation), not UI configuration. Synthetic data
+only. `tools/render_console_examples.py` regenerates to stdout or a new file and
+refuses to overwrite edits. No user logbook/config is read by the generator.
+
+Ten new regressions cover fixed-anchor component cycling and actual shell keys,
+known/unknown offsets and stored components, invalid radius/filters, not-heard
+report exclusion, deletion audit/conflict/rollback/ID reuse, CLI confirmation,
+modal save/delete/cancel, and example generation/alignment/overwrite refusal.
+Full suite: 549 passed; compileall/diff checks passed. Offline pseudo-terminal smoke
+exercised nearby cycling, confirmed save, not-heard revision and explicit deletion:
+zero active rows and three audit revisions in a temporary fixture-only database.
+No live receiver connections or user data changes; rna-sites.toml remains untracked
+and untouched.
+
 ## 2026-09-26 — A main and B logging with Unicode boxes
 
 Implemented the selected layout pair. Main uses full-width radio/header/footer

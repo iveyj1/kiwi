@@ -57,8 +57,8 @@ def reception_draft(browser, state, *, receiver: str, source_kind: str, event: s
 def validate_reception(record: dict) -> None:
     if record.get('schema') != 1:
         raise ValueError('unsupported reception schema')
-    if record.get('status') not in {'tentative', 'confirmed', 'rejected'}:
-        raise ValueError('status must be tentative, confirmed or rejected')
+    if record.get('status') not in {'tentative', 'confirmed', 'rejected', 'not-heard'}:
+        raise ValueError('status must be tentative, confirmed, rejected or not-heard')
     if record.get('source_kind') not in {'live', 'fixture'}:
         raise ValueError('source must be live or fixture')
     utc_time(record['heard_utc'])
@@ -102,9 +102,12 @@ class Logbook:
         payload = json.dumps(record, allow_nan=False, sort_keys=True)
         duplicates = sum(entry['station_key'] == record['station_key'] and
                          entry['receiver'] == record['receiver'] and entry.get('event') == record.get('event') and
-                         entry['status'] != 'rejected' for entry in self.entries())
+                         entry['status'] not in {'rejected', 'not-heard'} for entry in self.entries())
         with self.connection:
-            cursor = self.connection.execute('INSERT INTO receptions(payload) VALUES (?)', (payload,))
+            # Deletions must not reuse an audited reception ID (including old schemas).
+            cursor = self.connection.execute('''INSERT INTO receptions(id, payload)
+                SELECT max(coalesce((SELECT max(id) FROM receptions), 0),
+                           coalesce((SELECT max(reception_id) FROM revisions), 0)) + 1, ?''', (payload,))
             key = cursor.lastrowid
             self._audit(key, payload)
         return key, duplicates
@@ -126,6 +129,21 @@ class Logbook:
             if cursor.rowcount != 1:
                 raise ValueError('entry changed concurrently; reopen before editing')
             self._audit(key, payload)
+
+    def delete(self, key: int, *, expected: dict | None = None) -> None:
+        """Remove from current receptions while preserving a deletion audit record."""
+        with self.connection:
+            row = self.connection.execute('SELECT payload FROM receptions WHERE id=?', (key,)).fetchone()
+            if row is None:
+                raise ValueError(f'unknown log entry {key}')
+            record = json.loads(row[0])
+            if expected is not None and dict(record, log_id=key) != expected:
+                raise ValueError('entry changed since the form opened; cancel and reopen with w')
+            cursor = self.connection.execute('DELETE FROM receptions WHERE id=? AND payload=?', (key, row[0]))
+            if cursor.rowcount != 1:
+                raise ValueError('entry changed concurrently; reopen before deleting')
+            self._audit(key, json.dumps(dict(record, deleted_utc=datetime.now(timezone.utc).isoformat()),
+                                       allow_nan=False, sort_keys=True))
 
     def _audit(self, key, payload):
         self.connection.execute('INSERT INTO revisions(reception_id, changed_utc, payload) VALUES (?, ?, ?)',
@@ -217,9 +235,12 @@ def main(argv=None) -> int:
     sub.add_parser('list')
     edit = sub.add_parser('edit')
     edit.add_argument('id', type=int)
-    edit.add_argument('--status', choices=['tentative', 'confirmed', 'rejected'])
+    edit.add_argument('--status', choices=['tentative', 'confirmed', 'rejected', 'not-heard'])
     edit.add_argument('--heard-utc')
     edit.add_argument('--notes')
+    delete = sub.add_parser('delete')
+    delete.add_argument('id', type=int)
+    delete.add_argument('--yes', action='store_true', help='confirm removal from current receptions; audit retained')
     export = sub.add_parser('export-cle332')
     export.add_argument('--profile', type=Path, required=True)
     export.add_argument('--output', type=Path, help='new file only; omitted means stdout preview')
@@ -232,6 +253,10 @@ def main(argv=None) -> int:
                 print(json.dumps(book.entries(), indent=2))
             elif args.command == 'edit':
                 book.revise(args.id, status=args.status, heard_utc=args.heard_utc, notes=args.notes)
+            elif args.command == 'delete':
+                if not args.yes:
+                    raise ValueError('delete requires --yes confirmation')
+                book.delete(args.id)
             else:
                 with args.profile.open('rb') as source:
                     profile = tomllib.load(source)

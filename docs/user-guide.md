@@ -15,7 +15,8 @@ Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration)
   keep their existing lifecycle. Save/cancel returns to the waterfall with a full
   repaint. The form never relabels current tuning as old reception evidence.
 - The existing `UTC timestamp | notes` input remains in the bottom edit band;
-  Enter reviews it, `y` confirms, `t` saves tentative, Esc cancels. This is the new
+  Enter reviews it, `y` confirms, `t` saves tentative, `n` saves not-heard,
+  `d` requests deletion of an existing entry (uppercase `D` confirms), Esc cancels. This is the new
   layout, not yet a Tab-driven field editor or an older-entry picker.
 - At narrow widths, panels stack instead of squeezing two columns. Small windows
   retain identity, log state and input; optional details/telemetry are omitted.
@@ -37,6 +38,8 @@ not moved to false frequencies; browse co-channel stations with the keyboard.
 - A station remembers its last component choice; first visits choose USB if known,
   otherwise carrier. Highlighting a search row alone still does not tune.
 - `A`: cycle active-plus-unknown, active-only, and all activity policies.
+- `.` / `,`: next/previous station with a known component near the current RF center;
+  tune its closest carrier/sideband/stored component immediately.
 
 The details panel shows nominal and component frequencies, location, distance,
 activity, offsets, period/format and last logged date. Selection is NOT reception.
@@ -118,6 +121,29 @@ nominal 210 kHz passes the even-channel test. `:rna cle off` permits MT markers 
 selection for general listening. This does **not** change CLE332 report rules:
 MT at nominal 209 remains ineligible, regardless of the sideband being heard.
 
+### Nearby station alternatives
+
+While listening to a possibly misidentified signal, press `.` for the next nearby
+station or `,` for the previous one. This compares **component RF frequencies**, not
+nominal carriers: a different station's carrier, lower sideband, upper sideband or
+personal stored center can overlap the component currently being heard. Each station
+appears once, using its closest known component. Missing offsets are not guessed.
+
+The default radius is **±200 Hz** around the current actual RF passband center.
+Use `:rna near 100` to choose ±100 Hz, or `--rna-near-hz 100` at startup. The first
+press fixes the neighborhood anchor; repeated cycling does not walk progressively
+across the band as it tunes each candidate. Manual retuning, receiver/filter/radius
+changes reset the neighborhood. The message shows anchor, radius and candidate count.
+This navigation remembers the chosen component, but never confirms an ID or logs it.
+
+**Current RNA shortlist filters still apply**, including CLE eligibility, activity,
+power, distance and text filters. If expected alternatives are missing, inspect the
+FILTERS band; `:rna cle off`, `:rna search off`, `:rna range off` or `:rna power off`
+may be appropriate for general identification. Report eligibility remains separate.
+For example, PH at nominal 332 has USB 333.035 kHz; the supplied catalogue also places
+several other stations' components nearby. Proximity alone is not evidence of which
+ident you actually heard.
+
 ### Personal station tuning memories
 
 After selecting a station, fine-tune and adjust CW bandwidth with h/l, H/L and j/k.
@@ -163,8 +189,15 @@ After listening and copying the ident:
    Use uppercase `W` to deliberately add a repeat reception instead of editing.
 3. Edit `UTC timestamp | notes` with Backspace/typing; Enter accepts the fields.
    Timestamp needs `Z` or a UTC offset. There is no automatic ID confirmation.
-4. At the explicit copied-ID question, press `y` for confirmed, `t` for tentative,
-   or Esc to cancel. Only a successful transaction reports a saved entry number.
+4. At the review prompt, press `y` for confirmed, `t` for tentative, `n` for
+   **not-heard**, or Esc to cancel. Not-heard retains the entry and its history but
+   excludes that entry from the CLE report. Only a successful transaction reports
+   a saved entry number.
+5. To delete an existing entry, press `d` at the review prompt, then uppercase `D`
+   at the explicit entry-ID/station confirmation. Esc cancels without deleting.
+   Deletion removes the current reception row from status/search/report results;
+   its revision history and a deletion audit record remain. IDs are never reused.
+   An unsaved draft is cancelled with Esc, not deleted.
 
 The main RECEPTION panel, callsign hits and logging form show status and full UTC
 hearing date/time for the selected station, plus the entry ID/count. If the latest
@@ -174,6 +207,11 @@ LIVE/fixture source: `NOT LOGGED` means not logged in that scope. A missing logb
 is not created by viewing it; an unreadable one says `log unavailable`, not falsely
 `NOT LOGGED`. The read-only history index refreshes about once per second and after
 successful saves, so offline CLI edits become visible too.
+
+Not-heard/deletion applies to the chosen entry only, not every reception of that
+station. An older confirmed reception remains confirmed until separately reviewed.
+The current latest entry opens with `w`; use CLI IDs below to revise/delete older
+entries while the visual older-entry picker remains unimplemented.
 
 `w` changes the existing row's hearing time/status/notes with revision history;
 it never replaces original receiver, station, tuning, catalogue or source evidence
@@ -194,6 +232,18 @@ are now implemented with Unicode borders; the remaining alternatives and richer
 form/ledger interactions are still proposals. View with a monospace font, e.g.
 `less -S docs/ui-layout-workshop.txt`.
 
+For an **editable snapshot of the current renderer**, open
+[`docs/ui-layout-current.txt`](ui-layout-current.txt). It includes main, logging,
+not-heard review and delete-confirmation examples. Edit this file freely to suggest
+layout changes; it is a mockup, not live UI configuration. All data is illustrative.
+To regenerate into a different file without overwriting your tweaks:
+
+```bash
+PYTHONPATH=src python tools/render_console_examples.py --output /tmp/layout-new.txt
+```
+
+The generator reads no receiver/config/logbook and refuses an existing output file.
+
 Review or correct saved entries without a receiver connection:
 
 ```bash
@@ -202,6 +252,10 @@ PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
     edit 1 --heard-utc 2026-09-26T00:15:00Z --notes 'Copied twice'
 PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
     edit 1 --status tentative
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    edit 1 --status not-heard
+PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
+    delete 1 --yes
 ```
 
 Changes retain revision history. To correct a mistaken station association, reject

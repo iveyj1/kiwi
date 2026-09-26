@@ -126,5 +126,5 @@ def log_panel_rows(*, columns: int, height: int, title: str, editable: list[str]
         rows.append(rule(width, 'HISTORY'))
     rows.extend([row(width, history), rule(width, 'EDIT / SAVE'),
                  row(width, prompt, tail=True), row(width, message),
-                 rule(width, 'Esc cancels; Enter reviews; y confirms / t tentative', left='╰', right='╯')])
+                 rule(width, 'Esc cancels; Enter reviews; y yes / t tentative / n not heard / d delete', left='╰', right='╯')])
     return rows

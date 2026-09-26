@@ -42,6 +42,23 @@ def test_logging_layout_has_fixed_columns_and_visible_actions(columns, height):
         assert any('EDITABLE' in row and 'RECORDED EVIDENCE' in row for row in rows)
 
 
+def test_current_example_generator_is_aligned_and_never_overwrites_edits(tmp_path):
+    import runpy
+    module = runpy.run_path('tools/render_console_examples.py')
+    path = tmp_path / 'examples.txt'
+    assert module['main'](['--output', str(path)]) == 0
+    text = path.read_text()
+    assert 'NOT-HEARD' in text and 'DELETE #17 PH' in text
+    assert 'STATION / CATALOGUE' in text and 'RECORDED EVIDENCE' in text
+    for row in text.splitlines():
+        if row.startswith(('│', '╭', '╰', '├')):
+            assert cell_width(row) == 99
+    path.write_text('my layout tweaks')
+    with pytest.raises(FileExistsError):
+        module['main'](['--output', str(path)])
+    assert path.read_text() == 'my layout tweaks'
+
+
 def test_display_cells_combining_wide_characters_and_controls():
     assert cell_width('Chibougamau') == 11
     assert cell_width('e\u0301東京') == 5

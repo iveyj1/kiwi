@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import shlex
 from dataclasses import replace
 from pathlib import Path
@@ -31,7 +32,13 @@ def load_sites(path: Path | None) -> dict[str, ReceiverSite]:
 class RnaBrowser:
     def __init__(self, catalogue: Catalogue, *, filters: CatalogueFilter = CatalogueFilter(),
                  sites: dict[str, ReceiverSite] | None = None, cle332_only: bool = False,
-                 memory: StationMemory | None = None):
+                 memory: StationMemory | None = None, near_radius_hz: float = 200):
+        if not math.isfinite(near_radius_hz) or near_radius_hz < 0:
+            raise ValueError('nearby radius must be finite and nonnegative Hz')
+        self.near_radius_hz = near_radius_hz
+        self._near_anchor = None
+        self._near_expected = None
+        self._near_pool = ()
         self.memory = memory if memory is not None else StationMemory()
         self.cle332_only = cle332_only
         self.catalogue = catalogue
@@ -48,6 +55,7 @@ class RnaBrowser:
             self.refresh(frequency_khz)
 
     def refresh(self, frequency_khz: float) -> None:
+        self._near_anchor = self._near_expected = None
         old_key = self.selected.station.key if self.selected is not None else None
         try:
             self.matches = select_stations(self.catalogue, site=self.sites.get(self.receiver), filters=self.filters)
@@ -95,6 +103,7 @@ class RnaBrowser:
         self.memory.update(station.key, dict(choice='stored', stored=dict(
             carrier_khz=station.carrier_khz, offset_hz=(passband_center_khz(state) - station.carrier_khz) * 1000,
             bandwidth_hz=state.high_cut_hz - state.low_cut_hz)))
+        self._near_anchor = self._near_expected = None
         return f'Stored {station.ident}: center {self.component.frequency_khz:.6f} kHz, BW {state.high_cut_hz - state.low_cut_hz:g} Hz'
 
     def forget_tuning(self) -> str:
@@ -102,6 +111,7 @@ class RnaBrowser:
             raise ValueError('no station selected')
         station = self.selected.station
         self.memory.update(station.key, dict(choice='usb' if station.usb_hz is not None else 'carrier'))
+        self._near_anchor = self._near_expected = None
         return f'Forgot personal tuning for {station.ident}'
 
     def move(self, direction: int) -> None:
@@ -120,6 +130,41 @@ class RnaBrowser:
         self.filters = replace(self.filters, activity=choices[(choices.index(self.filters.activity) + 1) % len(choices)])
         self.refresh(frequency_khz)
 
+    def nearby_components(self, center_khz: float):
+        """One closest known component per shortlisted station, in RF-distance order."""
+        hits = []
+        for match in self.matches:
+            components = match.station.components
+            stored = self.memory.records.get(match.station.key, {}).get('stored')
+            if stored is not None:
+                components += (Component('stored', match.station.carrier_khz + stored['offset_hz'] / 1000),)
+            component = min(components, key=lambda c: abs(c.frequency_khz - center_khz))
+            if abs(component.frequency_khz - center_khz) * 1000 <= self.near_radius_hz + 1e-6:
+                hits.append((match, component))
+        return tuple(sorted(hits, key=lambda hit: (abs(hit[1].frequency_khz - center_khz),
+                                                   hit[0].station.carrier_khz, hit[0].station.ident, hit[0].station.key)))
+
+    def cycle_nearby(self, center_khz: float, direction: int) -> str:
+        if direction not in (-1, 1) or not math.isfinite(center_khz):
+            raise ValueError('invalid nearby direction/center')
+        if self._near_anchor is None or self._near_expected is None or not math.isclose(
+                center_khz, self._near_expected, abs_tol=1e-6, rel_tol=0):
+            self._near_anchor = center_khz
+            self._near_pool = self.nearby_components(center_khz)
+        if not self._near_pool:
+            raise ValueError(f'no nearby stations within ±{self.near_radius_hz:g} Hz; current RNA filters apply')
+        current_key = self.selected.station.key if self.selected is not None else None
+        current = next((i for i, hit in enumerate(self._near_pool) if hit[0].station.key == current_key), None)
+        index = (0 if direction > 0 else len(self._near_pool) - 1) if current is None else (current + direction) % len(self._near_pool)
+        match, component = self._near_pool[index]
+        self.memory.update(match.station.key, dict(self.memory.records.get(match.station.key, {}), choice=component.kind))
+        self.index = next(i for i, row in enumerate(self.matches) if row.station.key == match.station.key)
+        return (f'NEAR {index + 1}/{len(self._near_pool)} anchor {self._near_anchor:.6f} kHz ±{self.near_radius_hz:g} Hz; '
+                f'{match.station.ident} {component.kind} {component.frequency_khz:.6f}; RNA filters apply')
+
+    def nearby_tuned(self, center_khz: float) -> None:
+        self._near_expected = center_khz
+
     def filter_summary(self) -> str:
         f = self.filters
         return (f'CLE332={"on" if self.cle332_only else "off"} activity={f.activity} '
@@ -130,6 +175,13 @@ class RnaBrowser:
         parts = shlex.split(text)
         if parts == ['rna']:
             return self.filter_summary()
+        if len(parts) == 3 and parts[:2] == ['rna', 'near']:
+            radius = float(parts[2])
+            if not math.isfinite(radius) or radius < 0:
+                raise ValueError('nearby radius must be finite and nonnegative Hz')
+            self.near_radius_hz = radius
+            self._near_anchor = self._near_expected = None
+            return f'Nearby radius ±{radius:g} Hz; , previous / . next; current RNA filters apply'
         filters, sites, cle = self.filters, dict(self.sites), self.cle332_only
         if len(parts) == 3 and parts[0] == 'rna':
             name, value = parts[1:]
@@ -271,6 +323,7 @@ class CallsignSearchPage:
 
 
 def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--rna-near-hz', type=float, default=200, help='nearby component cycling radius in Hz (default 200)')
     parser.add_argument('--rna-memory', type=Path, default=Path('rna-stations.json'), help='personal component choices and stored center/bandwidth, separate from RNA')
     parser.add_argument('--rna', type=Path, help='local RNA CSV; enable station markers and browsing')
     parser.add_argument('--rna-cle332', action='store_true', help='show only identified NDB catalogue rows on even nominal channels 190..530 kHz')
@@ -288,6 +341,6 @@ def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
 def browser_from_args(args) -> RnaBrowser | None:
     if args.rna is None:
         return None
-    return RnaBrowser(load_catalogue(args.rna), memory=StationMemory(args.rna_memory), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
+    return RnaBrowser(load_catalogue(args.rna), near_radius_hz=args.rna_near_hz, memory=StationMemory(args.rna_memory), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
         args.rna_activity, args.rna_min_khz, args.rna_max_khz, args.rna_distance_km,
         not args.rna_exclude_unknown_distance, args.rna_search, args.rna_sort, args.rna_min_power_w))

@@ -100,7 +100,7 @@ def logging_panel_rows(draft: dict, *, prompt: str, message: str, history: str,
         timestamp, _, notes = entry.partition('|')
     editable = [f'UTC    {timestamp.strip()}', f"Status {draft['status'].upper()}",
                 'Notes  ' + notes.strip(), '', 'Edit UTC | notes in the input below.',
-                'Enter reviews; y/t explicitly saves.']
+                'Enter reviews; y/t/n saves; d then D deletes.']
     evidence = [f"Station    {draft['ident']} / {draft['carrier_khz']:g} kHz",
                 f"Receiver   {draft['receiver']}", f"Source     {draft['source_kind']} / {draft.get('event') or 'general'}",
                 f'RF center  {center:.6f} kHz', f'Offset     {(center - draft["carrier_khz"]) * 1000:+.1f} Hz',
