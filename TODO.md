@@ -1,5 +1,30 @@
 # TODO
 
+## Current slice — RNA live reception and logging
+
+Branch/worktree: `feature/rna-live-logging`, `/home/user/kiwi-rna`, based on
+`05698f6` (pre-analysis application). Preserve the analysis branch and main.
+
+Goal: independent RNA catalogue, receiver-site distance/activity filters, then
+live tuning-line markers and assisted human-confirmed logging. No offline DSP.
+
+Milestones and done criteria:
+- [x] Catalogue: immutable parsed records, raw-field/provenance retention, independent
+  carrier/LSB/USB frequencies, explicit unknowns, receiver-site distances, validated
+  filters and fixture-backed tests; offline inspection command.
+- [ ] UI: RNA scale markers, station selection/details and explicit component tuning;
+  preserve nominal carrier and apply existing CW offset once; harness coverage.
+- [ ] Logbook: durable confirmed/tentative entries, editable hearing time, site/settings
+  snapshots and duplicate warnings; persistence/recovery tests.
+- [ ] CLE report: reviewed current announcement, configurable eligibility/time rules,
+  plain-text preview and export tests. Never submit automatically.
+
+The final CLE332 announcement is supplied and reviewed; see
+`docs/cle332-live-logging.md` for source hash and confirmed rules. Older event data
+is reference only, not the current candidate list. A remote event log must use one
+receiver only; never silently combine fallback receiver loggings.
+No live receiver connections are needed for the initial milestones.
+
 ## Current slice — Waterfall presentation cadence
 
 Goal: reduce visible multi-row stepping by removing the console's 5 Hz presentation bottleneck before introducing a playout buffer.

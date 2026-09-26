@@ -1,5 +1,19 @@
 # Dev Log
 
+## 2026-09-26 — Pre-analysis RNA branch and catalogue foundation
+
+Created `/home/user/kiwi-rna` on `feature/rna-live-logging` from `05698f6`.
+Original analysis branch, main and user-owned local files are unchanged.
+Added independent immutable RNA catalogue/site/filter models, raw-field/hash/load-time
+provenance, asymmetric component frequencies, unknown-value diagnostics, spherical
+distance and activity/search/range filters; offline JSON inspection CLI.
+18 new regression cases; full baseline-plus-catalogue suite: 421 passed.
+Real CSV smoke import passed; 45 diagnostics include approximate `~400`/`~1020`
+offsets, deliberately unknown rather than parsed as precise measurements.
+No radio access. UI/logbook/report are subsequent milestones.
+Reviewed user-supplied final332.txt; final rules and hash are recorded in
+`docs/cle332-live-logging.md`, including the single-remote-receiver restriction.
+
 Use this as lightweight project memory. Record facts that future agent sessions should not rediscover.
 
 ## 2026-06-13

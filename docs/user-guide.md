@@ -1,5 +1,29 @@
 # User Guide
 
+## RNA catalogue (offline inspection)
+
+From the pre-analysis `feature/rna-live-logging` worktree:
+
+```bash
+PYTHONPATH=src python -m kiwi_client.rna_catalogue rna-signals.csv --search RJ
+PYTHONPATH=src python -m kiwi_client.rna_catalogue rna-signals.csv \
+    --latitude 45 --longitude -75 --max-distance-km 2000 --sort distance
+```
+
+Coordinates above are examples: use the receiving antenna's location. The command
+never connects to a receiver. Default activity policy excludes explicitly inactive
+stations but retains unknown activity; `--activity active` requires confirmed
+catalogue-active status, and `--activity all` includes inactive records.
+`--min-khz`/`--max-khz` filter nominal carriers, not sidebands.
+Missing coordinates are retained with unknown distance unless
+`--exclude-unknown-distance` is supplied. Distance filters require coordinates.
+Missing/invalid offsets are unknown, never assumed symmetric or zero. Approximate
+text offsets such as `~400` currently produce warnings and no sideband marker.
+The JSON includes original fields, component RF frequencies, file hash, and load
+time (not a claimed download/update time). Catalogue matches are not heard IDs.
+
+Current event rules and input provenance: [CLE332 live logging](cle332-live-logging.md).
+
 The primary interactive interface is `kiwi-console`, combining a Kitty waterfall with terminal controls.
 
 Local receiver registers are `r1` = `10.0.0.41:8073`, `r2` = `10.0.0.42:8073`, and `r3` = `10.0.0.43:8073`. Prefer `r3` for local NDB development: it is currently reported to use 4-channel firmware mode. General startup defaults remain on `.41`; saved state or explicit CLI options can override them.

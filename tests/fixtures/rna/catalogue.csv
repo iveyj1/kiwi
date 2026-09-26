@@ -1,0 +1,9 @@
+KHz,ID,Type,Active,LSB,USB,Sec,Fmt,'Name' and Location,SP,ITU,GSQ,Lat,Lon,Notes,Last Logged
+378,RJ,NDB,Y,410,405,10.3,DAID,Roberval,QC,CAN,FN38un,48.5625,-72.2917,Asymmetric offsets,2026-04-13
+378,OLD,NDB,N,400,400,5,,Retired,QC,CAN,,48,-72,,2020-01-01
+380,UNK,NDB,,,,,,Unknown location,,CAN,,,,Unknown activity and offsets,
+382,DUP,NDB,Y,,0,6,,East site,,CAN,,0,179.9,,
+382,DUP,NDB,Y,1020,,6,,West site,,CAN,,0,-179.9,,
+384,BAD,NDB,Y,-4,NaN,inf,,Bad optional fields,,CAN,,91,0,,
+NaN,SKIP,NDB,Y,400,400,,,Invalid carrier,,,,0,0,,
+386,OTHER,Other,Y,400,400,,,Not an NDB,,,,0,0,,
