@@ -1,5 +1,14 @@
 # TODO
 
+## Current slice — compact selected-station tape labels
+
+Goal: show selected station ID once at the tape's left, mark only the carrier with
+lowercase c, and format marker frequencies to three decimals. Keep precise RF marker
+coordinates/stored tuning unchanged and suppress duplicate selected-station labels
+in the catalogue row. Completed: collision/edge/precision/render regressions, docs,
+and synthetic preview inspection. 630 tests pass; compileall/diff checks pass.
+No live radio or user-state changes.
+
 ## Current slice — constant-proportion graphical scale fonts
 
 Goal: size the graphics canvas from terminal cell pixels, resize waterfall history

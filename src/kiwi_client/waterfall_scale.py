@@ -253,6 +253,7 @@ def compose_waterfall_scale(
     tick_height = 5
     preset_stem_height = 5
     visible_annotations = tuple(a for a in annotations if start_khz <= a.frequency_khz <= end_khz)
+    catalogue_annotations = tuple(a for a in visible_annotations if not a.station_selected)
     station_annotations = tuple(a for a in visible_annotations if a.station_selected)
     station_components = tuple(a.frequency_khz for a in annotations if a.station_selected and a.kind in {'carrier', 'lsb', 'usb'})
     station_span = (max(start_khz, min(station_components)), min(end_khz, max(station_components))) if station_components else None
@@ -264,7 +265,7 @@ def compose_waterfall_scale(
         label_height = text_renderer.line_height + 3
         preset_label_height = text_renderer.line_height + 2
         footer_height = (tuning_height + tick_height + label_height
-                         + (1 + bool(visible_annotations) + show_station_row) * (preset_stem_height + preset_label_height))
+                         + (1 + bool(catalogue_annotations) + show_station_row) * (preset_stem_height + preset_label_height))
         minimum_history = 1 if font_scale == 1 else text_renderer.line_height
         if canvas_size is None or canvas_size[1] >= footer_height + minimum_history:
             break
@@ -382,11 +383,11 @@ def compose_waterfall_scale(
         preset_occupied.append(interval)
         preset_labels.append(label)
 
-    if visible_annotations:
+    if catalogue_annotations:
         annotation_top = preset_stem_top + preset_stem_height + preset_label_height
         occupied_annotations: list[tuple[int, int]] = []
         # Selected labels win collisions; all visible stems survive label suppression.
-        for annotation in sorted(visible_annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
+        for annotation in sorted(catalogue_annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
             column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
             if column is None:
                 continue
@@ -413,7 +414,13 @@ def compose_waterfall_scale(
             right = _frequency_column(station_span[1], start_khz, end_khz, waterfall.width)
             for x in range(left, right + 1):
                 _set_pixel(rgb, waterfall.width, x, station_stem_top, STATION_BAR_RGB)
-        occupied_station: list[tuple[int, int]] = []
+        ident = next(a.label.rsplit(':', 1)[0] for a in annotations if a.station_selected)
+        label_top = station_stem_top + preset_stem_height + 1
+        text_labels.append((0, label_top, ident, (255, 255, 255)))
+        station_labels.append(ident)
+        ident_width = text_renderer.width(ident)
+        carrier_frequency = next((a.frequency_khz for a in annotations if a.station_selected and a.kind == 'carrier'), None)
+        occupied_station: list[tuple[int, int]] = [(0, ident_width)]
         # Draw the active component last so a coincident inactive guide cannot hide it.
         for annotation in sorted(station_annotations, key=lambda item: item.selected):
             column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
@@ -433,18 +440,23 @@ def compose_waterfall_scale(
         for annotation in sorted(station_annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
             column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
             color = (255, 255, 255) if annotation.selected else STATION_MARKER_COLORS[annotation.kind]
-            label = f'{annotation.label} {annotation.frequency_khz:.4f}'
+            is_carrier = annotation.kind == 'carrier' or annotation.frequency_khz == carrier_frequency
+            label = f'{annotation.frequency_khz:.3f}' + (' c' if is_carrier else '')
             label_width = text_renderer.width(label)
-            x = min(max(0, column - label_width // 2), max(0, waterfall.width - label_width))
+            # Reserve the left identifier; edge labels may shift, but RF stems never do.
+            left_margin = ident_width + 2 * font_scale
+            if label_width > waterfall.width - left_margin:
+                continue
+            x = min(max(left_margin, column - label_width // 2), waterfall.width - label_width)
             interval = (x, x + label_width)
             if any(interval[0] < used[1] + font_scale and interval[1] + font_scale > used[0] for used in occupied_station):
                 continue
-            text_labels.append((x, station_stem_top + preset_stem_height + 1, label, color))
+            text_labels.append((x, label_top, label, color))
             station_labels.append(label)
             occupied_station.append(interval)
         if not station_annotations:
-            text_labels.append((0, station_stem_top + preset_stem_height + 1,
-                                'Station span; C/L/U components offscreen', STATION_BAR_RGB))
+            text_labels.append((ident_width + 2 * font_scale, label_top,
+                                'components offscreen', STATION_BAR_RGB))
 
     rendered_rgb = text_renderer.render(rgb, waterfall.width, output_height, text_labels)
     return GraphicalScaleResult(

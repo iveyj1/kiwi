@@ -86,7 +86,7 @@ def test_station_connectors_use_final_rf_columns_and_leave_history_clear(width, 
         color = (255, 255, 255) if kind == 'usb' else STATION_MARKER_COLORS[kind]
         assert crop(result.image, x, result.station_stem_top, 1, 1) == bytes(color)
         assert crop(result.image, x, result.tuning_top, 1, 1) == bytes(color)
-        assert any(value.startswith(label) for value in result.station_labels)
+        assert f'{frequency:.3f}' + (' c' if kind == 'carrier' else '') in result.station_labels
     assert result.station_stem_top > result.tuning_top
 
 

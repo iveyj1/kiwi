@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import replace
 
 import pytest
 
@@ -83,10 +84,11 @@ def test_marker_geometry_offscreen_and_collisions():
     kwargs = dict(tuned_khz=378, selected_khz=378, low_cut_hz=600, high_cut_hz=1000,
                   presets={}, font_backend='bitmap', font_scale=1)
     plain = compose_waterfall_scale(image, 377.5, 378.5, **kwargs).image
-    result = compose_waterfall_scale(image, 377.5, 378.5,
-                                     annotations=b.annotations(377.5, 378.5), **kwargs)
+    # Exercise the general catalogue row separately from the focused station marker.
+    annotations = tuple(replace(a, station_selected=False) for a in b.annotations(377.5, 378.5))
+    result = compose_waterfall_scale(image, 377.5, 378.5, annotations=annotations, **kwargs)
     annotated = result.image
-    marker_top = plain.height + result.preset_stem_top - result.station_stem_top
+    marker_top = plain.height
     assert annotated.height > plain.height
     def pixel(x, y):
         index = (y * annotated.width + x) * 3

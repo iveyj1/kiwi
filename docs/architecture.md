@@ -45,7 +45,10 @@ frequency annotations to `waterfall_scale.py` and uses the existing controller
 for explicit CW tuning, including search acceptance and next/previous selection.
 Annotations distinguish the selected station from its active component. The pure
 scale compositor uses that metadata for a horizontal station bracket below the
-frequency scale and dotted C/L/U connectors confined to the footer. Offscreen
+frequency scale and dotted C/L/U connectors confined to the footer. Its ID is drawn
+once at the left; marker labels use three decimals and only the carrier has a c tag.
+The selected station is excluded from the general catalogue annotation row. This
+formatting does not round RF coordinates or modify component/tuning state. Offscreen
 selected endpoints are retained to clip the span, but never create false edge
 connectors. No marker ink enters the history region; source samples/rasters remain
 unchanged. For the integrated console, `terminal_geometry.py` reads cell pixels via

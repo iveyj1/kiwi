@@ -43,7 +43,11 @@ dedicated label row. It does not draw lines through waterfall history. The guide
 the scale: `x = round((f - start)/(end - start) * (width - 1))`, with all frequencies
 in kHz. Thus RJ's carrier is marked at 378.000, LSB at 377.590 and USB at 378.405;
 the CW receiver reference at 377.605 is not a station component. A personal stored
-RF center gets its own S label/stem, without a fourth connector. The horizontal
+RF center gets its own numeric label/stem, without a fourth connector.
+The station ID appears once at the left; only the carrier frequency is tagged `c`.
+Frequencies on this marker display three decimal places in kHz, but their stored
+values and plotted coordinates retain full precision. The selected station is not
+repeated in the general catalogue annotation row. The horizontal
 span is clipped to the viewport; out-of-view component connectors are omitted,
 not clamped to an edge. These are location hypotheses on the spectrum, not detections; missing
 or inaccurate catalogue offsets remain a limitation. Fixed-raster tests in

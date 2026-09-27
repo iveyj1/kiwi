@@ -60,20 +60,24 @@ narrow signals rather than interpreting larger pixels as finer measurements.
 
 ## RNA markers and live station browsing
 
-Add `--rna rna-signals.csv` to the console command. The RNA row uses `ID:C`
-for nominal carriers and `ID:L`/`ID:U` for catalogued sidebands. Carrier stems
+Add `--rna rna-signals.csv` to the console command. The other-stations RNA row uses
+`ID:C` for nominal carriers and `ID:L`/`ID:U` for catalogued sidebands. Carrier stems
 are taller; sideband caps point left/right. Labels that collide are suppressed,
 not moved to false frequencies; browse co-channel stations with the keyboard.
 
-The **currently selected station** also gets its own scale row with component
-labels and RF frequencies in kHz. A **horizontal bar below the frequency scale**
+The **currently selected station** gets its own scale row, with its ID shown once
+at the left. Frequencies use three decimal places in kHz; only the carrier has a
+`c` tag. For example: `RJ    377.590    378.000 c    378.405`. Sidebands and a saved
+center have numeric labels without L/U/S suffixes. The selected station is omitted
+from the other-stations row to avoid repeating its ID. Label rounding does not
+change precise marker positions, stored frequencies or tuning. A **horizontal bar below the frequency scale**
 spans its known LSB/carrier/USB frequencies. **Three dotted connectors** (where all
 three are known and in view) run upward from that bar to the bottom edge of the
 waterfall. Nothing is drawn inside the waterfall history:
 
 - **C**: nominal carrier, amber.
 - **L / U**: recorded RNA lower/upper sideband offsets, violet/cyan.
-- **S**: your saved personal RF center, pink, when one exists; a label/stem only,
+- Your saved personal RF center is pink when one exists; a numeric label/stem only,
   not a fourth dotted connector.
 - The actively selected component is **white**; the other components stay marked.
 
@@ -234,7 +238,8 @@ ident you actually heard.
 After selecting a station, fine-tune and adjust CW bandwidth with h/l, H/L and j/k.
 `:rna store` saves the **current actual RF passband center offset from that station's
 nominal carrier and the full bandwidth**. This selects a new `stored` component,
-shown as `ID:S` on the scale. It is independent of, and never overwrites, RNA data.
+shown numerically on the selected-station marker (`ID:S` in the other-stations row).
+It is independent of, and never overwrites, RNA data.
 `:rna forget` removes that station's stored tuning and resets its preferred component
 to USB (carrier if USB is unknown). `v` cycles carrier, LSB, USB and stored where
 available. Returning to stored restores both its RF center and width; choosing a

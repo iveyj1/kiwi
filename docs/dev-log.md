@@ -1,5 +1,21 @@
 # Dev Log
 
+## 2026-09-26 — Compact selected-station tape labels
+
+The focused marker now shows its ID once at the left, numeric frequencies to three
+kHz decimals, and a lowercase c only at the carrier: RJ / 377.590 / 378.000 c /
+378.405. Sideband/stored suffixes are omitted. Selected-station annotations no
+longer repeat in the general catalogue row; other stations retain their existing
+labels. The identifier reserves left-hand space, edge frequency labels fit beside
+it, and tiny panes retain ID/stems rather than partial numeric labels. Coincident
+carrier/sideband points retain the carrier tag with active-component emphasis.
+
+Only label formatting changed: precise RF coordinates, stored frequencies, tuning,
+colors and footer-only connector geometry remain intact. Added rendering capture
+and edge/coincidence tests; updated stored sub-Hz, native-pixel and general-catalogue
+regressions. Full suite: 630 passed; compileall/diff checks passed. Inspected a
+synthetic Pillow preview in /tmp; no live radio or user-state modifications.
+
 ## 2026-09-26 — Native-pixel waterfall scales, without stretched fonts
 
 Confirmed the cause: the integrated console baked labels into a source-size image,
