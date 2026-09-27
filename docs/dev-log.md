@@ -1,5 +1,23 @@
 # Dev Log
 
+## 2026-09-26 — Selected-station carrier and recorded sideband guides
+
+RNA annotations now distinguish selected-station membership from active component.
+The pure waterfall compositor adds dashed RF guides and a dedicated frequency row
+for the selected station's carrier, known RNA LSB/USB and optional stored RF center.
+Carrier is amber, LSB violet, USB cyan, stored pink; active component is white. Other
+stations cannot consume this row's label space. Active labels/guides win coincident
+positions, while every in-view selected-station stem is drawn. Unknown offsets and
+offscreen components remain omitted. Values are catalogue/memory hypotheses, not
+signal detections; no CW offset is added to marker RF coordinates.
+
+Reused the asymmetric-offset RNA fixture with synthetic fixed rasters. Five new
+regressions cover exact RF columns versus CW reference, crowded other-station labels,
+unknown/offscreen offsets, saved sub-Hz frequency labels, component/station changes,
+coincident active priority, tiny-image clipping and unchanged source pixels.
+Updated user/architecture/technique notes. Full suite: 559 passed; compileall/diff
+checks passed. No live-radio tests or user data changes.
+
 ## 2026-09-26 — Requested 2 Hz and 5 Hz CW bandwidths
 
 Extended j/k ladder to 2,5,10,20,30,50,100,500 Hz. Integer filter cuts make odd/even

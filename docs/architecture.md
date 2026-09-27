@@ -38,6 +38,10 @@ access. `rna_console.py` owns browsing/selection and receiver-to-site associatio
 selection never changes reception evidence. The integrated shell passes generic
 frequency annotations to `waterfall_scale.py` and uses the existing controller
 for explicit CW tuning, including search acceptance and next/previous selection.
+Annotations distinguish the selected station from its active component. The pure
+scale compositor uses that metadata for a dedicated selected-station frequency row
+and dashed RF guides over a copied raster, leaving source waterfall data untouched.
+It neither queries the catalogue/logbook nor infers missing sidebands.
 `station_memory.py` maintains atomic personal JSON component choices and RF-center
 plus bandwidth settings keyed by station identity, independently of immutable RNA
 records. Stored-center recall converts RF passband center back to the existing CW

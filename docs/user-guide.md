@@ -32,6 +32,22 @@ for nominal carriers and `ID:L`/`ID:U` for catalogued sidebands. Carrier stems
 are taller; sideband caps point left/right. Labels that collide are suppressed,
 not moved to false frequencies; browse co-channel stations with the keyboard.
 
+The **currently selected station** also gets its own scale row with component
+labels and RF frequencies in kHz, plus dashed guides through the waterfall:
+
+- **C**: nominal carrier, amber.
+- **L / U**: recorded RNA lower/upper sideband offsets, violet/cyan.
+- **S**: your saved personal RF center, pink, when one exists.
+- The actively selected component is **white**; the other components stay marked.
+
+Other stations cannot crowd out this dedicated row. If selected-station labels
+themselves overlap, the active component wins, but all in-view stems/guides remain.
+Offscreen components are not pinned to the edges: zoom out to see them. Unknown
+sideband offsets are never guessed. These are catalogue/personal-memory hypotheses,
+not detected signals or proof of an ID. Coordinates are RF frequencies, not the CW
+receiver reference. Switching stations replaces the guides; `v` changes emphasis
+without removing that station's other known components.
+
 - `n` / `N`: select and immediately tune the next/previous filtered station in CW.
 - `v`: cycle and immediately tune carrier/LSB/USB/stored, skipping unavailable entries.
 - `y`: retune the selected component in CW using the existing CW offset.

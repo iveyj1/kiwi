@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — selected-station carrier/sideband markers
+
+Goal: make the selected station's nominal carrier, known RNA LSB/USB and personal
+stored center unambiguous on the waterfall and tuning scale, distinct from other
+catalogue stations and the CW receiver reference. Dedicated selected-station label
+row, RF-aligned dashed guides, no invented offsets or offscreen edge markers.
+Completed: dedicated selected-station RF label row and dashed C/L/U/S guides;
+active component white, others color-coded, missing/offscreen components omitted.
+Fixed-raster regressions cover geometry, collisions, unknown offsets, stored sub-Hz
+centers, station/component changes and immutable source pixels. 559 tests passed;
+compileall/diff checks passed. No live-radio access or changes to user state.
+
 ## Current slice — 2/5 Hz CW bandwidth requests
 
 Goal: extend bandwidth ladder with 2 and 5 Hz, preserving RF passband center despite

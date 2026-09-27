@@ -183,6 +183,7 @@ class FrequencyAnnotation:
     label: str
     kind: str = "carrier"
     selected: bool = False
+    station_selected: bool = False
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,16 @@ class GraphicalScaleResult:
     tick_top: int
     preset_stem_top: int
     text_backend: str
+    station_labels: tuple[str, ...] = ()
+    station_stem_top: int | None = None
+
+
+STATION_MARKER_COLORS = {
+    'carrier': (255, 190, 80),
+    'lsb': (180, 130, 255),
+    'usb': (70, 220, 255),
+    'stored': (255, 140, 190),
+}
 
 
 def _frequency_column(frequency_khz: float, start_khz: float, end_khz: float, width: int) -> int | None:
@@ -236,6 +247,9 @@ def compose_waterfall_scale(
     preset_label_height = text_renderer.line_height + 2
     footer_height = tuning_height + tick_height + label_height + preset_stem_height + preset_label_height
     if annotations:
+        footer_height += preset_stem_height + preset_label_height
+    station_annotations = tuple(a for a in annotations if a.station_selected and start_khz <= a.frequency_khz <= end_khz)
+    if station_annotations:
         footer_height += preset_stem_height + preset_label_height
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
@@ -366,6 +380,39 @@ def compose_waterfall_scale(
             text_labels.append((label_x, annotation_top + preset_stem_height + 1, annotation.label, color))
             occupied_annotations.append(interval)
 
+    station_labels: list[str] = []
+    station_stem_top = None
+    if station_annotations:
+        station_stem_top = annotation_top + preset_stem_height + preset_label_height
+        occupied_station: list[tuple[int, int]] = []
+        # Draw the active component last so a coincident inactive guide cannot hide it.
+        for annotation in sorted(station_annotations, key=lambda item: item.selected):
+            column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
+            assert column is not None
+            color = (255, 255, 255) if annotation.selected else STATION_MARKER_COLORS[annotation.kind]
+            for y in range(waterfall.height):
+                if y % 6 < 2:
+                    _set_pixel(rgb, waterfall.width, column, y, color)
+            for y in range(station_stem_top, station_stem_top + preset_stem_height):
+                _set_pixel(rgb, waterfall.width, column, y, color)
+            direction = -1 if annotation.kind == 'lsb' else 1 if annotation.kind == 'usb' else 0
+            cap_offsets = range(-2, 3) if not direction else range(0, 3)
+            for dx in cap_offsets:
+                _set_pixel(rgb, waterfall.width, column + (direction * dx if direction else dx), station_stem_top, color)
+        # Give all selected-station labels their own collision budget; active wins ties.
+        for annotation in sorted(station_annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
+            column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
+            color = (255, 255, 255) if annotation.selected else STATION_MARKER_COLORS[annotation.kind]
+            label = f'{annotation.label} {annotation.frequency_khz:.4f}'
+            label_width = text_renderer.width(label)
+            x = min(max(0, column - label_width // 2), max(0, waterfall.width - label_width))
+            interval = (x, x + label_width)
+            if any(interval[0] < used[1] + font_scale and interval[1] + font_scale > used[0] for used in occupied_station):
+                continue
+            text_labels.append((x, station_stem_top + preset_stem_height + 1, label, color))
+            station_labels.append(label)
+            occupied_station.append(interval)
+
     rendered_rgb = text_renderer.render(rgb, waterfall.width, output_height, text_labels)
     return GraphicalScaleResult(
         image=RasterImage(waterfall.width, output_height, rendered_rgb),
@@ -375,4 +422,6 @@ def compose_waterfall_scale(
         tick_top=tick_top,
         preset_stem_top=preset_stem_top,
         text_backend=text_renderer.backend,
+        station_labels=tuple(station_labels),
+        station_stem_top=station_stem_top,
     )

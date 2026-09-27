@@ -264,7 +264,8 @@ class RnaBrowser:
                 if start_khz <= component.frequency_khz <= end_khz:
                     suffix = {'carrier': 'C', 'lsb': 'L', 'usb': 'U', 'stored': 'S'}[component.kind]
                     result.append(FrequencyAnnotation(component.frequency_khz, f'{match.station.ident}:{suffix}',
-                                                      component.kind, match == self.selected and component == self.component))
+                                                      component.kind, match == self.selected and component == self.component,
+                                                      station_selected=match == self.selected))
         return tuple(result)
 
     def status(self) -> str:
