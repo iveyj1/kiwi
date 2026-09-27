@@ -480,6 +480,11 @@ def run_fixture_shell(
     tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
     last_response = None
     message = "live paired session starting" if live_source is not None else "fixture-only; no receiver connection"
+    if rna_browser is not None:
+        try:
+            rna_browser.save_preferences()
+        except (OSError, ValueError) as exc:
+            message = f"RNA state NOT saved: {exc}"
 
     def station_log_status(station_key):
         receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"

@@ -11,6 +11,7 @@ import tomllib
 from kiwi_client.ndb_logbook import cle332_eligible
 from kiwi_client.rna_catalogue import Catalogue, CatalogueFilter, Component, ReceiverSite, load_catalogue, select_stations
 from kiwi_client.station_memory import StationMemory, passband_center_khz
+from kiwi_client.rna_preferences import RnaPreferences
 from kiwi_client.waterfall_scale import FrequencyAnnotation
 
 
@@ -32,10 +33,12 @@ def load_sites(path: Path | None) -> dict[str, ReceiverSite]:
 class RnaBrowser:
     def __init__(self, catalogue: Catalogue, *, filters: CatalogueFilter = CatalogueFilter(),
                  sites: dict[str, ReceiverSite] | None = None, cle332_only: bool = False,
-                 memory: StationMemory | None = None, near_radius_hz: float = 200):
+                 memory: StationMemory | None = None, near_radius_hz: float = 200,
+                 preferences: RnaPreferences | None = None):
         if not math.isfinite(near_radius_hz) or near_radius_hz < 0:
             raise ValueError('nearby radius must be finite and nonnegative Hz')
         self.near_radius_hz = near_radius_hz
+        self.preferences = preferences if preferences is not None else RnaPreferences()
         self._near_anchor = None
         self._near_expected = None
         self._near_pool = ()
@@ -48,6 +51,9 @@ class RnaBrowser:
         self.matches = ()
         self.index = 0
         self.error = ''
+
+    def save_preferences(self) -> None:
+        self.preferences.save(self.filters, self.cle332_only, self.near_radius_hz, self.sites)
 
     def set_receiver(self, receiver: str, frequency_khz: float) -> None:
         if receiver != self.receiver:
@@ -127,7 +133,9 @@ class RnaBrowser:
 
     def cycle_activity(self, frequency_khz: float) -> None:
         choices = ('active-unknown', 'active', 'all')
-        self.filters = replace(self.filters, activity=choices[(choices.index(self.filters.activity) + 1) % len(choices)])
+        filters = replace(self.filters, activity=choices[(choices.index(self.filters.activity) + 1) % len(choices)])
+        self.preferences.save(filters, self.cle332_only, self.near_radius_hz, self.sites)
+        self.filters = filters
         self.refresh(frequency_khz)
 
     def nearby_components(self, center_khz: float):
@@ -167,9 +175,19 @@ class RnaBrowser:
 
     def filter_summary(self) -> str:
         f = self.filters
+        extra = []
+        if f.search:
+            extra.append(f'search={shlex.quote(f.search)}')
+        if f.min_khz is not None or f.max_khz is not None:
+            extra.append(f'nominal={f.min_khz if f.min_khz is not None else "off"}..{f.max_khz if f.max_khz is not None else "off"}kHz')
+        if not f.include_unknown_distance:
+            extra.append('unknown-distance=exclude')
+        if self.near_radius_hz != 200:
+            extra.append(f'near={self.near_radius_hz:g}Hz')
         return (f'CLE332={"on" if self.cle332_only else "off"} activity={f.activity} '
                 f'range<={f.max_distance_km if f.max_distance_km is not None else "off"}km '
-                f'power>={f.min_power_w if f.min_power_w is not None else "off"}W sort={f.sort}')
+                f'power>={f.min_power_w if f.min_power_w is not None else "off"}W sort={f.sort}'
+                + ((' ' + ' '.join(extra)) if extra else ''))
 
     def command(self, text: str, frequency_khz: float) -> str:
         parts = shlex.split(text)
@@ -179,6 +197,7 @@ class RnaBrowser:
             radius = float(parts[2])
             if not math.isfinite(radius) or radius < 0:
                 raise ValueError('nearby radius must be finite and nonnegative Hz')
+            self.preferences.save(self.filters, self.cle332_only, radius, self.sites)
             self.near_radius_hz = radius
             self._near_anchor = self._near_expected = None
             return f'Nearby radius ±{radius:g} Hz; , previous / . next; current RNA filters apply'
@@ -208,6 +227,7 @@ class RnaBrowser:
         if sites.get(self.receiver) is None and (filters.max_distance_km is not None or filters.sort == 'distance'):
             raise ValueError('requires a receiver site; use :rna site LAT LON TIMEZONE or --rna-sites FILE')
         select_stations(self.catalogue, site=sites.get(self.receiver), filters=filters)
+        self.preferences.save(filters, cle, self.near_radius_hz, sites)
         self.filters, self.sites, self.cle332_only = filters, sites, cle
         self.refresh(frequency_khz)
         return self.filter_summary() + f' | {len(self.matches)} stations'
@@ -325,24 +345,41 @@ class CallsignSearchPage:
 
 
 def add_rna_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('--rna-near-hz', type=float, default=200, help='nearby component cycling radius in Hz (default 200)')
+    parser.add_argument('--rna-state', type=Path, default=Path('rna-filters.json'), help='persistent RNA filters and runtime receiving sites')
+    parser.add_argument('--no-rna-state', dest='rna_state', action='store_const', const=None, help='disable RNA state loading/saving')
+    parser.add_argument('--rna-reset-state', action='store_true', help='start with default RNA filters; replace saved state on interactive start')
+    parser.add_argument('--rna-near-hz', type=float, help='nearby radius in Hz; saved value or default 200')
     parser.add_argument('--rna-memory', type=Path, default=Path('rna-stations.json'), help='personal component choices and stored center/bandwidth, separate from RNA')
     parser.add_argument('--rna', type=Path, help='local RNA CSV; enable station markers and browsing')
-    parser.add_argument('--rna-cle332', action='store_true', help='show only identified NDB catalogue rows on even nominal channels 190..530 kHz')
+    parser.add_argument('--rna-cle332', action=argparse.BooleanOptionalAction, default=None, help='override saved CLE332 filter on/off')
     parser.add_argument('--rna-sites', type=Path, help='TOML receiving sites keyed by host:port')
-    parser.add_argument('--rna-activity', choices=['active', 'active-unknown', 'all'], default='active-unknown')
+    parser.add_argument('--rna-activity', choices=['active', 'active-unknown', 'all'])
     parser.add_argument('--rna-min-power-w', type=float, help='minimum catalogue power in watts; unknown power excluded')
     parser.add_argument('--rna-distance-km', type=float, help='maximum distance; requires matching receiver site')
-    parser.add_argument('--rna-exclude-unknown-distance', action='store_true')
+    parser.add_argument('--rna-exclude-unknown-distance', action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument('--rna-min-khz', type=float)
     parser.add_argument('--rna-max-khz', type=float)
-    parser.add_argument('--rna-search', default='')
-    parser.add_argument('--rna-sort', choices=['frequency', 'distance'], default='frequency')
+    parser.add_argument('--rna-search')
+    parser.add_argument('--rna-sort', choices=['frequency', 'distance'])
 
 
 def browser_from_args(args) -> RnaBrowser | None:
     if args.rna is None:
         return None
-    return RnaBrowser(load_catalogue(args.rna), near_radius_hz=args.rna_near_hz, memory=StationMemory(args.rna_memory), sites=load_sites(args.rna_sites), cle332_only=args.rna_cle332, filters=CatalogueFilter(
-        args.rna_activity, args.rna_min_khz, args.rna_max_khz, args.rna_distance_km,
-        not args.rna_exclude_unknown_distance, args.rna_search, args.rna_sort, args.rna_min_power_w))
+    preferences = RnaPreferences(args.rna_state, reset=args.rna_reset_state)
+    overrides = {}
+    for argument, field in [('rna_activity', 'activity'), ('rna_min_khz', 'min_khz'),
+                            ('rna_max_khz', 'max_khz'), ('rna_distance_km', 'max_distance_km'),
+                            ('rna_search', 'search'), ('rna_sort', 'sort'), ('rna_min_power_w', 'min_power_w')]:
+        value = getattr(args, argument)
+        if value is not None:
+            overrides[field] = value
+    if args.rna_exclude_unknown_distance is not None:
+        overrides['include_unknown_distance'] = not args.rna_exclude_unknown_distance
+    sites = dict(preferences.sites)
+    sites.update(load_sites(args.rna_sites))  # Explicit site file wins; it is never rewritten.
+    return RnaBrowser(load_catalogue(args.rna), preferences=preferences,
+                      near_radius_hz=preferences.near_radius_hz if args.rna_near_hz is None else args.rna_near_hz,
+                      memory=StationMemory(args.rna_memory), sites=sites,
+                      cle332_only=preferences.cle332_only if args.rna_cle332 is None else args.rna_cle332,
+                      filters=replace(preferences.filters, **overrides))

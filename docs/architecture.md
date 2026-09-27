@@ -35,7 +35,12 @@ Waterfall decoding and rendering should follow the same separation rule: W/F pro
 `rna_catalogue.py` loads immutable NDB records and source provenance, computes RF
 components and site distances, and applies catalogue filters without UI/network
 access. `rna_console.py` owns browsing/selection and receiver-to-site association;
-selection never changes reception evidence. The integrated shell passes generic
+selection never changes reception evidence. `rna_preferences.py` separately loads
+and atomically saves filter/CLE/near/site preferences. Explicit CLI values override
+saved defaults; runtime commands persist before publishing their changed state.
+The interactive shell saves effective startup settings, whereas dry runs only read.
+Catalogue, site TOML, station memories and reception records remain independent.
+The integrated shell passes generic
 frequency annotations to `waterfall_scale.py` and uses the existing controller
 for explicit CW tuning, including search acceptance and next/previous selection.
 Annotations distinguish the selected station from its active component. The pure
@@ -56,7 +61,9 @@ only committed writes report success. `reception_ui.py` reads existing logbooks
 without creating/upgrading them, indexes station/receiver/event/source scope and
 supplies main/search/form status. `console_panels.py` is the network-independent,
 cell-width-aware Unicode renderer for the full-width main station spreadsheet and
-B split logging page. `reception_ui.station_spreadsheet` builds only a small window
+B split logging page, with separately ruled FILTERS/KEYS/MESSAGE bands on the main
+page. Compact windows keep keys/messages separate when space permits; the shortest
+fallback retains identity/status/input. `reception_ui.station_spreadsheet` builds only a small window
 of the filtered shortlist, joining read-only scoped log status without database
 writes. Personal UTC status and RNA's last-logged date remain separate fields.
 It clips within fixed columns and adapts to narrow/short terminals. Full-screen

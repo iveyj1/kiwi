@@ -83,8 +83,20 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
     """Full-width radio, compact station spreadsheet, and filter/help bands."""
     width = max(12, columns - 1)  # Leave curses' final column unused, including borders.
     active_prompt = prompt != ':'
-    if height < 10 + int(active_prompt):
-        # Small terminals keep identity, logging and input/error visible, not telemetry.
+    if height < 12 + int(active_prompt):
+        # Compact terminals can still separate keys/messages without a table or telemetry.
+        if height >= 8 + int(active_prompt):
+            rows = [rule(width, 'RADIO / STATION', left='╭', right='╮'),
+                    row(width, station[0] if station else radio),
+                    row(width, reception[0] if reception else radio)]
+            if height >= 9 + int(active_prompt):
+                rows.append(row(width, station[1] if len(station) > 1 else radio))
+            rows.extend([rule(width, 'KEYS'), row(width, help_rows[0] if help_rows else ''),
+                         rule(width, 'MESSAGE'), row(width, message)])
+            if active_prompt:
+                rows.append(row(width, prompt, tail=True))
+            return rows + [rule(width, left='╰', right='╯')]
+        # Very short terminals keep identity, logging and input/error visible.
         body = [station[0] if station else radio, reception[0] if reception else radio,
                 *station[1:2], 'Message: ' + message]
         if active_prompt:
@@ -94,7 +106,7 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
         return [rule(width, 'RADIO / STATION', left='╭', right='╮'),
                 *(row(width, text, tail=text == prompt) for text in body),
                 rule(width, left='╰', right='╯')][:height]
-    body_count = max(2, min(6, height - 8 - int(active_prompt)))
+    body_count = max(2, min(6, height - 10 - int(active_prompt)))
     rows = [rule(width, radio_title, left='╭', right='╮'), row(width, radio)]
     rows.append(rule(width, table_title))
     if table:
@@ -105,16 +117,18 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
     rows.extend(row(width, text) for text in body[:body_count])
     rows.append(rule(width, 'FILTERS'))
     rows.append(row(width, filters))
-    rows.append(row(width, 'KEYS ' + (help_rows[0] if help_rows else '')))
-    # More room exposes additional help and telemetry, without moving the column divider.
-    remaining = height - len(rows) - 2 - int(active_prompt)
+    rows.append(rule(width, 'KEYS'))
+    rows.append(row(width, help_rows[0] if help_rows else ''))
+    # Reserve a separate message band and keep the active input visible.
+    remaining = height - len(rows) - 3 - int(active_prompt)
     for text in [*help_rows[1:], telemetry]:
         if remaining <= 0:
             break
         if text:
             rows.append(row(width, text))
             remaining -= 1
-    rows.append(row(width, 'Message: ' + message))
+    rows.append(rule(width, 'MESSAGE'))
+    rows.append(row(width, message))
     if active_prompt:
         rows.append(row(width, prompt, tail=True))
     rows.append(rule(width, left='╰', right='╯'))

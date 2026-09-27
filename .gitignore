@@ -10,6 +10,8 @@ state.json
 sites.toml
 rna-stations.json
 rna-stations.json.*
+rna-filters.json
+rna-filters.json.*
 cle332-profile.toml
 cle332-final.txt
 *egg-info/

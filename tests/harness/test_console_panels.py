@@ -60,6 +60,21 @@ def test_current_example_generator_is_aligned_and_never_overwrites_edits(tmp_pat
     assert path.read_text() == 'my layout tweaks'
 
 
+@pytest.mark.parametrize('columns', [40, 174])
+@pytest.mark.parametrize('height,prompt', [(8, ':'), (9, ':rna_'), (12, ':'), (15, ':rna_'), (19, ':')])
+def test_keys_and_message_have_independent_horizontal_rules(columns, height, prompt):
+    rows = main_panel_rows(columns=columns, height=height, radio='CW', station=['RJ'], reception=['NO'],
+                          filters='all', help_rows=['n/N browse'], message='Saved preferences', prompt=prompt,
+                          table=[('> RJ', '378', 'NO', 'Roberval', '123', '10.3', '2026-04-13')])
+    keys = next(i for i, text in enumerate(rows) if text.startswith('├') and ' KEYS ' in text)
+    message = next(i for i, text in enumerate(rows) if text.startswith('├') and ' MESSAGE ' in text)
+    assert keys < message and 'n/N browse' in rows[keys + 1]
+    assert 'Saved preferences' in rows[message + 1]
+    assert len(rows) <= height and all(cell_width(r) == columns - 1 for r in rows)
+    if prompt != ':':
+        assert any(prompt in r for r in rows)
+
+
 def test_display_cells_combining_wide_characters_and_controls():
     assert cell_width('Chibougamau') == 11
     assert cell_width('e\u0301東京') == 5

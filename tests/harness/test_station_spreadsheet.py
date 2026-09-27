@@ -57,7 +57,7 @@ def test_unknown_values_duplicate_ids_and_window_follow_selection(tmp_path):
 
 
 @pytest.mark.parametrize('columns', [40, 73, 100, 115, 174])
-@pytest.mark.parametrize('height', [10, 15])
+@pytest.mark.parametrize('height', [12, 15])
 def test_spreadsheet_alignment_selected_visibility_and_plain_period(columns, height):
     values = [('  A', '300', 'NO', '東京 e\u0301' * 100, '1234', '8.197', '2026-01-01'),
               ('  B', '302', 'TENTATIVE', 'Example location', '?', '?', '—'),

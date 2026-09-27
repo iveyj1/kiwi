@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — persistent RNA filters and separated footer bands
+
+Goal: restore RNA filter/CLE/sort/search/near state across starts, with explicit CLI
+values overriding saved settings and runtime site support retained separately from
+read-only site TOML. Atomic saves before applying changes; opt-out/reset, corrupt-file
+and failed-write coverage. Add independent KEYS and MESSAGE rules without overflowing
+small terminals. Completed: restart/precedence/rollback/corruption/read-only and
+startup-save harnesses, separate-band layout coverage and updated docs/mockup.
+607 tests pass; compileall/diff checks pass. Offline two-invocation PTY restored
+activity/CLE/near settings and showed separate bands at 174 columns. No live radio
+or real user-data writes; explicit CLI flags override restored preferences.
+
 ## Current slice — station bracket and full-width station spreadsheet
 
 Goal: leave waterfall pixels untouched; draw a horizontal station span below the

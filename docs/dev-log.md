@@ -1,5 +1,37 @@
 # Dev Log
 
+## 2026-09-26 — Remembered RNA filter preferences and ruled footer bands
+
+Added independent `rna_preferences.py` storage in cwd-relative rna-filters.json
+(default, gitignored). Restores activity, nominal bounds, range/unknown-distance,
+power, search, sort, CLE on/off, nearby radius and runtime receiving sites. Explicit
+CLI values override saved values; an explicit site TOML overrides saved coordinates
+without modifying that TOML. New --rna-state, --no-rna-state and --rna-reset-state
+options support separate profiles, opt-out and recovery. Boolean CLI overrides now
+also allow --no-rna-cle332 and --no-rna-exclude-unknown-distance. An existing launch
+command containing --rna-cle332 must omit it to honor a saved runtime CLE-off value.
+
+Accepted runtime filter/site commands and A save atomically before changing browser
+state; failed writes keep old live/disk settings. Interactive entry saves effective
+startup settings, warning on failure. Load/dry-run never write, and corrupt files
+produce a recovery error rather than silent reset/overwrite. Saved sites keep range
+usable on restart, while an unknown receiver still gets the existing empty/error
+shortlist instead of relaxed filters. Non-default search/bounds/unknown-distance/
+near settings are now included in the filter summary to expose restored constraints.
+
+KEYS and MESSAGE have independent full-width horizontal rules. Main row budgeting
+reserves their space; compact layouts retain separate bands when possible and the
+shortest fallback retains identity/status/input. Updated the 174-column snapshot
+with targeted band edits; generator output matches it. Logging form unchanged.
+
+607 tests passed, including restart/CLI precedence/site-file protection, atomic
+rollback/temp cleanup, malformed-state recovery, dry-run read-only behavior,
+startup saves/warnings, and footer rules at wide/narrow/compact sizes. Compileall
+and diff checks passed. Offline two-process PTY smoke restored runtime activity,
+CLE-off and 75 Hz nearby radius, with KEYS/MESSAGE visible at 174 columns. All test
+state stayed in temporary directories; no live receiver access or real user-data
+changes. The pre-existing untracked rna-sites.toml remains untouched.
+
 ## 2026-09-26 — Footer station bracket and 174-column station spreadsheet
 
 Replaced the full-height dashed marker overlays with a horizontal C/LSB/USB span

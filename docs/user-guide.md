@@ -7,7 +7,8 @@ box-drawing borders (`╭─╮`, `├┬┤`, `│`, `╰─╯`) and fixed ver
 Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration).
 
 - The main page keeps the waterfall full width. Below it: a radio/status band,
-  a full-width compact station spreadsheet, then filters, keys and messages.
+  a full-width compact station spreadsheet, then separate FILTERS, KEYS and MESSAGE
+  bands, each starting with its own full-width horizontal border.
   It replaces the former station/catalogue and reception/log split. At 174 columns
   all seven fields fit: **ID, nominal kHz, Logged, location, distance km, period s,
   Last (RNA)**. Period cells contain only the number. The selected row has `>`;
@@ -128,14 +129,44 @@ Runtime commands (also available in the fixture console with `--rna`):
 Replace LAT/LON with actual coordinates in degrees and TIMEZONE with an IANA name
 such as `America/Toronto`. Distance filtering/sorting requires a site for the exact
 connected receiver; it never guesses one. `--rna-sites FILE` supplies persistent
-site configuration. Runtime site/filter changes last only for this console session;
-use CLI/site settings to reproduce them on restart. Invalid commands leave existing
+site configuration. Runtime site/filter changes are saved in the personal RNA state
+file described below, without editing the site TOML. Invalid commands leave existing
 settings unchanged. Sorting preserves the selected station while changing browsing
 order. Callsign hits use the chosen sort within the exact/partial-ID groups.
 `--rna-min-power-w N` supplies the power threshold at startup. The existing startup
 `--rna-distance-km` policy may retain unknown distances unless
 `--rna-exclude-unknown-distance` is supplied; the explicit runtime `range N` command
 always applies a strict known-distance <= N test.
+
+### Remembered RNA filters
+
+With `--rna`, the console automatically restores **`rna-filters.json` in the current
+working directory**. It remembers activity (including `A`), nominal frequency bounds,
+distance/unknown-distance policy, power threshold, text search, sort order, CLE332
+on/off, nearby radius and runtime receiver sites. This file is separate from both
+the immutable RNA catalogue and `rna-stations.json` tuning memories.
+
+Successful runtime changes save immediately and atomically; no clean exit is needed.
+Interactive startup also saves the effective CLI/restored settings. Loading and
+`--dry-run` never write. Runtime write failures leave the old settings/file intact;
+startup save failures display a warning instead of claiming the settings were saved.
+
+**Precedence: explicit CLI values > saved values > defaults.** For example, remove
+`--rna-cle332` from your launch command if you want a saved `:rna cle off` to survive
+restart. `--rna-cle332` always forces it on; `--no-rna-cle332` forces it off. An explicit
+`--rna-sites FILE` overrides saved coordinates for receivers defined in that file,
+without rewriting it. Restored range/sort still requires the current receiver's site;
+a missing site produces an error/empty shortlist rather than dropping the filter.
+
+- `--rna-state PATH`: use a different preference file/profile.
+- `--no-rna-state`: use CLI/defaults without reading or writing saved preferences.
+- `--rna-reset-state`: start with defaults plus explicit CLI values; replace the old
+  state on interactive startup (not on a dry run). Use once, then remove the flag.
+
+Malformed saved files report an error and are not silently overwritten. Use the reset
+or disable option to recover. Use one writer per state file; concurrent consoles
+should use different `--rna-state` paths. Restart the upgraded console once to enable
+persistence; settings from an older running version cannot be recovered retroactively.
 
 ### Which stations appear on the tuning line?
 
@@ -145,7 +176,8 @@ produce a shortlist. Every shortlisted station's known carrier/LSB/USB component
 inside the visible waterfall frequency span gets a stem. Labels may be suppressed
 when they collide; the selected component's label has priority. A carrier outside
 the viewport does not suppress an in-view sideband. The FILTERS band now shows
-the active CLE/activity/range/power/sort settings explicitly.
+the active CLE/activity/range/power/sort settings explicitly, plus non-default text,
+nominal-range, unknown-distance and nearby-radius settings.
 
 For example, **MT (Chibougamau)** has nominal **209 kHz**, USB **209.410 kHz** and
 500 W listed power. With `--rna-cle332`, MT is hidden because 209 is odd; **ARX** at
