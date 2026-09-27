@@ -1,5 +1,22 @@
 # Dev Log
 
+## 2026-09-26 — Wider frequency heads, CW reference hidden by default
+
+Widened the current-frequency head by two pixels total (one per side), retaining
+its two-pixel stem and height. The separate magenta selection arrow's top row is
+now seven pixels instead of five; its three-pixel middle and one-pixel tip stay
+unchanged. Both clip at viewport edges without wrapping or painting into history.
+
+The amber CW receiver-reference mark is now hidden by default. Optional
+--show-cw-offset-marker restores it in CW; this is strictly a renderer setting,
+not a change to the CW offset, pitch, tuning or passband arithmetic. Wired the
+option through both fixture and live console entry paths.
+
+Pixel regressions cover head/tail dimensions, both viewport edges, default-hidden
+and explicit-visible reference geometry, and CLI defaults. Full suite: 635 passed;
+compileall/diff checks passed. Updated user/technique notes. No live radio access
+or real user-state changes.
+
 ## 2026-09-26 — Compact selected-station tape labels
 
 The focused marker now shows its ID once at the left, numeric frequencies to three

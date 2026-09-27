@@ -27,7 +27,9 @@ RF frequencies only; applying the CW offset in the catalogue as well as in the
 controller would shift tuning twice.
 
 The display therefore separates carrier/component annotations from the receiver
-reference/passband. The log stores all relevant frequencies, but CLE eligibility
+reference/passband. The CW reference mark is hidden by default (`--show-cw-offset-marker`
+reveals it); this display choice never disables the tuning offset or changes the
+RF passband calculation. The log stores all relevant frequencies, but CLE eligibility
 and report lines use **378 kHz**, not 378.405 or 377.605. A carrier or nearby spectral
 line alone does not confirm the station ident. Co-channel stations, interference,
 stale catalogue information and drift can all mislead an operator.

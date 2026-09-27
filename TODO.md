@@ -1,5 +1,14 @@
 # TODO
 
+## Current slice — frequency marker head and hidden CW reference
+
+Goal: widen current-frequency marker heads by two pixels total (one each side),
+keeping tails/heights fixed. Hide the CW receiver-reference mark by default, with
+an explicit display-only opt-in; do not change CW offsets or passband geometry.
+Completed: pixel/edge/default/CLI regressions and docs. 635 tests pass;
+compileall/diff checks pass. Both current and selection heads widen by two pixels;
+CW reference is display-only opt-in via --show-cw-offset-marker. No live radio.
+
 ## Current slice — compact selected-station tape labels
 
 Goal: show selected station ID once at the tape's left, mark only the carrier with

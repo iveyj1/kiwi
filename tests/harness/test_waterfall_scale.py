@@ -80,7 +80,8 @@ def test_graphical_scale_uses_exact_frequency_columns_for_all_markers():
     assert result.preset_labels == ("A 120.000",)
 
 
-def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_frequency():
+@pytest.mark.parametrize('show_reference', [False, True])
+def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_frequency(show_reference):
     waterfall = RasterImage(width=1001, height=1, rgb=b"\x00" * 1001 * 3)
     result = compose_waterfall_scale(
         waterfall,
@@ -88,6 +89,7 @@ def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_freque
         301.0,
         tuned_khz=300.0,
         passband_reference_khz=299.2,
+        show_reference_marker=show_reference,
         selected_khz=300.0,
         low_cut_hz=600,
         high_cut_hz=1000,
@@ -96,11 +98,48 @@ def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_freque
         font_scale=1,
     )
 
-    assert pixel(result.image, 100, result.tuning_top + 6) == RECEIVER_SCALE_RGB
+    assert pixel(result.image, 100, result.tuning_top + 6) == (RECEIVER_SCALE_RGB if show_reference else (0, 0, 0))
     assert pixel(result.image, 400, result.tuning_top + 2) == PASSBAND_SCALE_RGB
     assert pixel(result.image, 500, result.tuning_top + 6) == PASSBAND_SCALE_RGB
     assert pixel(result.image, 600, result.tuning_top + 2) == PASSBAND_SCALE_RGB
     assert pixel(result.image, 800, result.tuning_top + 2) != PASSBAND_SCALE_RGB
+
+
+def test_frequency_marker_heads_widen_by_two_pixels_without_changing_tails():
+    image = RasterImage(101, 2, b'\0' * 101 * 2 * 3)
+    result = compose_waterfall_scale(image, 100, 200, tuned_khz=150, selected_khz=170,
+        passband_reference_khz=101, low_cut_hz=0, high_cut_hz=1000, presets={}, font_backend='bitmap')
+    top = result.tuning_top
+    def columns(y, color, start=0, stop=101):
+        return {x for x in range(start, stop) if pixel(result.image, x, top + y) == color}
+    assert columns(2, PASSBAND_SCALE_RGB, 45, 56) == {49, 50, 51, 52}
+    for y in range(3, 7):
+        assert columns(y, PASSBAND_SCALE_RGB, 45, 56) == {50, 51}
+    assert not columns(1, PASSBAND_SCALE_RGB, 45, 56)
+    assert columns(5, CURSOR_MARKER_RGB) == set(range(67, 74))
+    assert columns(6, CURSOR_MARKER_RGB) == {69, 70, 71}
+    assert columns(7, CURSOR_MARKER_RGB) == {70}
+    assert not columns(4, CURSOR_MARKER_RGB)
+    assert result.image.rgb[:len(image.rgb)] == image.rgb
+
+
+@pytest.mark.parametrize('tuned,selected', [(100, 200), (200, 100)])
+def test_wider_frequency_heads_clip_at_viewport_edges(tuned, selected):
+    result = compose_waterfall_scale(RasterImage(101, 1, b'\0' * 303), 100, 200,
+        tuned_khz=tuned, selected_khz=selected, passband_reference_khz=145,
+        low_cut_hz=-1000, high_cut_hz=1000, presets={}, font_backend='bitmap')
+    c, s = tuned - 100, selected - 100
+    for x in range(101):
+        if x not in {44, 45, 46}:
+            assert (pixel(result.image, x, result.tuning_top + 2) == PASSBAND_SCALE_RGB) == (c - 1 <= x <= c + 2)
+        assert (pixel(result.image, x, result.tuning_top + 5) == CURSOR_MARKER_RGB) == (s - 3 <= x <= s + 3)
+
+
+def test_cw_reference_cli_is_opt_in():
+    from kiwi_client.integrated_terminal import build_arg_parser
+    parser = build_arg_parser()
+    assert not parser.parse_args([]).show_cw_offset_marker
+    assert parser.parse_args(['--show-cw-offset-marker']).show_cw_offset_marker
 
 
 def test_graphical_passband_clips_at_visible_viewport_edge():

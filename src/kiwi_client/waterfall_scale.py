@@ -238,6 +238,7 @@ def compose_waterfall_scale(
     presets: Mapping[str, Mapping[str, Any]],
     annotations: tuple[FrequencyAnnotation, ...] = (),
     passband_reference_khz: float | None = None,
+    show_reference_marker: bool = False,
     label_target_pixels: int = 150,
     font_scale: int = 2,
     font_backend: str = "auto",
@@ -286,7 +287,7 @@ def compose_waterfall_scale(
     low_frequency, high_frequency = sorted((low_frequency, high_frequency))
     center = _frequency_column(tuned_khz, start_khz, end_khz, waterfall.width)
     receiver = _frequency_column(passband_reference_khz, start_khz, end_khz, waterfall.width)
-    if receiver is not None and not math.isclose(passband_reference_khz, tuned_khz, abs_tol=1e-12):
+    if show_reference_marker and receiver is not None and not math.isclose(passband_reference_khz, tuned_khz, abs_tol=1e-12):
         for x in range(max(0, receiver - 2), min(waterfall.width, receiver + 3)):
             _set_pixel(rgb, waterfall.width, x, tuning_top, RECEIVER_SCALE_RGB)
         for x in range(receiver, min(waterfall.width, receiver + 2)):
@@ -306,6 +307,9 @@ def compose_waterfall_scale(
             for y in range(tuning_top, tuning_top + 4):
                 _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)
     if center is not None:
+        # Two extra pixels at the head only; retain the existing two-pixel stem.
+        for x in range(max(0, center - 1), min(waterfall.width, center + 3)):
+            _set_pixel(rgb, waterfall.width, x, tuning_top + 2, PASSBAND_SCALE_RGB)
         for x in range(center, min(waterfall.width, center + 2)):
             for y in range(tuning_top + 2, tuning_top + 7):
                 _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)
@@ -313,7 +317,8 @@ def compose_waterfall_scale(
     if selected is not None and selected != center:
         for radius in range(3):
             y = tuning_top + tuning_height - 1 - radius
-            for x in range(max(0, selected - radius), min(waterfall.width, selected + radius + 1)):
+            half_width = radius + (1 if radius == 2 else 0)
+            for x in range(max(0, selected - half_width), min(waterfall.width, selected + half_width + 1)):
                 _set_pixel(rgb, waterfall.width, x, y, CURSOR_MARKER_RGB)
 
     tick_top = tuning_top + tuning_height

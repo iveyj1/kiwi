@@ -437,6 +437,7 @@ def run_fixture_shell(
     refresh_hz: float,
     scale_font_backend: str = "auto",
     scale_font_name: str = "DejaVuSansMono.ttf",
+    show_cw_offset_marker: bool = False,
     demo_seconds: float | None = None,
     rna_browser: RnaBrowser | None = None,
     logbook_path: Path | None = None,
@@ -963,6 +964,7 @@ def run_fixture_shell(
                                 if state.mode == "cw"
                                 else state.frequency_khz
                             ),
+                            show_reference_marker=show_cw_offset_marker and state.mode == 'cw',
                             low_cut_hz=state.low_cut_hz,
                             high_cut_hz=state.high_cut_hz,
                             presets=presets,
@@ -1089,6 +1091,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--auto-scale", action="store_true", help="percentile-based smoothed display levels")
     parser.add_argument("--scale-font", choices=("auto", "pillow", "bitmap"), default="auto")
     parser.add_argument("--scale-font-name", default="DejaVuSansMono.ttf")
+    parser.add_argument('--show-cw-offset-marker', action='store_true', help='show the normally hidden CW receiver-reference mark; display only')
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--demo-seconds", type=float, help="exit cleanly after a fixture demonstration interval")
     parser.add_argument("--dry-run", action="store_true")
@@ -1159,6 +1162,7 @@ def main(argv: list[str] | None = None) -> int:
                     levels=levels,
                     tui_controller=None,
                     tui_config=None,
+                    show_cw_offset_marker=args.show_cw_offset_marker,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,
@@ -1242,6 +1246,7 @@ def main(argv: list[str] | None = None) -> int:
                     levels=levels,
                     tui_controller=controller,
                     tui_config=config,
+                    show_cw_offset_marker=args.show_cw_offset_marker,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,
                     scale_font_backend=args.scale_font,
