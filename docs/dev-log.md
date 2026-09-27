@@ -1,5 +1,35 @@
 # Dev Log
 
+## 2026-09-26 — Native-pixel waterfall scales, without stretched fonts
+
+Confirmed the cause: the integrated console baked labels into a source-size image,
+then placed it across independently varying terminal columns/rows. Kitty scaled
+text along with history, making wide windows stretch letters horizontally.
+
+Added read-only TIOCGWINSZ cell-pixel metrics with a stable 8×16 estimate when pixels
+are absent/stale. No escape queries or keyboard-response parsing. The compositor
+now reserves footer space, resizes only waterfall history into the remaining native
+pane, then renders labels and RF markers at final pixel dimensions. Font size follows
+cell height rather than window width. Short panes reduce font size; unfit panes show
+a resize notice while text/source workers continue. Existing font backend choices
+remain available. Source samples/history are unchanged; display-only nearest-neighbour
+resampling repeats/omits pixels without claiming additional RF/time resolution.
+
+Presenter cache keys include image pixel dimensions, covering cell-pixel/font zoom
+changes even if character geometry and frame generation are unchanged. Added a
+synthetic terminal-metrics fixture and tests for 80/174 columns, height/DPI changes,
+missing/stale ioctl metrics, identical bitmap/FreeType glyph crops, native RF marker
+coordinates, immutable source rasters, dependency-free resizing, small panes and
+fixture-shell resize without retuning. The initial fallback test found a nearest
+resampling boundary-tie mismatch; matching Pillow's incremental coordinates fixed
+it. An additional offline 1,440-size parity check found no remaining mismatches.
+
+Full suite: 628 passed; compileall/diff checks passed. Offline pseudo-terminal resize
+from 80 to 174 columns (simulated 10×20 cell pixels) decoded actual Kitty PNG payloads:
+800×400 at c=80/r=20, then 1740×400 at c=174/r=20. No live receiver connections or real
+user-data writes. Physical Kitty appearance still awaits user inspection; terminals
+without usable pixel metadata use the documented estimated cell ratio.
+
 ## 2026-09-26 — Remembered RNA filter preferences and ruled footer bands
 
 Added independent `rna_preferences.py` storage in cwd-relative rna-filters.json

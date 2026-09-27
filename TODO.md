@@ -1,5 +1,18 @@
 # TODO
 
+## Current slice — constant-proportion graphical scale fonts
+
+Goal: size the graphics canvas from terminal cell pixels, resize waterfall history
+before compositing labels, and render text/markers at final pixel dimensions. Keep
+font proportions consistent at 80 and 174 columns; use a stable metric fallback
+when ioctl supplies no pixels. Cover native/fallback geometry, resizing, small
+panes, image-cache invalidation and RF marker alignment with offline harnesses.
+Completed: native canvas composition, tty metrics/fallback, short-pane handling,
+RF/glyph/resize/cache harnesses and docs. 628 tests pass; compileall/diff checks pass.
+Offline PTY resize verified PNGs 800×400 / 1740×400 in matching 80×20 / 174×20 cell
+placements. Bitmap and FreeType glyph crops are identical across widths/heights.
+No radio access or modification of source waterfall samples/user state.
+
 ## Current slice — persistent RNA filters and separated footer bands
 
 Goal: restore RNA filter/CLE/sort/search/near state across starts, with explicit CLI

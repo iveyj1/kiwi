@@ -1,0 +1,11 @@
+{
+  "source": "synthetic TIOCGWINSZ cases; no receiver or physical terminal capture",
+  "cases": [
+    {"columns": 80, "lines": 40, "winsize": [40, 80, 800, 800], "cell": [10, 20], "measured": true},
+    {"columns": 174, "lines": 40, "winsize": [40, 174, 1740, 800], "cell": [10, 20], "measured": true},
+    {"columns": 174, "lines": 50, "winsize": [50, 174, 1740, 1000], "cell": [10, 20], "measured": true},
+    {"columns": 174, "lines": 40, "winsize": [40, 174, 3480, 1600], "cell": [20, 40], "measured": true},
+    {"columns": 174, "lines": 40, "winsize": [40, 174, 0, 0], "cell": [8, 16], "measured": false},
+    {"columns": 174, "lines": 40, "winsize": [40, 80, 800, 800], "cell": [8, 16], "measured": false}
+  ]
+}

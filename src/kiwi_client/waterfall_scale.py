@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
-from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage
+from kiwi_client.waterfall_raster import CURSOR_MARKER_RGB, RasterImage, resize_raster_nearest
 from kiwi_client.waterfall_terminal import choose_frequency_tick_step, frequency_label_decimals
 
 PASSBAND_SCALE_RGB = (0, 255, 0)
@@ -177,6 +177,10 @@ def scale_text_renderer(
     return BitmapScaleTextRenderer(scale=font_scale)
 
 
+class ScalePaneTooSmall(ValueError):
+    """The pixel pane cannot fit even the compact scale plus one history row."""
+
+
 @dataclass(frozen=True)
 class FrequencyAnnotation:
     frequency_khz: float
@@ -197,6 +201,7 @@ class GraphicalScaleResult:
     text_backend: str
     station_labels: tuple[str, ...] = ()
     station_stem_top: int | None = None
+    font_scale: int = 2
 
 
 STATION_BAR_RGB = (145, 155, 170)
@@ -237,28 +242,38 @@ def compose_waterfall_scale(
     font_scale: int = 2,
     font_backend: str = "auto",
     font_name: str = "DejaVuSansMono.ttf",
+    canvas_size: tuple[int, int] | None = None,
 ) -> GraphicalScaleResult:
     """Compose pixel-aligned tuning, frequency and preset scales below W/F."""
     if end_khz <= start_khz or label_target_pixels < 20 or font_scale <= 0:
         raise ValueError("invalid graphical scale dimensions")
-    text_renderer = scale_text_renderer(font_backend, font_scale=font_scale, font_name=font_name)
+    if canvas_size is not None and (len(canvas_size) != 2 or any(type(size) is not int or size <= 0 for size in canvas_size)):
+        raise ValueError('canvas dimensions must be positive integers')
     tuning_height = 8
     tick_height = 5
-    label_height = text_renderer.line_height + 3
     preset_stem_height = 5
-    preset_label_height = text_renderer.line_height + 2
-    footer_height = tuning_height + tick_height + label_height + preset_stem_height + preset_label_height
     visible_annotations = tuple(a for a in annotations if start_khz <= a.frequency_khz <= end_khz)
-    if visible_annotations:
-        footer_height += preset_stem_height + preset_label_height
     station_annotations = tuple(a for a in visible_annotations if a.station_selected)
     station_components = tuple(a.frequency_khz for a in annotations if a.station_selected and a.kind in {'carrier', 'lsb', 'usb'})
     station_span = (max(start_khz, min(station_components)), min(end_khz, max(station_components))) if station_components else None
     if station_span is not None and station_span[0] > station_span[1]:
         station_span = None
     show_station_row = bool(station_annotations or station_span is not None)
-    if show_station_row:
-        footer_height += preset_stem_height + preset_label_height
+    while True:
+        text_renderer = scale_text_renderer(font_backend, font_scale=font_scale, font_name=font_name)
+        label_height = text_renderer.line_height + 3
+        preset_label_height = text_renderer.line_height + 2
+        footer_height = (tuning_height + tick_height + label_height
+                         + (1 + bool(visible_annotations) + show_station_row) * (preset_stem_height + preset_label_height))
+        minimum_history = 1 if font_scale == 1 else text_renderer.line_height
+        if canvas_size is None or canvas_size[1] >= footer_height + minimum_history:
+            break
+        if font_scale == 1:
+            raise ScalePaneTooSmall('graphics pane too short for frequency scale; enlarge terminal')
+        font_scale -= 1
+    if canvas_size is not None:
+        # Resize only the history. Text and RF geometry are drawn at their final pixel size.
+        waterfall = resize_raster_nearest(waterfall, canvas_size[0], canvas_size[1] - footer_height)
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
     tuning_top = waterfall.height
@@ -442,4 +457,5 @@ def compose_waterfall_scale(
         text_backend=text_renderer.backend,
         station_labels=tuple(station_labels),
         station_stem_top=station_stem_top,
+        font_scale=font_scale,
     )

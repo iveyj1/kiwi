@@ -47,7 +47,15 @@ Annotations distinguish the selected station from its active component. The pure
 scale compositor uses that metadata for a horizontal station bracket below the
 frequency scale and dotted C/L/U connectors confined to the footer. Offscreen
 selected endpoints are retained to clip the span, but never create false edge
-connectors. Both source and displayed waterfall-history pixels remain untouched.
+connectors. No marker ink enters the history region; source samples/rasters remain
+unchanged. For the integrated console, `terminal_geometry.py` reads cell pixels via
+TIOCGWINSZ (stable 8×16 estimate when unavailable). The compositor reserves footer
+space, resamples only history to the remaining native pane dimensions, then draws
+labels/markers at final pixel resolution. Kitty's cell placement therefore does not
+stretch the already-composed text when measured cell dimensions are available.
+Small panes reduce font size or report insufficient space rather than deforming
+labels. Presenter cache keys include image pixel dimensions as well as cell geometry
+and generation, so pixel/font-size changes repaint even without a new W/F frame.
 It neither queries the catalogue/logbook nor infers missing sidebands.
 `station_memory.py` maintains atomic personal JSON component choices and RF-center
 plus bandwidth settings keyed by station identity, independently of immutable RNA

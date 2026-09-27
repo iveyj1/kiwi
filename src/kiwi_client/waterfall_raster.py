@@ -65,6 +65,36 @@ class RasterImage:
             raise ValueError("RGB byte count does not match raster dimensions")
 
 
+def resize_raster_nearest(image: RasterImage, width: int, height: int) -> RasterImage:
+    """Display-only resampling, before any text/markers are drawn; never change history."""
+    if width <= 0 or height <= 0:
+        raise ValueError('raster dimensions must be positive')
+    if (width, height) == (image.width, image.height):
+        return image
+    try:
+        from PIL import Image
+    except ImportError:
+        # Mirror Pillow's incremental pixel-center coordinates, including boundary ties.
+        step_x, step_y = image.width / width, image.height / height
+        position_x, position_y = step_x / 2, step_y / 2
+        columns = []
+        for _ in range(width):
+            columns.append(min(image.width - 1, int(position_x)) * 3)
+            position_x += step_x
+        cache = {}
+        rows = []
+        for _ in range(height):
+            source_y = min(image.height - 1, int(position_y))
+            position_y += step_y
+            if source_y not in cache:
+                start = source_y * image.width * 3
+                cache[source_y] = b''.join(image.rgb[start + x:start + x + 3] for x in columns)
+            rows.append(cache[source_y])
+        return RasterImage(width, height, b''.join(rows))
+    source = Image.frombytes('RGB', (image.width, image.height), image.rgb)
+    return RasterImage(width, height, source.resize((width, height), Image.Resampling.NEAREST).tobytes())
+
+
 class WaterfallHistory:
     """Fixed-height history of numeric W/F rows, independent from render backends."""
 

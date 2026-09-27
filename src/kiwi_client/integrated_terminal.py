@@ -24,7 +24,8 @@ from kiwi_client.station_memory import passband_center_khz, catalogue_reference_
 from kiwi_client.tui import InputMode, TuiInputState, handle_tui_key, render_tui_hints
 from kiwi_client.waterfall_levels import WaterfallLevelController
 from kiwi_client.waterfall_raster import RasterImage, encode_png
-from kiwi_client.waterfall_scale import compose_waterfall_scale
+from kiwi_client.waterfall_scale import compose_waterfall_scale, ScalePaneTooSmall
+from kiwi_client.terminal_geometry import terminal_cell_pixels
 from kiwi_client.waterfall_terminal import (
     choose_frequency_tick_step,
     encode_kitty_image,
@@ -223,7 +224,7 @@ class KittyPanePresenter:
         self.placement_ids = (placement_id, placement_id + 1)
         self.force = force
         self.environ = os.environ if environ is None else environ
-        self._last_key: tuple[int, int, int] | None = None
+        self._last_key: tuple[int, ...] | None = None
         self._active_slot: int | None = None
         self._finished = False
 
@@ -236,7 +237,7 @@ class KittyPanePresenter:
     ) -> bool:
         if not self.force and not terminal_supports_kitty(self.environ):
             raise RuntimeError("terminal does not advertise Kitty graphics support")
-        key = None if generation is None else (generation, layout.columns, layout.waterfall_rows)
+        key = None if generation is None else (generation, layout.columns, layout.waterfall_rows, image.width, image.height)
         if key is not None and key == self._last_key:
             return False
         slot = 0 if self._active_slot is None else 1 - self._active_slot
@@ -949,24 +950,33 @@ def run_fixture_shell(
                         presenter.invalidate()
                     image = model.image()
                     start_khz, end_khz = model.display_frequency_range()
-                    image = compose_waterfall_scale(
-                        image,
-                        start_khz,
-                        end_khz,
-                        tuned_khz=state.frequency_khz,
-                        selected_khz=state.selected_khz,
-                        passband_reference_khz=(
-                            state.frequency_khz + state.cw_offset_hz / 1000.0
-                            if state.mode == "cw"
-                            else state.frequency_khz
-                        ),
-                        low_cut_hz=state.low_cut_hz,
-                        high_cut_hz=state.high_cut_hz,
-                        presets=presets,
-                        annotations=() if rna_browser is None else rna_browser.annotations(start_khz, end_khz),
-                        font_backend=scale_font_backend,
-                        font_name=scale_font_name,
-                    ).image
+                    cells = terminal_cell_pixels(columns, lines)
+                    try:
+                        image = compose_waterfall_scale(
+                            image,
+                            start_khz,
+                            end_khz,
+                            tuned_khz=state.frequency_khz,
+                            selected_khz=state.selected_khz,
+                            passband_reference_khz=(
+                                state.frequency_khz + state.cw_offset_hz / 1000.0
+                                if state.mode == "cw"
+                                else state.frequency_khz
+                            ),
+                            low_cut_hz=state.low_cut_hz,
+                            high_cut_hz=state.high_cut_hz,
+                            presets=presets,
+                            annotations=() if rna_browser is None else rna_browser.annotations(start_khz, end_khz),
+                            font_backend=scale_font_backend,
+                            font_name=scale_font_name,
+                            font_scale=max(1, round(cells.height / 10)),
+                            label_target_pixels=max(20, cells.width * 15),
+                            canvas_size=(columns * cells.width, layout.waterfall_rows * cells.height),
+                        ).image
+                    except ScalePaneTooSmall as exc:
+                        image = None
+                        presenter.clear()
+                        transport_status += f' | {exc}'
                 if catalogue_command is not None:
                     prompt = f":{catalogue_command}_"
                 elif entry is not None:

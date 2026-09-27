@@ -50,6 +50,16 @@ or inaccurate catalogue offsets remain a limitation. Fixed-raster tests in
 `tests/harness/test_selected_station_markers.py` check RF geometry, unknown offsets,
 collision priority and removal of old guides when selection changes.
 
+The integrated console separates **source bins**, **display pixels** and **font
+pixels**. It first resizes the history raster into the available terminal-pixel
+rectangle, then draws scale text and markers. Resizing a combined image would also
+stretch the letters, with a width/height ratio that changes with window shape.
+This order keeps labels proportionate and maps every RF marker through the same
+final display width. Nearest-neighbour display resampling repeats or omits source
+pixels; it does not improve frequency resolution or alter stored W/F samples.
+`tests/harness/test_native_scale_pixels.py` checks identical glyph pixels at 80/174
+columns and different heights, plus final-coordinate RF marker placement.
+
 ## Symmetric CW bandwidth adjustment
 
 The console's `j/k` steps request full widths of 2, 5, 10, 20, 30, 50, 100 or 500 Hz.

@@ -4,6 +4,20 @@
 
 The harness allows development and regression testing without requiring live KiwiSDR hardware.
 
+## Pixel-native graphical scale regressions
+
+`tests/fixtures/terminal/pixel-geometry.json` contains synthetic TIOCGWINSZ cases
+for 80/174 columns, different heights/DPI, missing pixels and stale cell dimensions.
+`tests/harness/test_native_scale_pixels.py` checks exact pane dimensions, identical
+bitmap/FreeType glyph pixels across window sizes, final RF marker coordinates,
+nearest-neighbour fallback parity, short panes, and repainting after pixel changes.
+A fixture-shell resize test verifies native canvases without retuning. No radio or
+physical-terminal measurements are required by these tests.
+
+```bash
+python -m pytest tests/harness/test_native_scale_pixels.py -q
+```
+
 ## Required capabilities
 
 ### Fixture replay
