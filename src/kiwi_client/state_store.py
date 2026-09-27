@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import tomllib
 from dataclasses import fields
 from pathlib import Path
@@ -85,15 +87,41 @@ def load_state_file(path: str | Path) -> dict[str, Any]:
     unknown = set(data) - {"last_state"}
     if unknown:
         raise ValueError(f"unsupported state file keys: {', '.join(sorted(unknown))}")
-    return {"last_state": data.get("last_state")}
+    last = data.get('last_state')
+    if last is not None and not isinstance(last, dict):
+        raise ValueError('last_state must be an object')
+    if last is not None and 'waterfall_zoom' in last:
+        _validate_zoom(last['waterfall_zoom'])
+    return {"last_state": last}
 
 
-def save_state_file(path: str | Path, *, last_state: Any) -> None:
-    """Save ephemeral TUI state only."""
+def _validate_zoom(zoom: Any) -> None:
+    if type(zoom) is not int or not 0 <= zoom <= 14:
+        raise ValueError('saved waterfall zoom must be an integer from 0 to 14')
+
+
+def save_state_file(path: str | Path, *, last_state: Any, waterfall_zoom: int | None = None) -> None:
+    """Atomically save last state; retain saved console zoom unless supplied."""
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
+    previous = load_state_file(path).get('last_state') or {}
+    zoom = previous.get('waterfall_zoom') if waterfall_zoom is None else waterfall_zoom
     data = {"last_state": last_state_preset(last_state)}
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if zoom is not None:
+        _validate_zoom(zoom)
+        data['last_state']['waterfall_zoom'] = zoom
+    name = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent, prefix=path.name + '.', delete=False) as output:
+            name = output.name
+            json.dump(data, output, indent=2, sort_keys=True, allow_nan=False)
+            output.write('\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(name, path)
+    finally:
+        if name is not None and os.path.exists(name):
+            os.unlink(name)
 
 
 def load_presets_file(path: str | Path) -> dict[str, Any]:

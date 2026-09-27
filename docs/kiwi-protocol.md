@@ -260,7 +260,12 @@ Fixture/test:
 Failure behavior:
 ```
 
-## Narrow CW command requests (synthetic evidence only)
+## Historical narrow CW requests (synthetic evidence only)
+
+The 2/5 Hz console steps have been removed after the user reported no apparent
+benefit. The current ladder starts at 10 Hz. This is an operator/UI decision, not a
+measured firmware filter limit; no receiver/settings/time details were supplied for
+that observation. The following examples remain encoding evidence only.
 
 The existing `SET mod=cw low_cut=<integer Hz> high_cut=<integer Hz> freq=<kHz>`
 path can encode 2 Hz and 5 Hz requested passbands; this is not a claim of achieved
@@ -276,13 +281,13 @@ For a target RF center of 378.000 kHz and normal 800 Hz listening midpoint:
 - 2 Hz: `SET mod=cw low_cut=799 high_cut=801 freq=377.2000`.
   RF edges 377.999..378.001 kHz; audio midpoint returns to 800 Hz.
 
-Direction: client to SND server. Timing: an attended j/k change uses the existing
+Direction: client to SND server. The former attended j/k requests used the existing
 atomic filter/tune state batch, emitting one final modulation command. Four or
 more frequency command decimals are required for the half-Hz correction. At
 coarser precision, incompatible widths are skipped instead of rounded off-center.
 Synthetic fixture: `tests/fixtures/kiwi/cw-narrow-commands.json`; regressions in
-`tests/harness/test_narrow_cw_bandwidth.py` cover command values, precision limits,
-RF-center invariance, repeated parity changes and catalogue/log association.
+`tests/harness/test_narrow_cw_bandwidth.py` retain command-encoding checks and cover
+migration/recall to the 10 Hz minimum with RF-center and log association preserved.
 Server rejection/clamping and actual filter response remain unverified; no new
 acknowledgment or bandwidth-capability message is assumed.
 

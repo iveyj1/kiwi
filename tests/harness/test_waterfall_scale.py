@@ -108,7 +108,7 @@ def test_graphical_cw_passband_uses_offset_radio_frequency_but_marks_user_freque
 def test_frequency_marker_heads_widen_by_two_pixels_without_changing_tails():
     image = RasterImage(101, 2, b'\0' * 101 * 2 * 3)
     result = compose_waterfall_scale(image, 100, 200, tuned_khz=150, selected_khz=170,
-        passband_reference_khz=101, low_cut_hz=0, high_cut_hz=1000, presets={}, font_backend='bitmap')
+        passband_reference_khz=101, low_cut_hz=0, high_cut_hz=3000, presets={}, font_backend='bitmap')
     top = result.tuning_top
     def columns(y, color, start=0, stop=101):
         return {x for x in range(start, stop) if pixel(result.image, x, top + y) == color}
@@ -133,6 +133,35 @@ def test_wider_frequency_heads_clip_at_viewport_edges(tuned, selected):
         if x not in {44, 45, 46}:
             assert (pixel(result.image, x, result.tuning_top + 2) == PASSBAND_SCALE_RGB) == (c - 1 <= x <= c + 2)
         assert (pixel(result.image, x, result.tuning_top + 5) == CURSOR_MARKER_RGB) == (s - 3 <= x <= s + 3)
+
+
+@pytest.mark.parametrize('width_hz', [10, 50, 100])
+def test_minimum_passband_gets_nine_by_seven_pointer(width_hz):
+    result = compose_waterfall_scale(RasterImage(1001, 1, b'\0' * 3003), 100, 200,
+        tuned_khz=150, selected_khz=150, low_cut_hz=0, high_cut_hz=width_hz,
+        presets={}, font_backend='bitmap')
+    for dy, expected in enumerate([set(range(496, 505)), set(range(497, 504)), set(range(498, 503)),
+                                    {499, 500, 501}, {500, 501}, {500, 501}, {500, 501}]):
+        actual = {x for x in range(490, 510) if pixel(result.image, x, result.tuning_top + dy) == PASSBAND_SCALE_RGB}
+        assert actual == expected
+
+
+@pytest.mark.parametrize('frequency', [100, 200])
+def test_minimum_pointer_clips_without_wrapping(frequency):
+    result = compose_waterfall_scale(RasterImage(101, 1, b'\0' * 303), 100, 200,
+        tuned_khz=frequency, selected_khz=frequency, low_cut_hz=0, high_cut_hz=10,
+        presets={}, font_backend='bitmap')
+    center = int(frequency - 100)
+    actual = {x for x in range(101) if pixel(result.image, x, result.tuning_top) == PASSBAND_SCALE_RGB}
+    assert actual == set(range(max(0, center - 4), min(101, center + 5)))
+
+
+def test_clipped_wide_passband_does_not_get_minimum_pointer():
+    result = compose_waterfall_scale(RasterImage(101, 1, b'\0' * 303), 100, 200,
+        tuned_khz=150, selected_khz=150, passband_reference_khz=90, low_cut_hz=0,
+        high_cut_hz=11000, presets={}, font_backend='bitmap')
+    assert pixel(result.image, 50, result.tuning_top) == (0, 0, 0)
+    assert pixel(result.image, 50, result.tuning_top + 6) == PASSBAND_SCALE_RGB
 
 
 def test_cw_reference_cli_is_opt_in():

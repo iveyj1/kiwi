@@ -24,13 +24,14 @@ def cw_model(low=600, high=1000):
 def test_bandwidth_ladder_preserves_center_and_tuning():
     model = cw_model()
     from kiwi_client.station_memory import passband_center_khz
-    for expected in (100, 50, 30, 20, 10, 5, 2, 2):
+    assert CW_BANDWIDTHS_HZ == (10, 20, 30, 50, 100, 500)
+    for expected in (100, 50, 30, 20, 10, 10):
         step_console_cw_bandwidth(model, -1)
         state = model.session.state
         assert state.high_cut_hz - state.low_cut_hz == expected
-        assert state.high_cut_hz + state.low_cut_hz == (1601 if expected == 5 else 1600)
+        assert state.high_cut_hz + state.low_cut_hz == 1600
         assert passband_center_khz(state) == pytest.approx(378)
-        assert state.frequency_khz == state.selected_khz == pytest.approx(378 - (0.0005 if expected == 5 else 0))
+        assert state.frequency_khz == state.selected_khz == pytest.approx(378)
     for expected in (*CW_BANDWIDTHS_HZ[1:], 500):
         step_console_cw_bandwidth(model, 1)
         assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == expected
@@ -56,8 +57,6 @@ def test_non_cw_and_half_hz_center_with_coarse_precision():
     assert model.session.state == original
     model = cw_model(600, 1001)
     model.session.state = replace(model.session.state, frequency_decimals=3)
-    step_console_cw_bandwidth(model, -1)
-    assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == 5
     original = model.session.state
     assert 'No centered step' in step_console_cw_bandwidth(model, -1)
     assert model.session.state == original

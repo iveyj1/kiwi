@@ -66,19 +66,29 @@ pixels; it does not improve frequency resolution or alter stored W/F samples.
 `tests/harness/test_native_scale_pixels.py` checks identical glyph pixels at 80/174
 columns and different heights, plus final-coordinate RF marker placement.
 
+A very narrow RF passband can map to just one or two display columns. In that case
+the tape draws a larger 9×7-pixel **pointer**, not an inflated bandwidth rectangle.
+The RF filter edges remain exact, and the width test uses unclipped coordinates so
+an offscreen wide passband is not mistaken for a narrow one. Wider bars keep the
+normal small pointer. Neither glyph size nor display magnification measures filter
+selectivity.
+
 ## Symmetric CW bandwidth adjustment
 
-The console's `j/k` steps request full widths of 2, 5, 10, 20, 30, 50, 100 or 500 Hz.
+The console's `j/k` steps request full widths of 10, 20, 30, 50, 100 or 500 Hz.
+Experimental 2/5 Hz choices were removed following the user's report of no apparent
+benefit; that observation does not establish a measured firmware minimum.
 For current audio passband edges `low` and `high`, preserve midpoint
 `m = (low + high)/2` and set the new edges to `m - width/2` and `m + width/2`.
 Thus 600–1000 Hz (400 Hz wide, midpoint 800 Hz) narrows to 750–850 Hz at 100 Hz
 width. For even-to-even changes the receiver reference and selected RF component do not
-change. A 5 Hz width instead needs half-integer edges about an integer midpoint,
-but the command encodes integer-Hz cuts. Use cuts 798..803 Hz (midpoint 800.5 Hz)
-and lower the receiver reference by 0.5 Hz: the actual RF passband remains symmetric
-about the same RF center. A 2 Hz width uses 799..801 Hz and restores the reference.
-Canonical integer/half-integer midpoints avoid accumulating reference drift when
-cycling repeatedly. Catalogue retuning and logging account for this compensation.
+change. Legacy or custom odd widths can instead have a half-integer midpoint,
+but the command encodes integer-Hz cuts. For example, widening old cuts 798..803 Hz
+(midpoint 800.5 Hz) to 795..805 Hz (10 Hz wide, midpoint 800 Hz) requires raising
+the receiver reference by 0.5 Hz to preserve the modeled RF center. The live console
+normalizes sub-10 Hz CW startup/recall settings this way, without changing archived
+reception evidence or rewriting personal memories. Catalogue retuning and logging
+continue to account for midpoint/reference differences.
 Four or more kHz command decimals are needed for the half-Hz reference adjustment;
 at coarser precision, incompatible ladder steps are skipped rather than shifting
 RF center silently.
@@ -98,7 +108,8 @@ offset `1000 * (RF_center_kHz - nominal_carrier_kHz)` and full bandwidth in Hz.
 The RF center is `UI_frequency + cw_offset/1000 + (low_cut+high_cut)/2000` in CW.
 For UI 378.375 kHz, CW offset -800 Hz and cuts 825..875 Hz, center is 378.425 kHz:
 +425 Hz from nominal 378, at 50 Hz bandwidth. Recall restores the requested width
-and computes the CW UI reference required for that same RF center. It does not
+(with a 10 Hz minimum for console recall) and computes the CW UI reference required
+for that same RF center. It does not
 assume the audio midpoint equals the magnitude of the configured CW offset.
 
 These memories reflect a listener's preference/observation, not calibrated carrier

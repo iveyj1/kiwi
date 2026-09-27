@@ -30,6 +30,18 @@ Live transport startup follows the current Kiwi browser bootstrap: fetch `/VER` 
 
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md). The standalone combined viewer coordinates separate W/F and SND tasks through exact selected-frequency state and command queues; it does not merge their transport lifecycles or parsers. `WaterfallSnapshotPublisher` provides bounded immutable numeric history snapshots, preserving each row's original frequency mapping while coalescing slow consumers onto the latest generation.
 
+## Integrated-console radio-state checkpoints
+
+`console_state.py` checkpoints zoom and per-mode passbands into the existing
+`[startup].state_file`. `state_store.py` writes atomically and retains the optional
+nested `last_state.waterfall_zoom` during legacy TUI state saves. Startup mode `last`
+restores it (old files fall back to configured zoom); default/preset startup remains
+explicit. The live shell checkpoints changed settings and orderly exit without
+writing presets on every change. Failed writes retain the old file, report an error,
+and are not retried every frame. Fixture/dry-run paths do not enable checkpoints.
+Legacy sub-10 Hz CW startup/recall requests widen to 10 Hz while preserving modeled
+RF center; archived receptions and stored-memory files remain unchanged.
+
 ## Live RNA reception assistant
 
 `rna_catalogue.py` loads immutable NDB records and source provenance, computes RF

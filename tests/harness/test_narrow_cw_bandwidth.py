@@ -1,10 +1,11 @@
+"""Regressions for retiring experimental 2/5 Hz console widths."""
 from dataclasses import replace
 import json
 from pathlib import Path
 
 import pytest
 
-from kiwi_client.client_app import ClientController, ClientState
+from kiwi_client.commands import encode_modulation
 from kiwi_client.gui_app import WaterfallGuiModel
 from kiwi_client.integrated_terminal import step_console_cw_bandwidth, tune_rna_component
 from kiwi_client.ndb_logbook import reception_draft
@@ -15,48 +16,34 @@ from kiwi_client.station_memory import passband_center_khz
 FIXTURES = Path(__file__).parents[1] / 'fixtures'
 
 
-def test_narrow_command_fixture_preserves_rf_center():
+def test_historical_narrow_fixture_is_encoding_evidence_not_supported_ladder():
     fixture = json.loads((FIXTURES / 'kiwi/cw-narrow-commands.json').read_text())
-    controller = ClientController(state=ClientState(mode='cw', frequency_khz=378, low_cut_hz=795,
-                                                    high_cut_hz=805, frequency_command_decimals=4))
-    model = WaterfallGuiModel()
-    model.session = controller.paired_session
-    model.action_dispatch = controller.dispatch_session_action
-    for expected in fixture['commands']:
-        step_console_cw_bandwidth(model, -1, controller)
-        assert controller._modulation_command() == expected['command']
-        assert controller.state.high_cut_hz - controller.state.low_cut_hz == expected['bandwidth_hz']
-        assert passband_center_khz(model.session.state) == pytest.approx(378)
+    for item, cuts, frequency in zip(fixture['commands'], [(798, 803), (799, 801)], [377.1995, 377.2000]):
+        assert encode_modulation('cw', *cuts, frequency, frequency_decimals=4) == item['command']
 
 
-def test_coarse_precision_skips_five_but_allows_two():
+@pytest.mark.parametrize('cuts', [(799, 801), (798, 803)])
+@pytest.mark.parametrize('direction', [-1, 1])
+def test_old_narrow_width_steps_to_ten_and_keeps_rf_center(cuts, direction):
     model = WaterfallGuiModel()
     model.session.state = replace(model.session.state, mode='cw', frequency_khz=378, selected_khz=378,
-                                  low_cut_hz=795, high_cut_hz=805, frequency_decimals=3)
-    message = step_console_cw_bandwidth(model, -1)
-    assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == 2
-    assert 'skipped' in message
-    assert passband_center_khz(model.session.state) == pytest.approx(378)
-    step_console_cw_bandwidth(model, 1)
+                                  low_cut_hz=cuts[0], high_cut_hz=cuts[1], frequency_decimals=4)
+    center = passband_center_khz(model.session.state)
+    step_console_cw_bandwidth(model, direction)
     assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == 10
+    assert passband_center_khz(model.session.state) == pytest.approx(center)
 
 
-@pytest.mark.parametrize('midpoint', [800, 850, -800])
-def test_repeated_parity_changes_no_drift_and_catalogue_log_association(midpoint):
+def test_old_stored_five_hz_memory_recalls_ten_without_rewriting_memory():
     browser = RnaBrowser(load_catalogue(FIXTURES / 'rna/catalogue.csv'))
     browser.set_receiver('fixture', 378)
+    key = browser.selected.station.key
+    browser.memory.update(key, dict(choice='stored', stored=dict(carrier_khz=378, offset_hz=405.5, bandwidth_hz=5)))
     model = WaterfallGuiModel()
-    model.session.state = replace(model.session.state, mode='cw', low_cut_hz=midpoint-5,
-                                  high_cut_hz=midpoint+5, frequency_decimals=4)
+    model.session.state = replace(model.session.state, mode='cw', low_cut_hz=795, high_cut_hz=805, frequency_decimals=4)
     tune_rna_component(browser, model)
-    original = passband_center_khz(model.session.state)
-    for _ in range(5):
-        for direction, expected_width in [(-1, 5), (-1, 2), (1, 5), (1, 10)]:
-            step_console_cw_bandwidth(model, direction)
-            assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == expected_width
-            assert passband_center_khz(model.session.state) == pytest.approx(original)
-            tune_rna_component(browser, model)  # Retune must not undo half-Hz compensation.
-            assert passband_center_khz(model.session.state) == pytest.approx(original)
-            record = reception_draft(browser, model.session.state, receiver='fixture', source_kind='fixture', event=None)
-            assert record['bandwidth_hz'] == expected_width
-            assert record['rf_center_khz'] == pytest.approx(original)
+    assert model.session.state.high_cut_hz - model.session.state.low_cut_hz == 10
+    assert passband_center_khz(model.session.state) == pytest.approx(378.4055)
+    assert browser.memory.records[key]['stored']['bandwidth_hz'] == 5
+    draft = reception_draft(browser, model.session.state, receiver='fixture', source_kind='fixture', event=None)
+    assert draft['bandwidth_hz'] == 10 and draft['rf_center_khz'] == pytest.approx(378.4055)

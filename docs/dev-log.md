@@ -1,5 +1,32 @@
 # Dev Log
 
+## 2026-09-27 — Remember console zoom/passbands; retire sub-10 Hz steps
+
+The live console checkpoints zoom and per-mode bandwidths in the configured startup
+state file, on settings changes and orderly exit. Last-state startup restores the
+zoom; default/preset startup remains explicit, and old files without zoom fall back
+to configuration. Existing TUI saves preserve the optional zoom field. State writes
+now use a flushed temporary file and atomic replace; failure keeps the old file,
+reports an error, and does not cause a per-frame retry loop. Dry-run output exposes
+the restored zoom/cuts without writing; fixture-only entry does not checkpoint.
+
+Removed 2/5 Hz from j/k at the user's request after no apparent benefit. Startup CW
+settings and personal recalls below 10 Hz widen to 10 Hz with modeled RF center
+preserved, including old half-Hz midpoint compensation. Stored-memory records and
+past reception evidence are not changed. The historical narrow-command fixture
+remains an encoding regression, not evidence of effective physical filtering.
+
+Completed the pending minimum-size tuning pointer: 9×7 pixels only when the full,
+unclipped passband maps to one or two display columns. Wider markers and the
+existing two-pixel bottom remain unchanged; the RF bandwidth bar is not inflated.
+
+Validation: 653 offline tests passed, including restart/per-mode restoration,
+fixture-driven j/+ interaction and checkpoints, read-only live dry-run planning,
+atomic failure preservation/retry behavior, old narrow-width migration/recall,
+and pointer threshold/clipping geometry. Compileall and diff checks passed.
+No radio connection or real user-state/log/memory writes were made. Physical Kitty
+appearance and effective receiver filter response remain user-verified only.
+
 ## 2026-09-26 — Wider frequency heads, CW reference hidden by default
 
 Widened the current-frequency head by two pixels total (one per side), retaining

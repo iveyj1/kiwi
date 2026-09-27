@@ -1,5 +1,20 @@
 # TODO
 
+## Current slice — minimum pointer, remembered zoom/bandwidth, 10 Hz minimum
+
+Goal: use a 9-pixel-wide, 7-pixel-tall tuning pointer only when the full passband
+maps to one or two display columns. Keep its existing two-pixel bottom, normal
+markers for wider bands, and accurate filter edges. Do not mistake viewport clipping
+for a narrow band. Also checkpoint zoom and per-mode passbands in the configured
+startup state file, restore with startup.mode=last, and retire 2/5 Hz ladder steps.
+Migrate old sub-10 Hz CW startup/recall requests to 10 Hz without rewriting memories.
+Done criteria: threshold/edge/geometry and restart/atomic-state tests, docs, full
+suite; no live radio or real user-data writes.
+
+Completed: atomic change/exit checkpoints and last-state restoration, read-only
+startup planning, 10 Hz minimum/legacy recall handling, and collapsed-only 9×7
+pointer. 653 offline tests, compileall and diff checks passed. No receiver access.
+
 ## Current slice — frequency marker head and hidden CW reference
 
 Goal: widen current-frequency marker heads by two pixels total (one each side),

@@ -18,6 +18,7 @@ from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
 from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines, station_spreadsheet
 from kiwi_client.console_panels import main_panel_rows
+from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, normalize_console_cw_bandwidth
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.station_memory import passband_center_khz, catalogue_reference_khz
@@ -319,7 +320,7 @@ def tune_console_selection(model: WaterfallGuiModel, delta: int, *, small: bool 
     return set_console_frequency(model, model.session.state.selected_khz)
 
 
-CW_BANDWIDTHS_HZ = (2, 5, 10, 20, 30, 50, 100, 500)
+CW_BANDWIDTHS_HZ = (10, 20, 30, 50, 100, 500)
 
 
 def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controller=None) -> str:
@@ -330,7 +331,8 @@ def step_console_cw_bandwidth(model: WaterfallGuiModel, direction: int, controll
     if state.mode != "cw":
         return "j/k bandwidth steps are available in CW mode only"
     width = state.high_cut_hz - state.low_cut_hz
-    choices = [value for value in CW_BANDWIDTHS_HZ if (value - width) * direction > 0]
+    choices = ([CW_BANDWIDTHS_HZ[0]] if width < CW_BANDWIDTHS_HZ[0] else
+               [value for value in CW_BANDWIDTHS_HZ if (value - width) * direction > 0])
     if not choices:
         return f"CW bandwidth {width:g} Hz; {'minimum' if direction < 0 else 'maximum'} step reached"
     midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
@@ -402,8 +404,9 @@ def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller
         stored = browser.memory.records[browser.selected.station.key]['stored']
         state = model.session.state
         midpoint = (state.low_cut_hz + state.high_cut_hz) / 2
-        low = round(midpoint - stored['bandwidth_hz'] / 2)
-        high = low + int(stored['bandwidth_hz'])
+        recalled_width = max(CW_BANDWIDTHS_HZ[0], int(stored['bandwidth_hz']))
+        low = round(midpoint - recalled_width / 2)
+        high = low + recalled_width
         if controller is not None:
             controller.execute(f"filter {low} {high}")
         else:
@@ -438,6 +441,7 @@ def run_fixture_shell(
     scale_font_backend: str = "auto",
     scale_font_name: str = "DejaVuSansMono.ttf",
     show_cw_offset_marker: bool = False,
+    settings_checkpoint: ConsoleSettingsCheckpoint | None = None,
     demo_seconds: float | None = None,
     rna_browser: RnaBrowser | None = None,
     logbook_path: Path | None = None,
@@ -544,6 +548,12 @@ def run_fixture_shell(
                     next_source = now + 0.25
                     dirty = True
 
+            if settings_checkpoint is not None:
+                try:
+                    settings_checkpoint.save_if_changed(tui_controller)
+                except (OSError, ValueError) as exc:
+                    message = f'Zoom/bandwidth NOT saved: {exc}'
+                    dirty = True
             if rna_browser is not None:
                 receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
                 rna_browser.set_receiver(receiver, model.session.state.frequency_khz)
@@ -1066,6 +1076,8 @@ def run_fixture_shell(
         if live_source is not None:
             live_source.stop()
         presenter.finish()
+        if settings_checkpoint is not None:
+            settings_checkpoint.save_if_changed(tui_controller, force=True)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -1178,6 +1190,7 @@ def main(argv: list[str] | None = None) -> int:
 
         config = load_config(discover_config_path(args.config))
         state, presets = startup_state_and_presets(config)
+        state = normalize_console_cw_bandwidth(state)
         if args.receiver:
             host, port = normalize_receiver_address(args.receiver, default_port=state.port)
             state = replace(state, host=host, port=port)
@@ -1197,7 +1210,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         controller.configure_waterfall_session(
             center_khz=state.frequency_khz,
-            zoom=config.waterfall.zoom,
+            zoom=startup_waterfall_zoom(config),
             speed=config.waterfall.speed,
             interp=config.waterfall.interp,
             history_rows=args.rows,
@@ -1223,6 +1236,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({
                 "backend": "kitty+curses",
                 "receiver": state.receiver,
+                "waterfall_zoom": controller.paired_session.state.waterfall_zoom,
+                "passband_hz": [state.low_cut_hz, state.high_cut_hz],
                 "rna": None if rna_browser is None else rna_browser.status(),
                 "audio": args.audio,
                 "network": False,
@@ -1246,6 +1261,7 @@ def main(argv: list[str] | None = None) -> int:
                     levels=levels,
                     tui_controller=controller,
                     tui_config=config,
+                    settings_checkpoint=ConsoleSettingsCheckpoint(config),
                     show_cw_offset_marker=args.show_cw_offset_marker,
                     source_fps=args.fps,
                     refresh_hz=args.refresh_hz,

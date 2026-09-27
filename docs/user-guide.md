@@ -53,9 +53,11 @@ depend on the real cell aspect ratio. Short panes use a smaller font; if even th
 cannot fit, graphics are hidden with an enlarge-terminal notice, without stopping
 receiver/audio workers.
 
-The current-frequency marker head is two pixels wider in total (one per side),
-with unchanged height and bottom width; the separate selection arrow uses the same
-head-only widening. The **CW receiver-offset mark is hidden by default**. Add
+When the full passband collapses to **one or two display columns**, the current
+frequency gets a **9-pixel-wide, 7-pixel-tall pointer**, retaining its two-pixel bottom.
+Wider passbands retain the smaller marker. This enlarges the pointer, not the indicated
+filter width; a wide band clipped at a viewport edge does not trigger it. The separate
+selection arrow retains its widened head and unchanged tip. The **CW receiver-offset mark is hidden by default**. Add
 `--show-cw-offset-marker` to display it. This is visual only: the CW tuning offset,
 listening pitch and RF passband calculation are unchanged.
 
@@ -63,6 +65,24 @@ Only the displayed waterfall is resampled (nearest neighbour); source samples an
 history remain unchanged. Larger images do not add RF resolution, and reducing the
 pane can omit source bins/rows from the displayed image. Use receiver zoom to inspect
 narrow signals rather than interpreting larger pixels as finer measurements.
+
+### Remembered zoom and bandwidth
+
+The live console now checkpoints the waterfall **zoom level and per-mode passbands**
+when they change and again on orderly exit, using the existing `[startup].state_file`
+(`state.json` in the shipped project config). With `[startup].mode = "last"`, restart
+restores them; `default`/`preset` startup continues to use configured startup choices.
+RNA selection therefore reuses your last CW bandwidth rather than losing it when
+switching modes. This radio state is separate from `rna-filters.json` and station
+memories. Saves are atomic; failures are reported without undoing active radio settings.
+Fixture-only runs and dry runs do not save radio state. Live `--dry-run` reports the
+restored `waterfall_zoom` and `passband_hz` without connecting or writing.
+
+The CW ladder is now **10, 20, 30, 50, 100, 500 Hz**. The experimental 2/5 Hz steps
+were removed following your report of no apparent benefit; this is not a measured
+receiver filter-limit claim. Old sub-10 Hz CW startup settings and stored-memory
+recalls request 10 Hz instead, preserving their modeled RF center. Memory files and
+past reception evidence are not rewritten by this normalization.
 
 ## RNA markers and live station browsing
 
@@ -1035,7 +1055,7 @@ Fixture/live tuning defaults to simple immediate mode with 1.0/0.1 kHz main/fine
 
 Mouse input is intentionally ignored in the integrated console. In particular, wheel events are consumed instead of being allowed to fall back to terminal up/down arrow sequences and accidentally change volume.
 
-In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through requested widths **2, 5, 10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. The RF passband center stays fixed. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. Odd/even width transitions require a 0.5 Hz change to the CW tuning reference because filter cuts are integer Hz; an opposite shift of the audio midpoint preserves RF center (audio pitch changes at most 0.5 Hz). This requires `[tuning].command_frequency_decimals >= 4`, already set in the shipped project config. At coarser precision, unrepresentable steps are skipped with an explanation: an integer-centered passband can still reach 2 Hz but skips 5 Hz. These keys do nothing outside CW except display a message. The widths are command requests, not measured filter-response widths: effective 2/5 Hz response, receiver clamping and narrow-filter ringing have not been live-verified. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, station spreadsheet and filter/help bands use the boxed layout described above. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
+In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through requested widths **10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. The RF passband center stays fixed. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. Odd/even width transitions require a 0.5 Hz change to the CW tuning reference because filter cuts are integer Hz; an opposite shift of the audio midpoint preserves RF center (audio pitch changes at most 0.5 Hz). This requires `[tuning].command_frequency_decimals >= 4`, already set in the shipped project config. At coarser precision, unrepresentable transitions from custom odd-width filters are skipped with an explanation. These keys do nothing outside CW except display a message. The widths are command requests, not measured filter-response widths: effective response, receiver clamping and narrow-filter ringing have not been measured here; 2/5 Hz requests are no longer in the ladder. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, station spreadsheet and filter/help bands use the boxed layout described above. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
 
 Display levels start from `--render-min-db` / `--render-max-db`. `u` toggles smoothed percentile auto-scale; `[`/`]` lower/raise the manual minimum by 5 dB and `{`/`}` lower/raise the manual maximum. Any manual adjustment disables auto mode. Current mode and limits are shown in status.
 

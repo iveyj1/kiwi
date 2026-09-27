@@ -307,12 +307,25 @@ def compose_waterfall_scale(
             for y in range(tuning_top, tuning_top + 4):
                 _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)
     if center is not None:
-        # Two extra pixels at the head only; retain the existing two-pixel stem.
-        for x in range(max(0, center - 1), min(waterfall.width, center + 3)):
-            _set_pixel(rgb, waterfall.width, x, tuning_top + 2, PASSBAND_SCALE_RGB)
-        for x in range(center, min(waterfall.width, center + 2)):
-            for y in range(tuning_top + 2, tuning_top + 7):
-                _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)
+        # Use the un-clipped width: a wide band clipped at an edge is not a tiny band.
+        factor = (waterfall.width - 1) / (end_khz - start_khz)
+        band_columns = (
+            round((high_frequency - start_khz) * factor)
+            - round((low_frequency - start_khz) * factor) + 1
+        )
+        if band_columns <= 2:
+            # Distinct pointer, not an exaggerated bandwidth indication. Bottom stays two pixels.
+            pointer_rows = (range(-4, 5), range(-3, 4), range(-2, 3), range(-1, 2),
+                            range(2), range(2), range(2))
+            for dy, offsets in enumerate(pointer_rows):
+                for dx in offsets:
+                    _set_pixel(rgb, waterfall.width, center + dx, tuning_top + dy, PASSBAND_SCALE_RGB)
+        else:
+            for x in range(max(0, center - 1), min(waterfall.width, center + 3)):
+                _set_pixel(rgb, waterfall.width, x, tuning_top + 2, PASSBAND_SCALE_RGB)
+            for x in range(center, min(waterfall.width, center + 2)):
+                for y in range(tuning_top + 2, tuning_top + 7):
+                    _set_pixel(rgb, waterfall.width, x, y, PASSBAND_SCALE_RGB)
     selected = _frequency_column(selected_khz, start_khz, end_khz, waterfall.width)
     if selected is not None and selected != center:
         for radius in range(3):
