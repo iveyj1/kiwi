@@ -1,5 +1,19 @@
 # Dev Log
 
+## 2026-09-27 — Separate nearby browsing and tuning keys
+
+Comma/period now show previous/next nearby station/component without tuning.
+Angle brackets perform the former browse-and-tune action; y still tunes the
+already displayed candidate. Both paths retain the fixed RF neighborhood anchor,
+including mixed browsing/tuning sequences. Existing radius, proximity ordering,
+filters and component memory behavior remain unchanged. Help and messages now
+explicitly distinguish showing from tuning; updated the example renderer without
+overwriting editable layout snapshots.
+
+Validation: 668 offline tests passed; compileall/diff checks passed. Shell regressions
+cover both directions, mixed sequences, fixed-anchor retention, unchanged passband
+and no tuning-helper calls from comma/period. No radio connection or user-data edits.
+
 ## 2026-09-27 — Remember tuning steps and waterfall display scale
 
 Added per-mode step-pair indices to checkpoint change detection. Integrated startup

@@ -758,10 +758,14 @@ def run_fixture_shell(
                 except ValueError as exc:
                     message = str(exc)
                 dirty = True
-            elif rna_browser is not None and key in (",", "."):
+            elif rna_browser is not None and key in (",", ".", "<", ">"):
                 try:
-                    message = rna_browser.cycle_nearby(passband_center_khz(model.session.state), -1 if key == "," else 1)
-                    tune_rna_component(rna_browser, model, tui_controller)
+                    message = rna_browser.cycle_nearby(passband_center_khz(model.session.state), -1 if key in (",", "<") else 1)
+                    if key in ("<", ">"):
+                        tune_rna_component(rna_browser, model, tui_controller)
+                        message += '; tuned'
+                    else:
+                        message += '; shown only — tuning unchanged (y tunes shown station)'
                     rna_browser.nearby_tuned(passband_center_khz(model.session.state))
                 except (ValueError, RuntimeError, OSError) as exc:
                     message = str(exc)
@@ -1038,7 +1042,7 @@ def run_fixture_shell(
                                                            'live' if live_source is not None else 'fixture')
                 elif rna_browser is not None:
                     station_rows = [rna_browser.status()]
-                help_rows = [("/ find n/N station ,/. nearby v band " if rna_browser is not None else "") +
+                help_rows = [("/ find n/N station ,/. show nearby </> tune nearby v band " if rna_browser is not None else "") +
                              "h/l small H/L large j/k BW w edit W new q quit"]
                 if rna_browser is not None:
                     help_rows.append("f freq m mode t/T steps c center +/- zoom a audio u auto : commands")

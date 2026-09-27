@@ -30,7 +30,7 @@ def render_examples(columns=174, lines=30) -> str:
                ('> PH', '332', 'CONFIRMED 2026-09-26 01:02:03Z', "'Phurn' Port Huron MI USA", '?', '8.197', '2026-09-21'),
                ('  EX2', '334', 'TENTATIVE 2026-09-26 01:05:00Z', 'Example south site', '920', '10.5', '2026-09-22')],
         filters='CLE332=on activity=active-unknown range<=offkm power>=offW sort=frequency',
-        help_rows=['/ find n/N station ,/. nearby v band h/l small H/L large j/k BW w edit W new q quit',
+        help_rows=['/ find n/N station ,/. show nearby </> tune nearby v band h/l small H/L large j/k BW w edit W new q quit',
                    'f freq m mode t/T steps c center +/- zoom a audio u auto : commands',
                    'RNA :rna store / forget / near HZ / range KM / power W / sort distance'],
         message='NEAR 1/12 anchor 333.035000 kHz ±200 Hz; PH usb 333.035000; RNA filters apply',

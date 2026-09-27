@@ -53,7 +53,15 @@ def test_near_radius_validation_filter_reset_and_stored_component(nearby):
         nearby.cycle_nearby(300, 1)
 
 
-def test_nearby_shell_keys_tune_matching_sideband(nearby, monkeypatch):
+@pytest.mark.parametrize('keys,ident,frequency', [
+    ('>><q', 'BB', 300.09),
+    ('..,q', 'BB', 300),
+    ('>..q', 'BB', 300.09),
+    ('>.q', 'AA', 300.09),
+    ('>.<q', 'BB', 300.09),
+    ('.><q', 'BB', 300.09),
+])
+def test_nearby_shell_browse_and_tune_keys(nearby, monkeypatch, keys, ident, frequency):
     from dataclasses import replace
     from pathlib import Path
     import kiwi_client.integrated_terminal as shell
@@ -62,8 +70,14 @@ def test_nearby_shell_keys_tune_matching_sideband(nearby, monkeypatch):
     for name in ('mousemask', 'curs_set', 'doupdate'):
         monkeypatch.setattr(shell.curses, name, lambda *args: None)
     monkeypatch.setattr(shell.curses, 'has_colors', lambda: False)
+    tune_calls = []
+    original_tune = shell.tune_rna_component
+    def tune(*args):
+        tune_calls.append(True)
+        return original_tune(*args)
+    monkeypatch.setattr(shell, 'tune_rna_component', tune)
     class Screen:
-        keys = iter('..,q')
+        def __init__(self): self.keys = iter(keys)
         def get_wch(self): return next(self.keys)
         def getmaxyx(self): return 40, 160
         def __getattr__(self, name): return lambda *args: None
@@ -75,9 +89,11 @@ def test_nearby_shell_keys_tune_matching_sideband(nearby, monkeypatch):
     shell.run_fixture_shell(Screen(), model=model, timeline=FixtureWaterfallTimeline.from_fixture(fixture, repeat=1),
         live_source=None, presets={}, presenter=Presenter(), levels=WaterfallLevelController(), tui_controller=None,
         tui_config=None, source_fps=20, refresh_hz=1000, scale_font_backend='bitmap', rna_browser=nearby)
-    assert nearby.selected.station.ident == 'BB'
-    assert nearby.component.kind == 'usb'
-    assert model.session.state.frequency_khz == pytest.approx(300.09)
+    assert len(tune_calls) == sum(key in '<>' for key in keys)
+    assert nearby.selected.station.ident == ident
+    assert nearby.component.kind == ('usb' if ident == 'BB' else 'carrier')
+    assert model.session.state.frequency_khz == pytest.approx(frequency)
+    assert (model.session.state.low_cut_hz, model.session.state.high_cut_hz) == (600, 1000)
     assert nearby._near_anchor == 300
 
 

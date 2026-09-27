@@ -135,8 +135,10 @@ without removing that station's other known components.
 - A station remembers its last component choice; first visits choose USB if known,
   otherwise carrier. Highlighting a search row alone still does not tune.
 - `A`: cycle active-plus-unknown, active-only, and all activity policies.
-- `.` / `,`: next/previous station with a known component near the current RF center;
-  tune its closest carrier/sideband/stored component immediately.
+- `,` / `.`: show previous/next nearby station and its closest known component,
+  without changing tuning, mode or bandwidth.
+- `<` / `>`: show and immediately tune previous/next nearby station.
+  Use `y` to tune the candidate already shown without advancing.
 
 The spreadsheet shows neighbouring shortlisted stations and personal logging status;
 the title shows the selected component frequency. Selection is NOT reception.
@@ -251,8 +253,11 @@ MT at nominal 209 remains ineligible, regardless of the sideband being heard.
 
 ### Nearby station alternatives
 
-While listening to a possibly misidentified signal, press `.` for the next nearby
-station or `,` for the previous one. This compares **component RF frequencies**, not
+While listening to a possibly misidentified signal, press `.` to show the next nearby
+station or `,` for the previous one, **without retuning**. Press `>` / `<` to show
+and tune the next/previous candidate instead, or `y` to tune the candidate already
+shown. The message distinguishes shown-only from tuned selections.
+This compares **component RF frequencies**, not
 nominal carriers: a different station's carrier, lower sideband, upper sideband or
 personal stored center can overlap the component currently being heard. Each station
 appears once, using its closest known component. Missing offsets are not guessed.
@@ -260,7 +265,7 @@ appears once, using its closest known component. Missing offsets are not guessed
 The default radius is **±200 Hz** around the current actual RF passband center.
 Use `:rna near 100` to choose ±100 Hz, or `--rna-near-hz 100` at startup. The first
 press fixes the neighborhood anchor; repeated cycling does not walk progressively
-across the band as it tunes each candidate. Manual retuning, receiver/filter/radius
+across the band when tuning candidates, even when mixing browse-only and tune keys. Manual retuning, receiver/filter/radius
 changes reset the neighborhood. The message shows anchor, radius and candidate count.
 This navigation remembers the chosen component, but never confirms an ID or logs it.
 

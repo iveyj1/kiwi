@@ -1,5 +1,14 @@
 # TODO
 
+## Current slice — separate nearby browsing from tuning
+
+Goal: comma/period show previous/next nearby candidates without tuning; angle
+brackets show and tune previous/next candidates. Preserve fixed-anchor cycling,
+filters and component selection. Done: mixed-key/no-tune regressions, help/docs,
+full offline suite; no receiver access.
+Completed: split keymaps, shown/tuned messages and help/docs. 668 offline tests,
+compileall and diff checks passed. No live receiver or user-data changes.
+
 ## Current slice — remembered tuning steps and display scale
 
 Goal: checkpoint per-mode main/fine step selection and restore it without implicit
