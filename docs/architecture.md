@@ -39,8 +39,10 @@ selection never changes reception evidence. The integrated shell passes generic
 frequency annotations to `waterfall_scale.py` and uses the existing controller
 for explicit CW tuning, including search acceptance and next/previous selection.
 Annotations distinguish the selected station from its active component. The pure
-scale compositor uses that metadata for a dedicated selected-station frequency row
-and dashed RF guides over a copied raster, leaving source waterfall data untouched.
+scale compositor uses that metadata for a horizontal station bracket below the
+frequency scale and dotted C/L/U connectors confined to the footer. Offscreen
+selected endpoints are retained to clip the span, but never create false edge
+connectors. Both source and displayed waterfall-history pixels remain untouched.
 It neither queries the catalogue/logbook nor infers missing sidebands.
 `station_memory.py` maintains atomic personal JSON component choices and RF-center
 plus bandwidth settings keyed by station identity, independently of immutable RNA
@@ -53,7 +55,10 @@ snapshots and revision history. The console freezes a draft before confirmation;
 only committed writes report success. `reception_ui.py` reads existing logbooks
 without creating/upgrading them, indexes station/receiver/event/source scope and
 supplies main/search/form status. `console_panels.py` is the network-independent,
-cell-width-aware Unicode renderer for the A main bands and B split logging page.
+cell-width-aware Unicode renderer for the full-width main station spreadsheet and
+B split logging page. `reception_ui.station_spreadsheet` builds only a small window
+of the filtered shortlist, joining read-only scoped log status without database
+writes. Personal UTC status and RNA's last-logged date remain separate fields.
 It clips within fixed columns and adapts to narrow/short terminals. Full-screen
 forms clear only the Kitty placement, leaving source workers running, and trigger
 a full console repaint on return. `w` revises the latest scoped hearing, while `W`

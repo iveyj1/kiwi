@@ -2,13 +2,23 @@
 
 ## Main and logging page layout
 
-The console now uses **A main + B logging** from the layout workshop, with Unicode
+The console uses a **spreadsheet main page + B logging page**, with Unicode
 box-drawing borders (`╭─╮`, `├┬┤`, `│`, `╰─╯`) and fixed vertical separators.
 Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration).
 
 - The main page keeps the waterfall full width. Below it: a radio/status band,
-  station/catalogue on the left and reception/log on the right, then filters,
-  keys and messages. Column positions depend on terminal width, not field contents.
+  a full-width compact station spreadsheet, then filters, keys and messages.
+  It replaces the former station/catalogue and reception/log split. At 174 columns
+  all seven fields fit: **ID, nominal kHz, Logged, location, distance km, period s,
+  Last (RNA)**. Period cells contain only the number. The selected row has `>`;
+  the window follows `n/N` through the filtered shortlist in its current sort order.
+  Column positions depend on terminal width, not field contents.
+- **Logged** shows your latest reception status and UTC hearing time, scoped to the
+  current receiver/event/live-or-fixture source. `NO` means no entry, `OFF` means
+  logging is disabled, and `UNAVAILABLE` means the log cannot be read. A `+` after
+  a non-confirmed status means an older confirmed reception still exists.
+  **Last (RNA)** is the catalogue's last-logged date, not your personal hearing time.
+  The table title retains the selected component/frequency and logging scope.
 - `w`/`W` opens a **full-screen logging page**: editable UTC/status/notes on the left,
   frozen station/receiver/source/center/offset/bandwidth evidence on the right.
   The waterfall placement is hidden while the form is open; receiver/audio workers
@@ -18,7 +28,8 @@ Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration)
   Enter reviews it, `y` confirms, `t` saves tentative, `n` saves not-heard,
   `d` requests deletion of an existing entry (uppercase `D` confirms), Esc cancels. This is the new
   layout, not yet a Tab-driven field editor or an older-entry picker.
-- At narrow widths, panels stack instead of squeezing two columns. Small windows
+- At narrow widths the spreadsheet drops secondary columns; logging panels stack
+  instead of squeezing two columns. Small windows
   retain identity, log state and input; optional details/telemetry are omitted.
   Long values are clipped with an ellipsis inside their cells, and long input
   scrolls left to keep its insertion end visible. Resizing retains the draft.
@@ -33,16 +44,21 @@ are taller; sideband caps point left/right. Labels that collide are suppressed,
 not moved to false frequencies; browse co-channel stations with the keyboard.
 
 The **currently selected station** also gets its own scale row with component
-labels and RF frequencies in kHz, plus dashed guides through the waterfall:
+labels and RF frequencies in kHz. A **horizontal bar below the frequency scale**
+spans its known LSB/carrier/USB frequencies. **Three dotted connectors** (where all
+three are known and in view) run upward from that bar to the bottom edge of the
+waterfall. Nothing is drawn inside the waterfall history:
 
 - **C**: nominal carrier, amber.
 - **L / U**: recorded RNA lower/upper sideband offsets, violet/cyan.
-- **S**: your saved personal RF center, pink, when one exists.
+- **S**: your saved personal RF center, pink, when one exists; a label/stem only,
+  not a fourth dotted connector.
 - The actively selected component is **white**; the other components stay marked.
 
 Other stations cannot crowd out this dedicated row. If selected-station labels
 themselves overlap, the active component wins, but all in-view stems/guides remain.
-Offscreen components are not pinned to the edges: zoom out to see them. Unknown
+The horizontal span is clipped to the viewport, but offscreen components are not
+pinned to the edges or given fake connectors: zoom out to see them. Unknown
 sideband offsets are never guessed. These are catalogue/personal-memory hypotheses,
 not detected signals or proof of an ID. Coordinates are RF frequencies, not the CW
 receiver reference. Switching stations replaces the guides; `v` changes emphasis
@@ -57,8 +73,8 @@ without removing that station's other known components.
 - `.` / `,`: next/previous station with a known component near the current RF center;
   tune its closest carrier/sideband/stored component immediately.
 
-The details panel shows nominal and component frequencies, location, distance,
-activity, offsets, period/format and last logged date. Selection is NOT reception.
+The spreadsheet shows neighbouring shortlisted stations and personal logging status;
+the title shows the selected component frequency. Selection is NOT reception.
 CLI filters: `--rna-search`, `--rna-min-khz`, `--rna-max-khz`, `--rna-activity`,
 `--rna-distance-km`, `--rna-sort frequency|distance`, and
 `--rna-exclude-unknown-distance`. Frequency limits apply to nominal carriers.
@@ -243,13 +259,14 @@ the catalogue predicts. Database activity is not proof of current reception.
 
 Layout alternatives with sample main/logging screens are in
 [`docs/ui-layout-workshop.txt`](ui-layout-workshop.txt): compact bands (A), fixed
-two-column blocks (B), and a station/history sidebar (C). A main and B logging
-are now implemented with Unicode borders; the remaining alternatives and richer
+two-column blocks (B), and a station/history sidebar (C). The main page now replaces
+A's station/log split with a spreadsheet; B logging retains its Unicode borders.
+The remaining alternatives and richer
 form/ledger interactions are still proposals. View with a monospace font, e.g.
 `less -S docs/ui-layout-workshop.txt`.
 
 For an **editable snapshot of the current renderer**, open
-[`docs/ui-layout-current.txt`](ui-layout-current.txt). It includes main, logging,
+[`docs/ui-layout-174.txt`](ui-layout-174.txt). It includes the current 174-column main, logging,
 not-heard review and delete-confirmation examples. Edit this file freely to suggest
 layout changes; it is a mockup, not live UI configuration. All data is illustrative.
 To regenerate into a different file without overwriting your tweaks:
@@ -258,7 +275,9 @@ To regenerate into a different file without overwriting your tweaks:
 PYTHONPATH=src python tools/render_console_examples.py --output /tmp/layout-new.txt
 ```
 
-The generator reads no receiver/config/logbook and refuses an existing output file.
+The generator defaults to 174 columns; use `--columns 100` for a smaller example.
+It reads no receiver/config/logbook and refuses an existing output file.
+The older `docs/ui-layout-current.txt` mockup is retained rather than overwritten.
 
 Review or correct saved entries without a receiver connection:
 
@@ -952,7 +971,7 @@ Fixture/live tuning defaults to simple immediate mode with 1.0/0.1 kHz main/fine
 
 Mouse input is intentionally ignored in the integrated console. In particular, wheel events are consumed instead of being allowed to fall back to terminal up/down arrow sequences and accidentally change volume.
 
-In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through requested widths **2, 5, 10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. The RF passband center stays fixed. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. Odd/even width transitions require a 0.5 Hz change to the CW tuning reference because filter cuts are integer Hz; an opposite shift of the audio midpoint preserves RF center (audio pitch changes at most 0.5 Hz). This requires `[tuning].command_frequency_decimals >= 4`, already set in the shipped project config. At coarser precision, unrepresentable steps are skipped with an explanation: an integer-centered passband can still reach 2 Hz but skips 5 Hz. These keys do nothing outside CW except display a message. The widths are command requests, not measured filter-response widths: effective 2/5 Hz response, receiver clamping and narrow-filter ringing have not been live-verified. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, station/reception and filter/help bands use the boxed A layout described above. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
+In live mode, `:` opens the existing TUI command editor with history and contextual hints. `m` opens a receive-mode prefix map: `a` AM, `u` USB, `l` LSB, and `c` CW. Mode selection applies the existing configured per-mode passband and step pairs and sends the normal active SND modulation command. Configured non-waterfall key actions, preset/store prefixes, receiver registers, command parsing, and errors delegate to the existing TUI/controller code; current volume is shown beside RSSI. Use `:volume N` or `:volume-step N` for volume. The integrated console reserves `j`/`k` for decreasing/increasing CW full bandwidth through requested widths **2, 5, 10, 20, 30, 50, 100, 500 Hz**, clamping at the ladder ends. From an unlisted width, it chooses the next smaller/larger width. The RF passband center stays fixed. For example, 600..1000 Hz becomes 750..850 Hz on `j`, not a filter centered at zero. Odd/even width transitions require a 0.5 Hz change to the CW tuning reference because filter cuts are integer Hz; an opposite shift of the audio midpoint preserves RF center (audio pitch changes at most 0.5 Hz). This requires `[tuning].command_frequency_decimals >= 4`, already set in the shipped project config. At coarser precision, unrepresentable steps are skipped with an explanation: an integer-centered passband can still reach 2 Hz but skips 5 Hz. These keys do nothing outside CW except display a message. The widths are command requests, not measured filter-response widths: effective 2/5 Hz response, receiver clamping and narrow-filter ringing have not been live-verified. The current bandwidth is shown in the radio status. These overrides apply to `kiwi-console`; the standalone `kiwi-tui` retains its configured bindings. General radio/status, station spreadsheet and filter/help bands use the boxed layout described above. Contextual command/prefix hints replace general help while active; stale standalone-TUI key hints are not shown. Waterfall selection/tune/center and display-level keys remain console-specific.
 
 Display levels start from `--render-min-db` / `--render-max-db`. `u` toggles smoothed percentile auto-scale; `[`/`]` lower/raise the manual minimum by 5 dB and `{`/`}` lower/raise the manual maximum. Any manual adjustment disables auto mode. Current mode and limits are shown in status.
 

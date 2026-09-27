@@ -16,7 +16,7 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
-from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines
+from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines, station_spreadsheet
 from kiwi_client.console_panels import main_panel_rows
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
@@ -987,6 +987,8 @@ def run_fixture_shell(
                          f"RSSI {rssi_text:>4} dBm  audio {'ON' if state.audio_enabled else 'MUTED'} {volume}%  "
                          f"step {model.small_step_hz:g}/{model.main_step_hz:g} Hz")
                 station_rows = ['No RNA station selected']
+                table = []
+                table_title = 'STATIONS'
                 receiver = tui_controller.state.receiver if tui_controller is not None else 'fixture'
                 reception_rows = [f'{log_event or "general"} / {"live" if live_source else "fixture"}', receiver]
                 filters = 'RNA disabled' if rna_browser is None else rna_browser.filter_summary()
@@ -994,6 +996,11 @@ def run_fixture_shell(
                     match = rna_browser.selected
                     station = match.station
                     component = rna_browser.component
+                    source_kind = 'live' if live_source is not None else 'fixture'
+                    table = station_spreadsheet(rna_browser, reception_index, receiver, log_event, source_kind)
+                    table_title = (f'STATIONS {rna_browser.index + 1}/{len(rna_browser.matches)} | '
+                                   f'{station.ident} {component.kind.upper()} {component.frequency_khz:.6f} kHz | '
+                                   f'{receiver} / {log_event or "general"} / {source_kind}')
                     station_rows = [f'{station.ident} / {station.carrier_khz:g} kHz / {rna_browser.index + 1} of {len(rna_browser.matches)}',
                         f'{component.kind.upper()} {component.frequency_khz:.6f} kHz',
                         f'{"?" if match.distance_km is None else f"{match.distance_km:.0f}"} km / '
@@ -1020,6 +1027,7 @@ def run_fixture_shell(
                 rows = main_panel_rows(columns=columns, height=layout.tui_rows + 1, radio=radio,
                     radio_title='RADIO / ' + transport_status,
                     station=station_rows, reception=reception_rows, filters=filters,
+                    table=table, table_title=table_title,
                     help_rows=help_rows, message=message, prompt=prompt,
                     telemetry=f'{levels.status_text()} | RX {radio_frequency_khz:.4f} | {transport_status}')
                 for offset, text in enumerate(rows[:layout.tui_rows + 1]):

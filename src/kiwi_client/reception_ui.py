@@ -86,6 +86,34 @@ def reception_panel_lines(index: ReceptionIndex, station_key, receiver, event, s
     return lines
 
 
+def station_spreadsheet(browser, index: ReceptionIndex, receiver, event, source_kind, *, limit=6):
+    """Small selected-centered shortlist window; Last is RNA, Logged is personal."""
+    matches = browser.matches
+    start = max(0, min(browser.index - limit // 2, len(matches) - limit))
+    rows = []
+    for match in matches[start:start + limit]:
+        station = match.station
+        records = index.matching(station.key, receiver, event, source_kind)
+        if index.path is None:
+            logged = 'OFF'
+        elif index.error:
+            logged = 'UNAVAILABLE'
+        elif not records:
+            logged = 'NO'
+        else:
+            latest = records[0]
+            earlier_confirmed = latest['status'] != 'confirmed' and any(r['status'] == 'confirmed' for r in records)
+            status = latest['status'].upper() + ('+' if earlier_confirmed else '')
+            logged = f"{status} {utc_time(latest['heard_utc']):%Y-%m-%d %H:%M:%SZ}"
+        rows.append((('> ' if match == browser.selected else '  ') + station.ident,
+                     f'{station.carrier_khz:g}', logged,
+                     ' '.join(filter(None, (station.location, station.raw_fields.get('SP', ''), station.raw_fields.get('ITU', '')))),
+                     '?' if match.distance_km is None else f'{match.distance_km:.0f}',
+                     '?' if station.period_s is None else f'{station.period_s:g}',
+                     station.raw_fields.get('Last Logged', '') or '—'))
+    return rows
+
+
 def logging_panel_rows(draft: dict, *, prompt: str, message: str, history: str,
                        columns: int = 100, height: int = 24, entry: str | None = None) -> list[str]:
     editing = draft.get('log_id')

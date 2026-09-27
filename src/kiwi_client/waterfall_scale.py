@@ -199,6 +199,8 @@ class GraphicalScaleResult:
     station_stem_top: int | None = None
 
 
+STATION_BAR_RGB = (145, 155, 170)
+
 STATION_MARKER_COLORS = {
     'carrier': (255, 190, 80),
     'lsb': (180, 130, 255),
@@ -246,10 +248,16 @@ def compose_waterfall_scale(
     preset_stem_height = 5
     preset_label_height = text_renderer.line_height + 2
     footer_height = tuning_height + tick_height + label_height + preset_stem_height + preset_label_height
-    if annotations:
+    visible_annotations = tuple(a for a in annotations if start_khz <= a.frequency_khz <= end_khz)
+    if visible_annotations:
         footer_height += preset_stem_height + preset_label_height
-    station_annotations = tuple(a for a in annotations if a.station_selected and start_khz <= a.frequency_khz <= end_khz)
-    if station_annotations:
+    station_annotations = tuple(a for a in visible_annotations if a.station_selected)
+    station_components = tuple(a.frequency_khz for a in annotations if a.station_selected and a.kind in {'carrier', 'lsb', 'usb'})
+    station_span = (max(start_khz, min(station_components)), min(end_khz, max(station_components))) if station_components else None
+    if station_span is not None and station_span[0] > station_span[1]:
+        station_span = None
+    show_station_row = bool(station_annotations or station_span is not None)
+    if show_station_row:
         footer_height += preset_stem_height + preset_label_height
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
@@ -328,7 +336,10 @@ def compose_waterfall_scale(
                 frequency_labels.append(label)
         frequency += step
 
+    station_stem_top = tick_top + tick_height + label_height if show_station_row else None
     preset_stem_top = tick_top + tick_height + label_height
+    if show_station_row:
+        preset_stem_top += preset_stem_height + preset_label_height
     preset_labels: list[str] = []
     preset_occupied: list[tuple[int, int]] = []
     visible: list[tuple[float, str]] = []
@@ -356,11 +367,11 @@ def compose_waterfall_scale(
         preset_occupied.append(interval)
         preset_labels.append(label)
 
-    if annotations:
+    if visible_annotations:
         annotation_top = preset_stem_top + preset_stem_height + preset_label_height
         occupied_annotations: list[tuple[int, int]] = []
         # Selected labels win collisions; all visible stems survive label suppression.
-        for annotation in sorted(annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
+        for annotation in sorted(visible_annotations, key=lambda item: (not item.selected, item.frequency_khz, item.label)):
             column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
             if column is None:
                 continue
@@ -381,17 +392,21 @@ def compose_waterfall_scale(
             occupied_annotations.append(interval)
 
     station_labels: list[str] = []
-    station_stem_top = None
-    if station_annotations:
-        station_stem_top = annotation_top + preset_stem_height + preset_label_height
+    if show_station_row:
+        if station_span is not None:
+            left = _frequency_column(station_span[0], start_khz, end_khz, waterfall.width)
+            right = _frequency_column(station_span[1], start_khz, end_khz, waterfall.width)
+            for x in range(left, right + 1):
+                _set_pixel(rgb, waterfall.width, x, station_stem_top, STATION_BAR_RGB)
         occupied_station: list[tuple[int, int]] = []
         # Draw the active component last so a coincident inactive guide cannot hide it.
         for annotation in sorted(station_annotations, key=lambda item: item.selected):
             column = _frequency_column(annotation.frequency_khz, start_khz, end_khz, waterfall.width)
             assert column is not None
             color = (255, 255, 255) if annotation.selected else STATION_MARKER_COLORS[annotation.kind]
-            for y in range(waterfall.height):
-                if y % 6 < 2:
+            # Connect only catalogue C/L/U to the bottom edge; never draw into waterfall history.
+            if annotation.kind in {'carrier', 'lsb', 'usb'}:
+                for y in range(waterfall.height, station_stem_top, 3):
                     _set_pixel(rgb, waterfall.width, column, y, color)
             for y in range(station_stem_top, station_stem_top + preset_stem_height):
                 _set_pixel(rgb, waterfall.width, column, y, color)
@@ -412,6 +427,9 @@ def compose_waterfall_scale(
             text_labels.append((x, station_stem_top + preset_stem_height + 1, label, color))
             station_labels.append(label)
             occupied_station.append(interval)
+        if not station_annotations:
+            text_labels.append((0, station_stem_top + preset_stem_height + 1,
+                                'Station span; C/L/U components offscreen', STATION_BAR_RGB))
 
     rendered_rgb = text_renderer.render(rgb, waterfall.width, output_height, text_labels)
     return GraphicalScaleResult(

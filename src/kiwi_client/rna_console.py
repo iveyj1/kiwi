@@ -261,7 +261,8 @@ class RnaBrowser:
             if stored is not None:
                 components += (Component('stored', match.station.carrier_khz + stored['offset_hz'] / 1000),)
             for component in components:
-                if start_khz <= component.frequency_khz <= end_khz:
+                # Include offscreen selected endpoints so the station span can be clipped correctly.
+                if match == self.selected or start_khz <= component.frequency_khz <= end_khz:
                     suffix = {'carrier': 'C', 'lsb': 'L', 'usb': 'U', 'stored': 'S'}[component.kind]
                     result.append(FrequencyAnnotation(component.frequency_khz, f'{match.station.ident}:{suffix}',
                                                       component.kind, match == self.selected and component == self.component,

@@ -3,7 +3,7 @@ import pytest
 from kiwi_client.console_panels import cell_width, fit, main_panel_rows, log_panel_rows, split_widths
 
 
-@pytest.mark.parametrize('columns', [40, 80, 100, 160])
+@pytest.mark.parametrize('columns', [40, 80, 100, 160, 174])
 @pytest.mark.parametrize('height', [5, 10, 11, 19])
 @pytest.mark.parametrize('prompt', [':', ':rna range 2000_'])
 def test_main_panel_fits_and_preserves_fixed_boundaries(columns, height, prompt):
@@ -11,7 +11,8 @@ def test_main_panel_fits_and_preserves_fixed_boundaries(columns, height, prompt)
         station=['RJ / 378 kHz', 'USB 378.405 kHz', '450 km / 500 W / active', 'A very long location ' * 10],
         reception=['CONFIRMED 2026-09-26 01:02:03Z', '#17 / 2 entries', 'CLE332 / live'],
         filters='range<=2000 power>=100', help_rows=['n/N station w edit W new', 'More keys'],
-        message='Save successful', prompt=prompt)
+        message='Save successful', prompt=prompt,
+        table=[('> RJ', '378', 'CONFIRMED 2026-09-26 01:02:03Z', 'A long location ' * 10, '450', '10.3', '2026-04-13')])
     assert len(rows) <= height
     assert rows[0].startswith('╭') and rows[-1].endswith('╯')
     assert all(cell_width(row) == columns - 1 for row in rows)
@@ -19,11 +20,10 @@ def test_main_panel_fits_and_preserves_fixed_boundaries(columns, height, prompt)
     assert any('CONFIRMED' in row for row in rows)
     if prompt != ':':
         assert any(prompt in row for row in rows)
-    if columns >= 80:
-        separator = split_widths(columns - 1)[0] + 1
-        for row in rows:
-            if row.count('│') == 3:
-                assert row[separator] == '│'
+    table_rows = [line for line in rows if line.count('│') > 2]
+    if table_rows:
+        boundaries = [[cell_width(line[:i]) for i, c in enumerate(line) if c == '│'] for line in table_rows]
+        assert all(boundary == boundaries[0] for boundary in boundaries)
 
 
 @pytest.mark.parametrize('columns', [40, 80, 100, 160])
@@ -49,10 +49,11 @@ def test_current_example_generator_is_aligned_and_never_overwrites_edits(tmp_pat
     assert module['main'](['--output', str(path)]) == 0
     text = path.read_text()
     assert 'NOT-HEARD' in text and 'DELETE #17 PH' in text
-    assert 'STATION / CATALOGUE' in text and 'RECORDED EVIDENCE' in text
+    assert 'STATIONS' in text and 'RECORDED EVIDENCE' in text
+    assert 'Nominal kHz' in text and 'Last (RNA)' in text
     for row in text.splitlines():
         if row.startswith(('│', '╭', '╰', '├')):
-            assert cell_width(row) == 99
+            assert cell_width(row) == 173
     path.write_text('my layout tweaks')
     with pytest.raises(FileExistsError):
         module['main'](['--output', str(path)])

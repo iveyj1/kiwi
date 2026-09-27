@@ -83,16 +83,18 @@ def test_marker_geometry_offscreen_and_collisions():
     kwargs = dict(tuned_khz=378, selected_khz=378, low_cut_hz=600, high_cut_hz=1000,
                   presets={}, font_backend='bitmap', font_scale=1)
     plain = compose_waterfall_scale(image, 377.5, 378.5, **kwargs).image
-    annotated = compose_waterfall_scale(image, 377.5, 378.5,
-                                       annotations=b.annotations(377.5, 378.5), **kwargs).image
+    result = compose_waterfall_scale(image, 377.5, 378.5,
+                                     annotations=b.annotations(377.5, 378.5), **kwargs)
+    annotated = result.image
+    marker_top = plain.height + result.preset_stem_top - result.station_stem_top
     assert annotated.height > plain.height
     def pixel(x, y):
         index = (y * annotated.width + x) * 3
         return tuple(annotated.rgb[index:index + 3])
-    assert pixel(90, plain.height) == (100, 220, 180)
-    assert pixel(500, plain.height) == (100, 220, 180)
-    assert pixel(905, plain.height) == (255, 255, 255)
-    assert pixel(905, plain.height + 4) == (0, 0, 0)
+    assert pixel(90, marker_top) == (100, 220, 180)
+    assert pixel(500, marker_top) == (100, 220, 180)
+    assert pixel(905, marker_top) == (255, 255, 255)
+    assert pixel(905, marker_top + 4) == (0, 0, 0)
     # Tiny viewport, many coincident labels and offscreen annotations remain safe.
     result = compose_waterfall_scale(RasterImage(10, 1, b'\0' * 30), 378, 378.01,
                                     annotations=b.annotations(377, 379) * 4, **kwargs)

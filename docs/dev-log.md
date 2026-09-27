@@ -1,5 +1,36 @@
 # Dev Log
 
+## 2026-09-26 — Footer station bracket and 174-column station spreadsheet
+
+Replaced the full-height dashed marker overlays with a horizontal C/LSB/USB span
+immediately below the frequency scale. Dotted connectors run only between the bar
+and the waterfall's bottom edge; both source and displayed history pixels are
+unchanged. Only known, in-view C/L/U components get connectors. Offscreen selected
+endpoints remain available to clip the horizontal span without false edge markers.
+Stored S retains a label/stem but does not introduce a fourth connector. Active
+component emphasis and label collision priority remain intact.
+
+Replaced the main station/catalogue and reception/log split with a full-width,
+selected-centered window of the current filtered shortlist. Fields: ID, nominal
+kHz, Logged (personal scoped status plus UTC), location, distance km, plain period
+seconds, Last (RNA catalogue last-logged date). A non-confirmed status with + marks
+an older retained confirmation. NO/OFF/UNAVAILABLE are distinct; duplicate IDs use
+station keys and receiver/event/source scoping. The title keeps selected component
+and scope, while n/N moves the table window. Secondary columns drop at narrow widths;
+very short terminals retain the existing identity/log/input fallback. Logging forms
+and source lifecycle are unchanged.
+
+Added scoped/status/window/Unicode alignment tests and 174-column coverage; revised
+marker geometry tests for footer-only dots, clipped spans, no fourth S connector,
+and unchanged waterfall pixels. 580 tests passed; compileall/diff checks passed.
+A synthetic PNG preview was inspected in /tmp (not committed). Offline 174-column
+pseudo-terminal smoke passed station navigation and log open/cancel without creating
+a logbook. No live receiver connection or user-data modification.
+
+New editable renderer snapshot: docs/ui-layout-174.txt. Generator defaults to 174
+columns and accepts --columns; exclusive output creation still protects edits.
+The older ui-layout-current.txt and untracked rna-sites.toml were left untouched.
+
 ## 2026-09-26 — Selected-station carrier and recorded sideband guides
 
 RNA annotations now distinguish selected-station membership from active component.

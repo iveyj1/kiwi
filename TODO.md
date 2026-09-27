@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — station bracket and full-width station spreadsheet
+
+Goal: leave waterfall pixels untouched; draw a horizontal station span below the
+frequency scale, with dotted LSB/carrier/USB connectors ending at its bottom edge.
+Replace the main station/log split with a compact full-width scrolling shortlist:
+ID, nominal kHz, scoped Logged status/time, location, distance, plain period, Last
+(RNA last-logged date). Target 174 columns; retain compact/narrow terminals and
+logging dialogs. Completed: geometry/viewport tests, scoped table/window/alignment
+checks (including 174 columns), updated editable example and docs. 580 tests pass;
+compileall/diff checks pass. Offline 174-column PTY navigation/log open/cancel passed;
+synthetic bracket preview inspected. No radio access or user-data writes.
+
 ## Current slice — selected-station carrier/sideband markers
 
 Goal: make the selected station's nominal carrier, known RNA LSB/USB and personal

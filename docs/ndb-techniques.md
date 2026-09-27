@@ -37,13 +37,15 @@ a diagnostic rather than becoming an exact marker. Raw catalogue fields are kept
 for review. See `rna_catalogue.py`, `rna_console.py` and the asymmetric-offset
 fixture `tests/fixtures/rna/catalogue.csv`.
 
-For the selected station, the display now draws dashed guides for every known RF
-component, with a dedicated label row. The guides use the same viewport mapping as
+For the selected station, the display draws a horizontal C/LSB/USB span below the
+frequency scale, with dotted connectors up to the waterfall's bottom edge and a
+dedicated label row. It does not draw lines through waterfall history. The guides use the same viewport mapping as
 the scale: `x = round((f - start)/(end - start) * (width - 1))`, with all frequencies
 in kHz. Thus RJ's carrier is marked at 378.000, LSB at 377.590 and USB at 378.405;
 the CW receiver reference at 377.605 is not a station component. A personal stored
-RF center gets its own S marker. Out-of-view components are omitted, not clamped to
-an edge. These are location hypotheses on the spectrum, not detections; missing
+RF center gets its own S label/stem, without a fourth connector. The horizontal
+span is clipped to the viewport; out-of-view component connectors are omitted,
+not clamped to an edge. These are location hypotheses on the spectrum, not detections; missing
 or inaccurate catalogue offsets remain a limitation. Fixed-raster tests in
 `tests/harness/test_selected_station_markers.py` check RF geometry, unknown offsets,
 collision priority and removal of old guides when selection changes.

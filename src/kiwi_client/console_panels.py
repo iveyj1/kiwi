@@ -57,10 +57,30 @@ def split_rule(width: int, first: str, second: str, *, middle='┬') -> str:
     return '├' + part(first, left) + middle + part(second, right) + '┤'
 
 
+def station_table_lines(table, width: int, count: int) -> list[str]:
+    """Cell-aligned full-width spreadsheet; reduce columns on narrow terminals."""
+    if width >= 110:
+        fields, sizes = [0, 1, 2, 3, 4, 5, 6], [8, 12, 31, width - 99, 11, 9, 10]
+    elif width >= 80:
+        fields, sizes = [0, 1, 2, 3, 4, 5, 6], [7, 11, 12, width - 74, 8, 8, 10]
+    elif width >= 52:
+        fields, sizes = [0, 1, 2, 3, 5], [7, 9, 12, width - 48, 8]
+    else:
+        fields, sizes = [0, 1, 2], [6, 8, width - 20]
+    headers = ('ID', 'Nominal kHz', 'Logged (UTC)', 'Location', 'Distance km', 'Period s', 'Last (RNA)')
+    def render(values):
+        return ' │ '.join(fit(values[field], size) for field, size in zip(fields, sizes))
+    selected = next((i for i, values in enumerate(table) if values[0].startswith('> ')), 0)
+    capacity = max(0, count - 1)
+    start = max(0, min(selected - capacity // 2, len(table) - capacity))
+    return [render(headers), *(render(values) for values in table[start:start + capacity])][:count]
+
+
 def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str],
                     reception: list[str], filters: str, help_rows: list[str],
-                    message: str, prompt: str = ':', telemetry: str = '', radio_title: str = 'RADIO') -> list[str]:
-    """Option A: full-width radio/footer bands and a fixed station/log split."""
+                    message: str, prompt: str = ':', telemetry: str = '', radio_title: str = 'RADIO',
+                    table: list[tuple[str, ...]] | None = None, table_title: str = 'STATIONS') -> list[str]:
+    """Full-width radio, compact station spreadsheet, and filter/help bands."""
     width = max(12, columns - 1)  # Leave curses' final column unused, including borders.
     active_prompt = prompt != ':'
     if height < 10 + int(active_prompt):
@@ -74,22 +94,16 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
         return [rule(width, 'RADIO / STATION', left='╭', right='╮'),
                 *(row(width, text, tail=text == prompt) for text in body),
                 rule(width, left='╰', right='╯')][:height]
-    split = width >= 73
     body_count = max(2, min(6, height - 8 - int(active_prompt)))
     rows = [rule(width, radio_title, left='╭', right='╮'), row(width, radio)]
-    if split:
-        rows.append(split_rule(width, 'STATION / CATALOGUE', 'RECEPTION / LOG'))
-        for index in range(body_count):
-            rows.append(split_row(width, station[index] if index < len(station) else '',
-                                  reception[index] if index < len(reception) else ''))
-        rows.append(split_rule(width, 'FILTERS', '', middle='┴'))
+    rows.append(rule(width, table_title))
+    if table:
+        body = station_table_lines(table, width - 4, body_count)
     else:
-        rows.append(rule(width, 'STATION / RECEPTION'))
-        compact = [station[0] if station else 'No station selected',
-                   reception[0] if reception else 'LOG disabled',
-                   *(reception[1:2]), *(station[1:])]
-        rows.extend(row(width, text) for text in compact[:body_count])
-        rows.append(rule(width, 'FILTERS'))
+        body = [station[0] if station else 'No station selected',
+                reception[0] if reception else 'LOG disabled', *station[1:]]
+    rows.extend(row(width, text) for text in body[:body_count])
+    rows.append(rule(width, 'FILTERS'))
     rows.append(row(width, filters))
     rows.append(row(width, 'KEYS ' + (help_rows[0] if help_rows else '')))
     # More room exposes additional help and telemetry, without moving the column divider.

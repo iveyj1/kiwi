@@ -3,7 +3,7 @@ from pathlib import Path
 from kiwi_client.rna_catalogue import load_catalogue
 from kiwi_client.rna_console import RnaBrowser
 from kiwi_client.waterfall_raster import RasterImage
-from kiwi_client.waterfall_scale import FrequencyAnnotation, STATION_MARKER_COLORS, compose_waterfall_scale
+from kiwi_client.waterfall_scale import FrequencyAnnotation, STATION_MARKER_COLORS, STATION_BAR_RGB, compose_waterfall_scale
 
 FIXTURE = Path(__file__).parents[1] / 'fixtures/rna/catalogue.csv'
 
@@ -20,6 +20,7 @@ def compose(annotations, start=377.5, end=378.5, width=1001):
                                     passband_reference_khz=377.605, low_cut_hz=600, high_cut_hz=1000,
                                     presets={}, annotations=annotations, font_backend='bitmap', font_scale=1)
     assert original.rgb == b'\0' * (width * 12 * 3)
+    assert result.image.rgb[:len(original.rgb)] == original.rgb  # No lines inside the waterfall.
     return result
 
 
@@ -37,12 +38,14 @@ def test_selected_station_marks_asymmetric_components_at_rf_not_cw_reference():
     assert result.station_stem_top is not None
     assert set(result.station_labels) == {'RJ:C 378.0000', 'RJ:L 377.5900', 'RJ:U 378.4050'}
     for x, color in [(90, STATION_MARKER_COLORS['lsb']), (500, STATION_MARKER_COLORS['carrier']), (905, (255, 255, 255))]:
-        assert pixel(result.image, x, 0) == color
-        assert pixel(result.image, x, 1) == color
-        assert pixel(result.image, x, 2) == (0, 0, 0)  # Dashed, not an opaque vertical stripe.
-        assert pixel(result.image, x, 6) == color
+        assert pixel(result.image, x, 12) == color
+        assert pixel(result.image, x, 13) == (0, 0, 0)  # Dots confined to the footer.
+        assert pixel(result.image, x, 15) == color
         assert pixel(result.image, x, result.station_stem_top) == color
-    assert pixel(result.image, 105, 0) == (0, 0, 0)  # 377.605 CW reference is not an RNA component.
+    assert result.tick_top < result.station_stem_top < result.preset_stem_top
+    assert all(pixel(result.image, x, result.station_stem_top) == STATION_BAR_RGB for x in range(94, 498))
+    plain = compose(())
+    assert {x for x in range(1001) if pixel(result.image, x, 12) != pixel(plain.image, x, 12)} == {90, 500, 905}
 
 
 def test_other_catalogue_labels_cannot_hide_selected_station_row():
@@ -51,7 +54,7 @@ def test_other_catalogue_labels_cannot_hide_selected_station_row():
     result = compose(b.annotations(377.5, 378.5) + crowd)
     assert 'RJ:C 378.0000' in result.station_labels
     assert all(label.startswith('RJ:') for label in result.station_labels)
-    assert pixel(result.image, 500, 0) == STATION_MARKER_COLORS['carrier']
+    assert pixel(result.image, 500, 12) == STATION_MARKER_COLORS['carrier']
 
 
 def test_unknown_offsets_and_offscreen_components_are_not_invented():
@@ -74,17 +77,28 @@ def test_stored_marker_and_component_switch_keep_all_station_guides():
     stored_column = round((378.4255 - 377.5) * 1000)
     result = compose(b.annotations(377.5, 378.5))
     assert 'RJ:S 378.4255' in result.station_labels
-    assert pixel(result.image, stored_column, 0) == (255, 255, 255)
-    assert pixel(result.image, 905, 0) == STATION_MARKER_COLORS['usb']
+    assert pixel(result.image, stored_column, result.station_stem_top) == (255, 255, 255)
+    assert pixel(result.image, stored_column, 12) == pixel(compose(()).image, stored_column, 12)  # No fourth connector.
+    assert pixel(result.image, 905, 12) == STATION_MARKER_COLORS['usb']
     b.cycle_component()  # stored -> carrier
     result = compose(b.annotations(377.5, 378.5))
-    assert pixel(result.image, 500, 0) == (255, 255, 255)
-    assert pixel(result.image, stored_column, 0) == STATION_MARKER_COLORS['stored']
+    assert pixel(result.image, 500, 12) == (255, 255, 255)
+    assert pixel(result.image, stored_column, result.station_stem_top) == STATION_MARKER_COLORS['stored']
     b.move(1)
-    assert not any(a.station_selected for a in b.annotations(377.5, 378.5))
+    assert not any(a.station_selected and 377.5 <= a.frequency_khz <= 378.5 for a in b.annotations(377.5, 378.5))
     result = compose(b.annotations(377.5, 378.5))
     assert result.station_stem_top is None
     assert pixel(result.image, 500, 0) == (0, 0, 0)
+
+
+def test_clipped_station_span_has_no_fake_edge_connectors():
+    b = browser()
+    start, end = 378.1, 378.2  # Between carrier and USB; no component is in view.
+    result = compose(b.annotations(start, end), start=start, end=end)
+    plain = compose((), start=start, end=end)
+    assert result.station_stem_top is not None and not result.station_labels
+    assert all(pixel(result.image, x, result.station_stem_top) == STATION_BAR_RGB for x in range(1001))
+    assert all(pixel(result.image, x, 12) == pixel(plain.image, x, 12) for x in range(1001))
 
 
 def test_same_pixel_active_marker_wins_and_labels_still_clip_safely():
@@ -92,6 +106,6 @@ def test_same_pixel_active_marker_wins_and_labels_still_clip_safely():
                    FrequencyAnnotation(378, 'A:U', 'usb', selected=True, station_selected=True))
     result = compose(annotations, width=12)
     x = round(.5 * 11)
-    assert pixel(result.image, x, 0) == (255, 255, 255)
+    assert pixel(result.image, x, 12) == (255, 255, 255)
     assert result.station_labels == ('A:U 378.0000',)
     assert len(result.image.rgb) == result.image.width * result.image.height * 3
