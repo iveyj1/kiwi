@@ -32,11 +32,17 @@ Waterfall decoding and rendering should follow the same separation rule: W/F pro
 
 ## Integrated-console radio-state checkpoints
 
-`console_state.py` checkpoints zoom and per-mode passbands into the existing
+`console_state.py` checkpoints zoom, per-mode passbands, step-pair indices and display
+scale (dB endpoints plus automatic/manual mode) into the existing
 `[startup].state_file`. `state_store.py` writes atomically and retains the optional
-nested `last_state.waterfall_zoom` during legacy TUI state saves. Startup mode `last`
+nested `last_state.waterfall_zoom` and validated `last_state.waterfall_scale` during
+legacy TUI state saves. Scale fields restore independently and explicit CLI flags
+win. Automatic level adaptation is excluded from change detection to avoid periodic
+telemetry-driven disk writes; final levels are saved on exit. Startup mode `last`
 restores it (old files fall back to configured zoom); default/preset startup remains
-explicit. The live shell checkpoints changed settings and orderly exit without
+explicit. Integrated startup retains restored step indices unless step flags are
+explicitly supplied; the GUI model and dry-run report use the effective pair.
+Step-pair values remain config-owned. The live shell checkpoints changed settings and orderly exit without
 writing presets on every change. Failed writes retain the old file, report an error,
 and are not retried every frame. Fixture/dry-run paths do not enable checkpoints.
 Legacy sub-10 Hz CW startup/recall requests widen to 10 Hz while preserving modeled

@@ -426,10 +426,12 @@ def test_controller_console_source_audio_mode_omits_null_sink():
     assert controller.commands[0] == "radio-bg --allow-live"
 
 
-def test_integrated_live_dry_run_requires_flag_but_does_not_connect(capsys):
+def test_integrated_live_dry_run_requires_flag_but_does_not_connect(capsys, tmp_path):
+    config_path = tmp_path / 'config.toml'
+    config_path.write_text(Path('config.toml').read_text())
     code = main([
         "--allow-live", "--receiver", "10.0.0.42:8073",
-        "--config", "config.toml", "--dry-run",
+        "--config", str(config_path), "--dry-run",
     ])
 
     assert code == 0

@@ -5,7 +5,7 @@ import pytest
 
 from kiwi_client.client_app import ClientController, ClientState, paired_snapshot_from_client_state
 from kiwi_client.config import KiwiClientConfig
-from kiwi_client.console_state import ConsoleSettingsCheckpoint, normalize_console_cw_bandwidth, startup_waterfall_zoom
+from kiwi_client.console_state import ConsoleSettingsCheckpoint, normalize_console_cw_bandwidth, startup_waterfall_zoom, startup_waterfall_scale
 from kiwi_client.session_manager import ZoomWaterfall
 from kiwi_client.state_store import load_state_file, save_state_file
 from kiwi_client.station_memory import passband_center_khz
@@ -54,7 +54,7 @@ def test_console_keys_checkpoint_zoom_and_bandwidth_without_live_radio(tmp_path,
         monkeypatch.setattr(shell.curses, name, lambda *args: None)
     monkeypatch.setattr(shell.curses, 'has_colors', lambda: False)
     class Screen:
-        keys = iter(['j', '+', None, 'q'])
+        keys = iter(['j', '+', '[', '}', None, 'q'])
         def get_wch(self):
             return next(self.keys)
         def getmaxyx(self):
@@ -78,6 +78,7 @@ def test_console_keys_checkpoint_zoom_and_bandwidth_without_live_radio(tmp_path,
     assert restored.high_cut_hz - restored.low_cut_hz == 30
     assert restored.mode_passbands['cw'] == (785, 815)
     assert startup_waterfall_zoom(config) == 11
+    assert startup_waterfall_scale(config) == dict(min_dbm=-105, max_dbm=-35, automatic=False)
 
 
 def test_live_startup_dry_run_reports_saved_zoom_and_bandwidth_without_writes(tmp_path, capsys, monkeypatch):
@@ -98,6 +99,99 @@ def test_live_startup_dry_run_reports_saved_zoom_and_bandwidth_without_writes(tm
     assert plan['waterfall_zoom'] == 11 and plan['passband_hz'] == [785, 815]
     assert plan['network'] is False
     assert path.read_bytes() == original and path.stat().st_mtime_ns == modified
+
+
+def test_step_only_changes_checkpoint_and_restore_per_mode(tmp_path):
+    config, current = config_at(tmp_path), controller()
+    pairs = {'cw': ((1000, 100), (500, 50), (100, 10)),
+             'am': ((5000, 1000), (1000, 100), (100, 10))}
+    config = replace(config, tuning=replace(config.tuning, mode_step_pairs=pairs))
+    current.state = replace(current.state, mode_step_pairs=pairs)
+    checkpoint = ConsoleSettingsCheckpoint(config)
+    checkpoint.save_if_changed(current)
+    current.execute('step-pair +1')
+    expected_cw = current.state.current_step_pair
+    assert expected_cw == (500, 50)
+    assert checkpoint.save_if_changed(current)
+    assert not checkpoint.save_if_changed(current)
+    current.execute('mode am; step-pair +2')
+    expected_am = current.state.current_step_pair
+    checkpoint.save_if_changed(current)
+    restored, _ = startup_state_and_presets(config)
+    assert restored.current_step_pair == expected_am
+    resumed = ClientController(state=restored)
+    resumed.execute('mode cw')
+    assert resumed.state.current_step_pair == expected_cw
+
+
+@pytest.mark.parametrize('flags,expected', [([], [0.1, 0.01]),
+    (['--main-step-khz', '1', '--small-step-khz', '0.1'], [1, 0.1])])
+def test_live_startup_restores_steps_unless_explicitly_overridden(tmp_path, capsys, flags, expected):
+    import kiwi_client.integrated_terminal as shell
+    config, current = config_at(tmp_path), controller()
+    current.state = replace(current.state, mode_step_indices={'cw': 2})
+    ConsoleSettingsCheckpoint(config).save_if_changed(current)
+    path = tmp_path / 'config.toml'
+    path.write_text('[startup]\nmode="last"\nstate_file="state.json"\n[presets]\nfile="presets.toml"\n'
+                    '[tuning.mode_steps.cw]\npairs=[[1000,100],[500,50],[100,10]]\n')
+    state_path = tmp_path / 'state.json'
+    before = state_path.read_bytes()
+    assert shell.main(['--allow-live', '--config', str(path), '--dry-run', *flags]) == 0
+    plan = json.loads(capsys.readouterr().out)
+    assert plan['steps_khz'] == expected
+    assert state_path.read_bytes() == before
+
+
+def test_scale_checkpoint_restore_auto_cadence_and_legacy_save(tmp_path):
+    from kiwi_client.waterfall_levels import WaterfallLevelController
+    config, current = config_at(tmp_path), controller()
+    levels = WaterfallLevelController(min_dbm=-120, max_dbm=-50)
+    checkpoint = ConsoleSettingsCheckpoint(config)
+    checkpoint.save_if_changed(current, levels=levels)
+    levels.adjust_min(5)
+    assert checkpoint.save_if_changed(current, levels=levels)
+    assert startup_waterfall_scale(config) == dict(min_dbm=-115, max_dbm=-50, automatic=False)
+    levels.set_automatic(True)
+    assert checkpoint.save_if_changed(current, levels=levels)
+    levels.min_dbm = -112
+    assert not checkpoint.save_if_changed(current, levels=levels)
+    checkpoint.save_if_changed(current, levels=levels, force=True)
+    save_state_file(tmp_path / 'state.json', last_state=current.state)
+    assert startup_waterfall_scale(config) == dict(min_dbm=-112, max_dbm=-50, automatic=True)
+    defaults = replace(config, startup=replace(config.startup, mode='default'))
+    assert startup_waterfall_scale(defaults) == dict(min_dbm=-100, max_dbm=-40, automatic=False)
+
+
+@pytest.mark.parametrize('flags,expected', [([], (-90, -10, True)),
+    (['--render-min-db', '-20', '--no-auto-scale'], (-20, -10, False))])
+def test_scale_live_dry_run_restore_and_override(tmp_path, capsys, flags, expected):
+    from kiwi_client.integrated_terminal import main
+    config = config_at(tmp_path)
+    save_state_file(tmp_path / 'state.json', last_state=controller().state,
+                    waterfall_scale=dict(min_dbm=-90, max_dbm=-10, automatic=True))
+    path = tmp_path / 'config.toml'
+    path.write_text('[startup]\nmode="last"\nstate_file="state.json"\n[presets]\nfile="presets.toml"\n')
+    original = (tmp_path / 'state.json').read_bytes()
+    assert main(['--allow-live', '--config', str(path), '--dry-run', *flags]) == 0
+    scale = json.loads(capsys.readouterr().out)['waterfall_scale']
+    assert (scale['min_dbm'], scale['max_dbm'], scale['automatic']) == expected
+    assert (tmp_path / 'state.json').read_bytes() == original
+
+
+@pytest.mark.parametrize('scale', [dict(min_dbm=-40, max_dbm=-100, automatic=False),
+    dict(min_dbm=float('nan'), max_dbm=-40, automatic=False),
+    dict(min_dbm=-100, max_dbm=-40, automatic='yes'), {}])
+def test_invalid_saved_scale_does_not_overwrite_state(tmp_path, scale):
+    path = tmp_path / 'state.json'
+    current = controller().state
+    save_state_file(path, last_state=current)
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match='scale'):
+        save_state_file(path, last_state=current, waterfall_scale=scale)
+    assert path.read_bytes() == original
+    path.write_text(json.dumps({'last_state': {'waterfall_scale': scale}}))
+    with pytest.raises(ValueError, match='scale'):
+        load_state_file(path)
 
 
 def test_legacy_state_without_zoom_uses_config_and_load_is_read_only(tmp_path):

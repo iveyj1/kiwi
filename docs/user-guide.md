@@ -66,9 +66,10 @@ history remain unchanged. Larger images do not add RF resolution, and reducing t
 pane can omit source bins/rows from the displayed image. Use receiver zoom to inspect
 narrow signals rather than interpreting larger pixels as finer measurements.
 
-### Remembered zoom and bandwidth
+### Remembered zoom, bandwidth, tuning steps and display scale
 
-The live console now checkpoints the waterfall **zoom level and per-mode passbands**
+The live console checkpoints the waterfall **zoom level, per-mode passbands and
+main/fine tuning-step selections, and waterfall display scale**
 when they change and again on orderly exit, using the existing `[startup].state_file`
 (`state.json` in the shipped project config). With `[startup].mode = "last"`, restart
 restores them; `default`/`preset` startup continues to use configured startup choices.
@@ -76,7 +77,19 @@ RNA selection therefore reuses your last CW bandwidth rather than losing it when
 switching modes. This radio state is separate from `rna-filters.json` and station
 memories. Saves are atomic; failures are reported without undoing active radio settings.
 Fixture-only runs and dry runs do not save radio state. Live `--dry-run` reports the
-restored `waterfall_zoom` and `passband_hz` without connecting or writing.
+restored `waterfall_zoom`, `passband_hz` and `steps_khz` (main/fine) without connecting
+or writing. Step changes with `t`/`T` are remembered per mode. Omit `--main-step-khz`
+and `--small-step-khz` to restore the saved selection; explicit flags select the
+nearest configured pair instead (an omitted companion flag uses 1/0.1 kHz defaults).
+Without a saved selection, the console retains its nearest-to-1/0.1 kHz startup
+choice. Step-pair values remain config-owned.
+
+The scale's minimum/maximum dB levels (`[`/`]`, `{`/`}`) and automatic/manual mode
+(`u`) are also restored. Explicit `--render-min-db`, `--render-max-db`,
+`--auto-scale` or `--no-auto-scale` override their saved fields. Older state files
+start at manual -100..-40 dB. Automatic adaptation does not trigger continuous disk
+writes; its latest levels are saved on other settings changes or orderly exit.
+Dry-run output includes `waterfall_scale`. This is display scaling only, not RF gain.
 
 The CW ladder is now **10, 20, 30, 50, 100, 500 Hz**. The experimental 2/5 Hz steps
 were removed following your report of no apparent benefit; this is not a measured

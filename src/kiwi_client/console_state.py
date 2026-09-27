@@ -1,4 +1,4 @@
-"""Integrated-console zoom/passband checkpoints in the existing startup state file."""
+"""Integrated-console zoom/passband/step checkpoints in the startup state file."""
 from dataclasses import replace
 import math
 
@@ -32,19 +32,33 @@ def normalize_console_cw_bandwidth(state: ClientState) -> ClientState:
     return replace(state, **changes)
 
 
+def startup_waterfall_scale(config: KiwiClientConfig) -> dict:
+    defaults = dict(min_dbm=-100, max_dbm=-40, automatic=False)
+    if config.startup.mode.lower() != 'last':
+        return defaults
+    last = load_state_file(resolve_state_path(config)).get('last_state') or {}
+    return last.get('waterfall_scale', defaults)
+
+
 class ConsoleSettingsCheckpoint:
     def __init__(self, config: KiwiClientConfig) -> None:
         self.path = resolve_state_path(config)
         self.last_attempt = None
 
-    def save_if_changed(self, controller: ClientController, *, force: bool = False) -> bool:
+    def save_if_changed(self, controller: ClientController, *, levels=None, force: bool = False) -> bool:
         state = controller.state
         zoom = controller.paired_session.state.waterfall_zoom
         key = (state.receiver, state.mode, state.low_cut_hz, state.high_cut_hz,
-               tuple(sorted((mode, tuple(cuts)) for mode, cuts in state.mode_passbands.items())), zoom)
+               tuple(sorted((mode, tuple(cuts)) for mode, cuts in state.mode_passbands.items())),
+               tuple(sorted(state.mode_step_indices.items())), zoom)
+        scale = None
+        if levels is not None:
+            scale = dict(min_dbm=levels.min_dbm, max_dbm=levels.max_dbm, automatic=levels.automatic)
+            # Automatic adaptation is telemetry, not a user settings change.
+            key += ((True,) if levels.automatic else (False, levels.min_dbm, levels.max_dbm),)
         if not force and key == self.last_attempt:
             return False
         # Do not retry a failing filesystem every frame; retry on change or orderly exit.
         self.last_attempt = key
-        save_state_file(self.path, last_state=state, waterfall_zoom=zoom)
+        save_state_file(self.path, last_state=state, waterfall_zoom=zoom, waterfall_scale=scale)
         return True

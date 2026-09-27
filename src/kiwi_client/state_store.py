@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import tempfile
 import tomllib
@@ -92,6 +93,8 @@ def load_state_file(path: str | Path) -> dict[str, Any]:
         raise ValueError('last_state must be an object')
     if last is not None and 'waterfall_zoom' in last:
         _validate_zoom(last['waterfall_zoom'])
+    if last is not None and 'waterfall_scale' in last:
+        _validate_scale(last['waterfall_scale'])
     return {"last_state": last}
 
 
@@ -100,8 +103,19 @@ def _validate_zoom(zoom: Any) -> None:
         raise ValueError('saved waterfall zoom must be an integer from 0 to 14')
 
 
-def save_state_file(path: str | Path, *, last_state: Any, waterfall_zoom: int | None = None) -> None:
-    """Atomically save last state; retain saved console zoom unless supplied."""
+def _validate_scale(scale: Any) -> None:
+    if not isinstance(scale, dict) or set(scale) != {'min_dbm', 'max_dbm', 'automatic'}:
+        raise ValueError('saved waterfall scale must contain min_dbm, max_dbm and automatic')
+    if (type(scale['automatic']) is not bool
+            or any(type(scale[key]) not in (int, float) or not math.isfinite(scale[key])
+                   for key in ('min_dbm', 'max_dbm'))
+            or scale['max_dbm'] <= scale['min_dbm']):
+        raise ValueError('saved waterfall scale requires finite ordered levels and boolean automatic')
+
+
+def save_state_file(path: str | Path, *, last_state: Any, waterfall_zoom: int | None = None,
+                    waterfall_scale: dict | None = None) -> None:
+    """Atomically save last state; retain console display settings unless supplied."""
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     previous = load_state_file(path).get('last_state') or {}
@@ -110,6 +124,10 @@ def save_state_file(path: str | Path, *, last_state: Any, waterfall_zoom: int | 
     if zoom is not None:
         _validate_zoom(zoom)
         data['last_state']['waterfall_zoom'] = zoom
+    scale = previous.get('waterfall_scale') if waterfall_scale is None else waterfall_scale
+    if scale is not None:
+        _validate_scale(scale)
+        data['last_state']['waterfall_scale'] = scale
     name = None
     try:
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent, prefix=path.name + '.', delete=False) as output:

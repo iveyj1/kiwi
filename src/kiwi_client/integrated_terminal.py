@@ -18,7 +18,7 @@ from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
 from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines, station_spreadsheet
 from kiwi_client.console_panels import main_panel_rows
-from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, normalize_console_cw_bandwidth
+from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, startup_waterfall_scale, normalize_console_cw_bandwidth
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
 from kiwi_client.station_memory import passband_center_khz, catalogue_reference_khz
@@ -550,9 +550,9 @@ def run_fixture_shell(
 
             if settings_checkpoint is not None:
                 try:
-                    settings_checkpoint.save_if_changed(tui_controller)
+                    settings_checkpoint.save_if_changed(tui_controller, levels=levels)
                 except (OSError, ValueError) as exc:
-                    message = f'Zoom/bandwidth NOT saved: {exc}'
+                    message = f'Radio settings NOT saved: {exc}'
                     dirty = True
             if rna_browser is not None:
                 receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
@@ -1077,7 +1077,7 @@ def run_fixture_shell(
             live_source.stop()
         presenter.finish()
         if settings_checkpoint is not None:
-            settings_checkpoint.save_if_changed(tui_controller, force=True)
+            settings_checkpoint.save_if_changed(tui_controller, levels=levels, force=True)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -1096,11 +1096,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fps", type=float, default=20.0)
     parser.add_argument("--refresh-hz", type=float, default=20.0,
                         help="maximum display refresh rate (default: 20 Hz; does not change receiver cadence)")
-    parser.add_argument("--main-step-khz", type=float, default=1.0)
-    parser.add_argument("--small-step-khz", type=float, default=0.1)
-    parser.add_argument("--render-min-db", type=float, default=-100)
-    parser.add_argument("--render-max-db", type=float, default=-40)
-    parser.add_argument("--auto-scale", action="store_true", help="percentile-based smoothed display levels")
+    parser.add_argument("--main-step-khz", type=float, help="override remembered step pair (fallback: 1 kHz)")
+    parser.add_argument("--small-step-khz", type=float, help="override remembered step pair (fallback: 0.1 kHz)")
+    parser.add_argument("--render-min-db", type=float, help="override remembered scale minimum (fallback: -100 dB)")
+    parser.add_argument("--render-max-db", type=float, help="override remembered scale maximum (fallback: -40 dB)")
+    parser.add_argument("--auto-scale", action=argparse.BooleanOptionalAction, default=None,
+                        help="override remembered automatic/manual display scaling")
     parser.add_argument("--scale-font", choices=("auto", "pillow", "bitmap"), default="auto")
     parser.add_argument("--scale-font-name", default="DejaVuSansMono.ttf")
     parser.add_argument('--show-cw-offset-marker', action='store_true', help='show the normally hidden CW receiver-reference mark; display only')
@@ -1112,6 +1113,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    explicit_steps = args.main_step_khz is not None or args.small_step_khz is not None
+    args.main_step_khz = 1.0 if args.main_step_khz is None else args.main_step_khz
+    args.small_step_khz = 0.1 if args.small_step_khz is None else args.small_step_khz
     try:
         if args.fps <= 0 or args.refresh_hz <= 0:
             raise ValueError("FPS and refresh rate must be positive")
@@ -1129,17 +1133,17 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--log-event requires --logbook")
         rna_browser = browser_from_args(args)
         presenter = KittyPanePresenter(output=sys.stdout.buffer, force=args.force)
-        levels = WaterfallLevelController(
-            min_dbm=args.render_min_db,
-            max_dbm=args.render_max_db,
-            automatic=args.auto_scale,
-        )
         if args.fixture is not None:
+            levels = WaterfallLevelController(
+                min_dbm=-100 if args.render_min_db is None else args.render_min_db,
+                max_dbm=-40 if args.render_max_db is None else args.render_max_db,
+                automatic=False if args.auto_scale is None else args.auto_scale,
+            )
             model = WaterfallGuiModel(
                 history_rows=args.rows,
                 show_frequency_lines=False,
-                render_min_db=args.render_min_db,
-                render_max_db=args.render_max_db,
+                render_min_db=levels.min_dbm,
+                render_max_db=levels.max_dbm,
                 main_step_hz=args.main_step_khz * 1000.0,
                 small_step_hz=args.small_step_khz * 1000.0,
             )
@@ -1189,19 +1193,26 @@ def main(argv: list[str] | None = None) -> int:
         from kiwi_client.tui import startup_receiver_presets, startup_state_and_presets
 
         config = load_config(discover_config_path(args.config))
+        scale = startup_waterfall_scale(config)
+        for key, value in (('min_dbm', args.render_min_db), ('max_dbm', args.render_max_db),
+                           ('automatic', args.auto_scale)):
+            if value is not None:
+                scale[key] = value
+        levels = WaterfallLevelController(**scale)
         state, presets = startup_state_and_presets(config)
         state = normalize_console_cw_bandwidth(state)
         if args.receiver:
             host, port = normalize_receiver_address(args.receiver, default_port=state.port)
             state = replace(state, host=host, port=port)
         mode = state.mode.lower()
-        pairs = state.mode_step_pairs.get(mode, ((args.main_step_khz * 1000.0, args.small_step_khz * 1000.0),))
-        step_index = nearest_step_pair_index(
-            pairs,
-            main_hz=args.main_step_khz * 1000.0,
-            small_hz=args.small_step_khz * 1000.0,
-        )
-        state = replace(state, mode_step_indices={**state.mode_step_indices, mode: step_index})
+        if explicit_steps or mode not in state.mode_step_indices:
+            pairs = state.mode_step_pairs.get(mode, ((args.main_step_khz * 1000.0, args.small_step_khz * 1000.0),))
+            step_index = nearest_step_pair_index(
+                pairs,
+                main_hz=args.main_step_khz * 1000.0,
+                small_hz=args.small_step_khz * 1000.0,
+            )
+            state = replace(state, mode_step_indices={**state.mode_step_indices, mode: step_index})
         controller = ClientController(
             state=state,
             allow_live_default=config.live.allow_live,
@@ -1218,15 +1229,15 @@ def main(argv: list[str] | None = None) -> int:
         model = WaterfallGuiModel(
             history_rows=args.rows,
             show_frequency_lines=False,
-            render_min_db=args.render_min_db,
-            render_max_db=args.render_max_db,
+            render_min_db=levels.min_dbm,
+            render_max_db=levels.max_dbm,
             tuned_khz=state.frequency_khz,
             selected_khz=state.frequency_khz,
             mode=state.mode,
             low_cut_hz=state.low_cut_hz,
             high_cut_hz=state.high_cut_hz,
-            main_step_hz=args.main_step_khz * 1000.0,
-            small_step_hz=args.small_step_khz * 1000.0,
+            main_step_hz=state.current_step_hz,
+            small_step_hz=state.current_small_step_hz,
             frequency_decimals=config.display.frequency_decimals,
         )
         source = ControllerConsoleSource(controller, model=model, audio=args.audio)
@@ -1237,11 +1248,12 @@ def main(argv: list[str] | None = None) -> int:
                 "backend": "kitty+curses",
                 "receiver": state.receiver,
                 "waterfall_zoom": controller.paired_session.state.waterfall_zoom,
+                "waterfall_scale": scale,
                 "passband_hz": [state.low_cut_hz, state.high_cut_hz],
                 "rna": None if rna_browser is None else rna_browser.status(),
                 "audio": args.audio,
                 "network": False,
-                "steps_khz": [args.main_step_khz, args.small_step_khz],
+                "steps_khz": [state.current_step_hz / 1000.0, state.current_small_step_hz / 1000.0],
                 "would_start": "radio-bg --allow-live" + ("" if args.audio else " --null-sink"),
             }, indent=2, sort_keys=True))
             return 0

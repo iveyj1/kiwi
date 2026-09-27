@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — remembered tuning steps and display scale
+
+Goal: checkpoint per-mode main/fine step selection and restore it without implicit
+CLI defaults overriding it. Explicit step flags still override; fixtures retain
+1/0.1 kHz defaults. Done: offline restart, step-only checkpoint and override tests,
+full suite, docs; no receiver access or real user-state writes.
+Also restore scale dB endpoints and auto/manual mode; explicit CLI flags override.
+Do not checkpoint each automatic adaptation. Validate saved scale and preserve it
+through legacy TUI saves. Include scale-key, restore, override and invalid-state tests.
+Completed: step and scale persistence/overrides with 663 offline tests passing;
+compileall and diff checks passed. No radio connection or real user-state writes.
+
 ## Current slice — minimum pointer, remembered zoom/bandwidth, 10 Hz minimum
 
 Goal: use a 9-pixel-wide, 7-pixel-tall tuning pointer only when the full passband

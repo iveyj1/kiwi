@@ -1,5 +1,25 @@
 # Dev Log
 
+## 2026-09-27 — Remember tuning steps and waterfall display scale
+
+Added per-mode step-pair indices to checkpoint change detection. Integrated startup
+no longer overwrites restored selections with implicit CLI defaults; explicit step
+flags still select the nearest configured pair. Model initialization and dry-run
+reporting now use the effective steps. Pair values remain config-owned.
+
+Saved scale endpoints and automatic/manual mode in last_state.waterfall_scale.
+Last-state startup restores these fields, with explicit CLI overrides including
+--no-auto-scale. Legacy TUI saves preserve them. Validated finite ordered endpoints
+and boolean mode before saving/loading. Automatic adaptation does not trigger
+continuous writes; current levels checkpoint on other setting changes or exit.
+Display scale does not change receiver RF gain.
+
+Validation: 663 offline tests passed; compileall/diff checks passed. Added step-only
+checkpoint/per-mode restart, CLI override, scale key interaction, auto-write cadence,
+legacy-save preservation and invalid-scale regressions. Isolated the existing live
+startup dry-run test from real working-directory state. No radio connection or real
+user-state writes. Restart the console to load the changes.
+
 ## 2026-09-27 — Remember console zoom/passbands; retire sub-10 Hz steps
 
 The live console checkpoints zoom and per-mode bandwidths in the configured startup
