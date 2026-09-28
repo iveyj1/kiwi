@@ -1,5 +1,15 @@
 # TODO
 
+## Current slice — explicit logbook quit controls
+
+Goal: add visible Quit and window-scoped Ctrl+Q, using normal window close rather
+than forced process termination. Done: offscreen keyboard/button regressions with
+child-widget focus, unchanged source/preferences checks, full suite and docs. Do
+not attribute the reported Alt+F4 failure to Kitty without evidence.
+Completed: shared Quit action/button and Ctrl+Q call normal window close. Six
+regressions cover child focus, button activation, unchanged source/preferences and
+subprocess event-loop exit; full offline suite passes (725 tests). No live access.
+
 ## Current slice — Kiwi label history
 
 Goal: stage the supplied label JSON alongside existing sources, read-only. Use

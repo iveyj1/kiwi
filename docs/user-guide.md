@@ -10,6 +10,10 @@ current `receptions.sqlite` and, if present, `data/wwsu-stage.json` and
 The `gui-pyside` optional dependency is required (already available in the shared
 local virtual environment). Installed entry point: `kiwi-logbook`.
 
+- Exit with **Ctrl+Q** or the visible **Quit (Ctrl+Q)** button. Both close the window
+  normally without writing reception sources or saving preferences. Ctrl+Q works
+  while the search field, table or details pane has focus. It is handled by the app,
+  unlike a window-manager shortcut such as Alt+F4.
 - Click column headers to sort; numeric frequency/distance columns sort numerically.
   Resize or drag headers, and scroll horizontally for event/review columns.
 - Search matches all entered words across ID, location, notes, receiver, source,

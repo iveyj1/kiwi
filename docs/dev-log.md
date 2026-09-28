@@ -1,5 +1,20 @@
 # Dev Log
 
+## 2026-09-28 — Explicit logbook quit action
+
+Added a visible Quit (Ctrl+Q) button and a window-scoped Ctrl+Q QAction. Both
+invoke normal window close, not process termination or unconditional app.quit;
+future close-event checks can still guard unsaved edits. No close-time data or
+preference writes were added. The reported Alt+F4 failure is not diagnosed and
+is not attributed to Kitty or the window manager without evidence.
+
+Validation: regression tests first reproduced missing keyboard/button handling;
+six passing offscreen cases now cover search/table/both detail panes, button
+activation, unchanged staged-source/preferences bytes, and normal application
+exit in a bounded subprocess. Full offline suite: 725 passed; compileall/diff
+checks clean. No receiver connections or personal source changes. Physical
+window-manager shortcut behavior remains unverified.
+
 ## 2026-09-28 — Add Kiwi DX label history as a separate review source
 
 User authorized treating note times without Z as UTC. Added the offline
