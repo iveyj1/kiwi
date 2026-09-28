@@ -2,11 +2,11 @@ Subject: CLE332 FINAL
 
 Test Listener
 Listening location: Test site (FN25AA)
-Receiver: KiwiSDR [10.0.0.43:8073]
+Receiver: KiwiSDR
 Aerial: Loop
 Remote receiver: 10.0.0.43:8073
 
-Date (UTC)  UTC    kHz  ID  Location
-2026-09-25 16:00  378  RJ  Roberval QC CAN ; center 378.405000 kHz; offset +405.0 Hz; BW 100 Hz
+Date (UTC)  UTC      kHz  ID   Distance (km)  Location
+2026-09-26  01:00    378  RJ            1123  Roberval QC CAN
 
 1 NDBs

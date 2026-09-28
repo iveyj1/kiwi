@@ -334,8 +334,8 @@ necessarily the displayed CW tuning reference. With a -800 Hz CW offset and cuts
 825..875 Hz, a UI frequency of 378.375 kHz means an RF center of 378.425 kHz, offset
 +425 Hz from nominal 378 kHz, with 50 Hz bandwidth. Stored recall accounts for this
 difference rather than applying the CW offset twice. Fresh receptions snapshot
-that RF center/offset/width. Report comments include these values and your notes;
-older logs reconstruct the center from their saved tuning settings. Later changes
+that RF center/offset/width for inspection, but reports no longer add those values
+to comments automatically. Reports preserve your written notes, including `*`. Later changes
 to station memories do not rewrite reception history or CLE nominal frequencies.
 
 ## Assisted reception log and CLE332 report
@@ -446,8 +446,14 @@ PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
 
 The exporter selects confirmed LIVE entries explicitly tagged CLE332, uses the
 receiver-local noon window (start inclusive, end exclusive), tests even nominal
-channels 190–530 kHz and excludes UNIDs. It keeps the earliest eligible reception
-per catalogue station and explains exclusions/repeats on stderr. If confirmed event entries use receiver identities different from the profile,
+channels 190–530 kHz and excludes UNIDs. It keeps the **latest eligible confirmed reception** per catalogue station, ordered
+by hearing UTC (highest record ID breaks equal-time ties), and explains excluded
+older repeats on stderr. Tentative entries never enter the report or replace a
+confirmed entry. Rows use space-aligned UTC time, nominal frequency, callsign and
+rounded distance in km; missing saved distance is `?`. Location and handwritten
+notes follow, without generated center/offset/BW comments. Receiver description
+comes from profile `equipment`, without an appended internal address; the separate
+remote-receiver line and receiver-identity validation still apply. If confirmed event entries use receiver identities different from the profile,
 export prints a warning with both identities and asks for confirmation on stderr.
 Answer `y`/`yes` to produce a **review draft**; Enter, `n` or end-of-input cancels
 without creating the output file. The draft retains a `REVIEW REQUIRED` warning.

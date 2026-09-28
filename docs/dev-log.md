@@ -1,5 +1,26 @@
 # Dev Log
 
+## 2026-09-28 — Apply report cleanup to export code; retain latest hearing
+
+Future CLE exports now use space-aligned date/time, nominal kHz, callsign and rounded
+saved distance in km, with ? for unknown distance. Location and handwritten notes
+(including *) remain; automatically generated center/offset/BW comments are removed.
+Those tuning fields remain intact in the database. Receiver description is the
+profile equipment label without its internal-address suffix. Updated the local
+ignored profile to KiwiSDR 2 and the example accordingly; receiver identity checks
+and remote/public metadata requirements are unchanged.
+
+For repeats, choose the latest eligible confirmed hearing by UTC, breaking equal-time
+ties with the highest record ID. Emit selected stations chronologically and explain
+omitted older records. Later tentative/ineligible records do not displace confirmed
+eligible hearings. No reception or existing report files were modified.
+
+Validation: 689 offline tests passed. Updated the golden report and added coverage
+for latest-record notes/distance, equal-time ties, tentative exclusion, expanded-ID
+column alignment, unknown distance, receiver label and frozen-data preservation.
+Compileall/diff checks passed. No live radio access; personal profile remains untracked
+by Git and personal report files were left untouched.
+
 ## 2026-09-28 — Station flags, clean view transitions and report review
 
 Edited the explicitly requested local cle332-log.txt: removed center/offset/BW

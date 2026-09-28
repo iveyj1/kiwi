@@ -208,38 +208,42 @@ def cle332_report(entries: list[dict], profile: dict, *, allow_receiver_mismatch
             warnings.append(f'{label}: ineligible nominal channel or unidentified station')
             continue
         accepted.append((when, entry))
-    seen = set()
-    lines = []
-    for when, entry in sorted(accepted, key=lambda item: (item[0], item[1]['carrier_khz'], item[1]['ident'])):
-        if entry['station_key'] in seen:
-            warnings.append(f'entry {entry.get("log_id", "?")}: repeat reception omitted from report')
+    latest = {}
+    for when, entry in sorted(accepted, key=lambda item: (item[0], item[1].get('log_id', 0)), reverse=True):
+        if entry['station_key'] in latest:
+            warnings.append(f'entry {entry.get("log_id", "?")}: older repeat reception omitted from report')
             continue
-        seen.add(entry['station_key'])
+        latest[entry['station_key']] = (when, entry)
+    rows = []
+    for when, entry in sorted(latest.values(), key=lambda item: (item[0], item[1]['carrier_khz'], item[1]['ident'])):
         fields = entry['catalogue_fields']
         optional = clean_text(' '.join([fields.get("'Name' and Location", ''), fields.get('SP', ''), fields.get('ITU', '')]))
-        # Older logs lack explicit centers; recover them from their frozen tuning settings.
-        center = entry.get('rf_center_khz')
-        if center is None:
-            center = entry['tuned_khz'] + ((entry.get('cw_offset_hz', 0) if entry['mode'] == 'cw' else 0)
-                                           + (entry['low_cut_hz'] + entry['high_cut_hz']) / 2) / 1000
-        offset = (center - entry['carrier_khz']) * 1000
-        width = entry.get('bandwidth_hz', entry['high_cut_hz'] - entry['low_cut_hz'])
-        comment = f'center {center:.6f} kHz; offset {offset:+.1f} Hz; BW {width:g} Hz'
         notes = clean_text(entry.get('notes', ''))
         if notes:
-            comment += '; ' + notes
-        lines.append(f'{when:%Y-%m-%d %H:%M}  {entry["carrier_khz"]:g}  {clean_text(entry["ident"])}  {optional} ; {comment}'.rstrip())
-    if not lines:
+            optional += ' ; ' + notes
+        distance = entry.get('distance_km')
+        rows.append((f'{when:%Y-%m-%d}', f'{when:%H:%M}', f'{entry["carrier_khz"]:g}',
+                     clean_text(entry['ident']), '?' if distance is None else f'{distance:.0f}', optional.strip()))
+    if not rows:
         raise ValueError('no eligible confirmed live receptions for CLE332')
+    headings = ('Date (UTC)', 'UTC', 'kHz', 'ID', 'Distance (km)', 'Location')
+    widths = (10, 5, max(5, *(len(row[2]) for row in rows)),
+              max(3, *(len(row[3]) for row in rows)),
+              max(len(headings[4]), *(len(row[4]) for row in rows)))
+    def report_line(row):
+        columns = [value.rjust(width) if i in (2, 4) else value.ljust(width)
+                   for i, (value, width) in enumerate(zip(row, widths))]
+        return ('  '.join([*columns, row[5]])).rstrip()
+    lines = [report_line(row) for row in rows]
     header = ['Subject: CLE332 FINAL', '', clean_text(profile['listener']),
               f'Listening location: {clean_text(profile["location"])} ({profile["locator"].upper()})',
-              f'Receiver: {clean_text(profile["equipment"])} [{clean_text(profile["receiver"])}]',
+              f'Receiver: {clean_text(profile["equipment"])}',
               f'Aerial: {clean_text(profile["aerial"])}']
     if profile['remote']:
         header.append('Remote receiver: ' + clean_text(profile.get('web_address') or profile['receiver']))
     if receiver_warning:
         header.append('REVIEW REQUIRED — ' + clean_text(receiver_warning))
-    header.extend(['', 'Date (UTC)  UTC    kHz  ID  Location', *lines, '', f'{len(lines)} NDBs', ''])
+    header.extend(['', report_line(headings), *lines, '', f'{len(lines)} NDBs', ''])
     return '\n'.join(header), tuple(warnings)
 
 

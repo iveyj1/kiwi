@@ -78,14 +78,15 @@ def test_eligibility_is_nominal_channel(frequency, ident, eligible):
     assert cle332_eligible(frequency, ident) is eligible
 
 
-def test_golden_report_uses_utc_nominal_and_excludes_repeats():
+def test_golden_report_uses_latest_utc_nominal_distance_and_excludes_repeats():
     first = confirmed(component_khz=378.405, tuned_khz=378.405, component='usb',
-                      rf_center_khz=378.405, carrier_offset_hz=405, bandwidth_hz=100)
+                      rf_center_khz=378.405, carrier_offset_hz=405, bandwidth_hz=100, distance_km=1123.4)
     second = dict(first, heard_utc='2026-09-26T01:00:00Z')
     text, warnings = cle332_report([second, first], PROFILE)
     assert text == (Path(__file__).parents[1] / 'fixtures/rna/cle332-report.txt').read_text()
     assert '  378  RJ ' in text
-    assert 'center 378.405000 kHz; offset +405.0 Hz; BW 100 Hz' in text
+    assert 'center ' not in text and 'offset ' not in text and 'BW ' not in text
+    assert '1123' in text
     assert len(warnings) == 1 and 'repeat' in warnings[0]
 
 
@@ -94,7 +95,7 @@ def test_event_window_is_receiver_local_start_inclusive_end_exclusive():
     end = confirmed(heard_utc='2026-09-28T16:00:00Z')
     inside = confirmed(heard_utc='2026-09-26T00:01:00Z')
     text, warnings = cle332_report([outside, end, inside], PROFILE)
-    assert '2026-09-26 00:01' in text
+    assert '2026-09-26  00:01' in text
     assert len(warnings) == 2
 
 
@@ -138,13 +139,15 @@ def test_cli_export_and_no_overwrite(tmp_path, capsys):
         main(args)
 
 
-def test_legacy_report_reconstructs_actual_center_and_includes_notes():
+def test_legacy_report_omits_tuning_details_and_preserves_notes():
     entry = confirmed(tuned_khz=378.375, mode='cw', low_cut_hz=825, high_cut_hz=875,
                       cw_offset_hz=-800, notes='Copied twice\nclear')
     for name in ('rf_center_khz', 'carrier_offset_hz', 'bandwidth_hz'):
         entry.pop(name)
     text, warnings = cle332_report([entry], PROFILE)
-    assert 'center 378.425000 kHz; offset +425.0 Hz; BW 50 Hz; Copied twice clear' in text
+    assert '; Copied twice clear' in text
+    assert 'center ' not in text and 'offset ' not in text and 'BW ' not in text
+    assert '?' in text  # Missing frozen distance is not guessed.
 
 
 @pytest.mark.parametrize('answer,allowed', [('yes\n', True), ('n\n', False), ('', False)])
@@ -174,6 +177,29 @@ def test_receiver_mismatch_prompts_on_stderr_and_never_silently_filters(tmp_path
     assert '[y/N]' in captured.err and not captured.out
     with Logbook(path) as book:
         assert book.entries() == original
+
+
+def test_report_latest_confirmed_ties_alignment_and_frozen_data():
+    old = confirmed(log_id=1, notes='old note', distance_km=100)
+    last = confirmed(log_id=2, heard_utc='2026-09-27T01:02:03Z', notes='* latest', distance_km=1234.6)
+    tie = dict(last, log_id=3, notes='* tie winner')
+    tentative = dict(last, log_id=4, heard_utc='2026-09-28T01:00:00Z', status='tentative', notes='not confirmed')
+    other = confirmed(log_id=5, station_key='other', ident='LONGID', carrier_khz=204,
+                      heard_utc='2026-09-26T03:15:00Z', distance_km=None, notes='other note')
+    entries = [tie, old, tentative, other, last]
+    before = deepcopy(entries)
+    text, warnings = cle332_report(entries, dict(PROFILE, equipment='KiwiSDR 2'))
+    assert entries == before
+    assert '* tie winner' in text and 'old note' not in text and '* latest' not in text
+    assert 'not confirmed' not in text and '2 NDBs' in text
+    assert 'Receiver: KiwiSDR 2\n' in text
+    assert 'Receiver: KiwiSDR 2 [' not in text
+    lines = [line for line in text.splitlines() if line.startswith('2026-')]
+    assert lines[0].startswith('2026-09-26') and lines[1].startswith('2026-09-27')
+    assert lines[0].index('LONGID') == lines[1].index('RJ')
+    assert lines[0].index('?') == lines[1].index('1235') + 3  # Right-aligned km.
+    assert all(line.index(':') == 14 for line in lines)
+    assert len(warnings) == 2
 
 
 def test_future_schema_not_modified(tmp_path):

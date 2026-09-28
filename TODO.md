@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — export layout and latest confirmed reception
+
+Goal: apply the requested report edits to future exports: aligned UTC/frequency/ID/
+distance-km columns, no automatic center/offset/BW comments, receiver description
+without internal address suffix. Use latest eligible confirmed reception per station,
+not earliest. Keep handwritten notes and frozen evidence. Set local equipment label
+to KiwiSDR 2 without committing personal files. Done: golden/ordering/alignment tests,
+full offline suite and docs; no receiver access or existing-report overwrite.
+Completed: new export template, local KiwiSDR 2 profile label, latest-hearing
+selection with record-ID tie break. 689 offline tests pass; compileall/diff checks
+pass. Existing reports and reception records unchanged.
+
 ## Current slice — report cleanup, station flags and fresh waterfall views
 
 Goals: edit the requested local CLE report (not commit it); persistent Space-toggle

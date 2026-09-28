@@ -125,10 +125,14 @@ assume the audio midpoint equals the magnitude of the configured CW offset.
 These memories reflect a listener's preference/observation, not calibrated carrier
 offset measurements: interference, propagation, receiver reference errors and
 filter preference may all contribute. They are stored separately in
-`station_memory.py`, and immutable reception snapshots supply report comments.
+`station_memory.py`, while immutable reception snapshots retain the original tuning
+and receiving-site distance for inspection/reporting.
 Later personal tuning changes must not retroactively alter previous loggings.
-The submitted main frequency column remains nominal; center/offset/BW go in
-optional comments after the required date/time/frequency/ID fields.
+The submitted frequency column remains nominal. The current report adds distance
+from the saved reception and preserves operator notes, but omits automatically
+generated center/offset/BW comments. This is a presentation choice, not removal of
+the underlying tuning evidence. Repeated stations use the latest eligible confirmed
+hearing, not the first.
 
 ## Comparing nearby station hypotheses
 
