@@ -53,7 +53,8 @@ def reception_draft(browser, state, *, receiver: str, source_kind: str, event: s
                 mode=state.mode, low_cut_hz=state.low_cut_hz, high_cut_hz=state.high_cut_hz,
                 cw_offset_hz=state.cw_offset_hz, distance_km=match.distance_km,
                 catalogue_sha256=browser.catalogue.sha256,
-                catalogue_fields=dict(match.station.raw_fields), notes='')
+                catalogue_fields=dict(match.station.raw_fields),
+                notes='*' if browser.memory.records.get(match.station.key, {}).get('marked', False) else '')
 
 
 def validate_reception(record: dict) -> None:
@@ -157,8 +158,12 @@ def cle332_eligible(carrier_khz: float, ident: str) -> bool:
             ident.strip().upper() not in {'', '?', '--', 'UNID', 'UNKNOWN', 'NONE'})
 
 
-def cle332_report(entries: list[dict], profile: dict) -> tuple[str, tuple[str, ...]]:
-    """Produce a manual-submission draft, rejecting mixed-receiver event logs."""
+class ReceiverMismatch(ValueError):
+    """Export requires an explicit human decision about receiver identity."""
+
+
+def cle332_report(entries: list[dict], profile: dict, *, allow_receiver_mismatch: bool = False) -> tuple[str, tuple[str, ...]]:
+    """Produce a draft; mismatched receiver identities require explicit consent."""
     required = ('listener', 'receiver', 'timezone', 'locator', 'location', 'equipment', 'aerial')
     for field in required:
         if not isinstance(profile.get(field), str) or not profile[field].strip():
@@ -175,11 +180,17 @@ def cle332_report(entries: list[dict], profile: dict) -> tuple[str, tuple[str, .
     event_rows = [e for e in entries if e.get('event') == 'CLE332' and e['status'] == 'confirmed']
     # Do not silently omit other receivers to make a noncompliant event log appear valid.
     live_receivers = {e['receiver'] for e in event_rows if e['source_kind'] == 'live'}
+    receiver_warning = None
     if live_receivers - {profile['receiver']}:
-        raise ValueError('CLE332 contains confirmed event entries from another receiver; review/reclassify them before export')
+        receiver_warning = ('Receiver mismatch: CLE332 contains confirmed event entries from another receiver. '
+                            f'Profile: {profile["receiver"]}; logged: {", ".join(sorted(live_receivers))}. '
+                            'CLE332 permits only one receiver; an address change may refer to the same physical receiver. '
+                            'Continuing does not establish compliance or change the saved evidence.')
+        if not allow_receiver_mismatch:
+            raise ReceiverMismatch(receiver_warning)
     start = datetime(2026, 9, 25, 12, tzinfo=zone).astimezone(timezone.utc)
     end = datetime(2026, 9, 28, 12, tzinfo=zone).astimezone(timezone.utc)
-    warnings = []
+    warnings = [receiver_warning] if receiver_warning else []
     accepted = []
     for entry in event_rows:
         label = f'entry {entry.get("log_id", "?")} {entry["ident"]}'
@@ -226,6 +237,8 @@ def cle332_report(entries: list[dict], profile: dict) -> tuple[str, tuple[str, .
               f'Aerial: {clean_text(profile["aerial"])}']
     if profile['remote']:
         header.append('Remote receiver: ' + clean_text(profile.get('web_address') or profile['receiver']))
+    if receiver_warning:
+        header.append('REVIEW REQUIRED — ' + clean_text(receiver_warning))
     header.extend(['', 'Date (UTC)  UTC    kHz  ID  Location', *lines, '', f'{len(lines)} NDBs', ''])
     return '\n'.join(header), tuple(warnings)
 
@@ -262,7 +275,16 @@ def main(argv=None) -> int:
             else:
                 with args.profile.open('rb') as source:
                     profile = tomllib.load(source)
-                text, warnings = cle332_report(book.entries(), profile)
+                entries = book.entries()
+                try:
+                    text, warnings = cle332_report(entries, profile)
+                except ReceiverMismatch as exc:
+                    import sys
+                    print(f'WARNING: {exc}', file=sys.stderr)
+                    print('Generate a review draft with these receiver identities? [y/N] ', end='', file=sys.stderr, flush=True)
+                    if sys.stdin.readline().strip().lower() not in {'y', 'yes'}:
+                        raise ValueError('report cancelled: receiver mismatch not confirmed')
+                    text, warnings = cle332_report(entries, profile, allow_receiver_mismatch=True)
                 if args.output:
                     with args.output.open('x', encoding='utf-8') as destination:
                         destination.write(text)
@@ -270,7 +292,7 @@ def main(argv=None) -> int:
                     print(text, end='')
                 import sys
                 for warning in warnings:
-                    print('Excluded: ' + warning, file=sys.stderr)
+                    print(('WARNING: ' if warning.startswith('Receiver mismatch:') else 'Excluded: ') + warning, file=sys.stderr)
                 print('Draft only; review and submit manually by 2026-09-30 08:00 UTC.', file=sys.stderr)
     except (OSError, ValueError, KeyError, sqlite3.Error) as exc:
         parser.error(str(exc))

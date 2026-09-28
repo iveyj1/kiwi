@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import math
 from collections import deque
 from dataclasses import dataclass
 from threading import Condition
@@ -53,8 +54,39 @@ class WaterfallSnapshotPublisher:
         self._generation = 0
         self._latest: WaterfallSnapshot | None = None
         self._closed = False
+        self._expected_view: tuple[float, int] | None = None
 
-    def append(self, frame: WaterfallFrame) -> WaterfallSnapshot:
+    def expect_view(self, center_khz: float, zoom: int) -> None:
+        """Start fresh history and reject queued frames from the old live viewport."""
+        with self._condition:
+            self._expected_view = (center_khz, zoom)
+            self._rows.clear()
+            self._latest = None
+            # Force incremental raster consumers to rebuild even for the same geometry.
+            self._generation += 1
+            self._condition.notify_all()
+
+    @property
+    def awaiting_view(self) -> bool:
+        with self._condition:
+            return self._expected_view is not None and self._latest is None and not self._closed
+
+    def _matches_view(self, frame: WaterfallFrame) -> bool:
+        if self._expected_view is None:
+            return True
+        if (frame.flags_x_zoom_server is None or frame.start_khz is None
+                or frame.span_khz is None or frame.bin_width_hz is None):
+            return False
+        center, zoom = self._expected_view
+        actual_zoom = frame.flags_x_zoom_server & 0xFFFF
+        if actual_zoom != zoom:
+            return False
+        bandwidth = frame.span_khz * 2 ** actual_zoom
+        expected_start = max(0.0, min(center - frame.span_khz / 2, bandwidth - frame.span_khz))
+        return math.isclose(frame.start_khz, expected_start, rel_tol=0,
+                            abs_tol=max(1e-9, frame.bin_width_hz / 1000))
+
+    def append(self, frame: WaterfallFrame) -> WaterfallSnapshot | None:
         """Publish one frame without retaining superseded snapshot objects."""
         row = tuple(frame.dbm)
         if not row:
@@ -62,6 +94,8 @@ class WaterfallSnapshotPublisher:
         with self._condition:
             if self._closed:
                 raise RuntimeError("waterfall snapshot publisher is closed")
+            if not self._matches_view(frame):
+                return None
             if self._width is None:
                 self._width = len(row)
             elif len(row) != self._width:

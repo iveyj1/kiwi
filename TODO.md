@@ -1,5 +1,19 @@
 # TODO
 
+## Current slice — report cleanup, station flags and fresh waterfall views
+
+Goals: edit the requested local CLE report (not commit it); persistent Space-toggle
+station marker visible in the spreadsheet and frozen as * in new reception notes;
+reject queued old-view W/F rows after live recenter/zoom; place selected station ID
+beside its carrier label when room permits; receiver mismatch warning and explicit
+export confirmation without relabeling evidence. Done: regression fixtures/tests,
+full offline suite, docs; no live radio. Report cleanup completed and checked against
+57 frozen reception distances; other notes retained.
+Completed: persistent flag/new-note inheritance, old-view frame gate with fresh
+raster rebuild and pending-target updates, inline ID placement and confirmed mismatch
+review export. 688 offline tests, compileall and diff checks passed. No live radio;
+same-header receiver FFT settling remains unverified. Personal files are not committed.
+
 ## Current slice — focus recovery and slow-render input starvation
 
 Goal: consume terminal focus reports instead of interpreting them as keys; pause

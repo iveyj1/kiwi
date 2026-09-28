@@ -309,6 +309,9 @@ def set_console_frequency(model: WaterfallGuiModel, frequency_khz: float):
     try:
         start_khz, end_khz = model.display_frequency_range()
     except ValueError:
+        # A second tune during a live view transition must supersede the pending target.
+        if model.publisher.awaiting_view:
+            recentered = model.recenter()
         return tuned, recentered
     if frequency_khz < start_khz or frequency_khz > end_khz:
         recentered = model.recenter()
@@ -780,6 +783,12 @@ def run_fixture_shell(
                 except ValueError as exc:
                     message = str(exc)
                 dirty = True
+            elif rna_browser is not None and key == ' ':
+                try:
+                    message = rna_browser.toggle_marker()
+                except (ValueError, OSError) as exc:
+                    message = str(exc)
+                dirty = True
             elif rna_browser is not None and key in (",", ".", "<", ">"):
                 try:
                     message = rna_browser.cycle_nearby(passband_center_khz(model.session.state), -1 if key in (",", "<") else 1)
@@ -980,7 +989,8 @@ def run_fixture_shell(
                 image = None
                 if snapshot is None:
                     presenter.clear()
-                    transport_status += " | waiting for first W/F frame"
+                    transport_status += (" | waiting for requested W/F view" if model.publisher.awaiting_view
+                                         else " | waiting for first W/F frame")
                 else:
                     if levels.observe(snapshot):
                         model.set_render_scale(levels.min_dbm, levels.max_dbm)
@@ -1068,7 +1078,7 @@ def run_fixture_shell(
                              "h/l small H/L large j/k BW w edit W new q quit"]
                 if rna_browser is not None:
                     help_rows.append("f freq m mode t/T steps c center +/- zoom a audio u auto : commands")
-                    help_rows.append("RNA :rna store / forget / near HZ / range KM / power W / sort distance")
+                    help_rows.append("Space mark * | RNA :rna store / forget / near HZ / range KM / power W / sort distance")
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (

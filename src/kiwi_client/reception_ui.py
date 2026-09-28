@@ -105,7 +105,8 @@ def station_spreadsheet(browser, index: ReceptionIndex, receiver, event, source_
             earlier_confirmed = latest['status'] != 'confirmed' and any(r['status'] == 'confirmed' for r in records)
             status = latest['status'].upper() + ('+' if earlier_confirmed else '')
             logged = f"{status} {utc_time(latest['heard_utc']):%Y-%m-%d %H:%M:%SZ}"
-        rows.append((('> ' if match == browser.selected else '  ') + station.ident,
+        marked = browser.memory.records.get(station.key, {}).get('marked', False)
+        rows.append((('>' if match == browser.selected else ' ') + ('*' if marked else ' ') + station.ident,
                      f'{station.carrier_khz:g}', logged,
                      ' '.join(filter(None, (station.location, station.raw_fields.get('SP', ''), station.raw_fields.get('ITU', '')))),
                      '?' if match.distance_km is None else f'{match.distance_km:.0f}',

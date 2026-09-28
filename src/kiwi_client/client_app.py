@@ -939,6 +939,8 @@ class ClientController:
         }
         status = self.background.status()
         if status.running and status.name == "radio":
+            if result.commands.waterfall:
+                self.waterfall_snapshots.expect_view(result.state.waterfall_center_khz, result.state.waterfall_zoom)
             for command in result.commands.snd:
                 self.background.send_command(RoutedSessionCommand("snd", command))
             for command in result.commands.waterfall:

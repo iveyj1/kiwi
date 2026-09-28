@@ -291,6 +291,24 @@ migration/recall to the 10 Hz minimum with RF-center and log association preserv
 Server rejection/clamping and actual filter response remain unverified; no new
 acknowledgment or bandwidth-capability message is assumed.
 
+## Display freshness after live W/F view changes
+
+No new protocol messages are assumed. On an attended recenter/zoom, the client
+clears display history before sending the existing `SET zoom=... cf=...` command.
+The snapshot publisher rejects queued frames whose reported zoom/start do not match
+the requested viewport. Start is derived from the requested center and the frame's
+span, clamped to the receiver bandwidth; tolerance is one frame-bin width to allow
+quantized positioning. Upper flag bits are masked when comparing zoom. Unmapped
+frames are withheld until metadata permits checking them; sequence counters are
+not used as acknowledgments (local receivers can repeat sequence zero).
+
+Synthetic fixture: `tests/fixtures/kiwi/wf-view-transition.json`. Harness coverage
+checks delayed old rows before/after new ones, edge clamping, missing metadata,
+wrong zoom and a second tune while awaiting the first viewport. This is display
+filtering, not packet loss or a change to captured evidence. No live validation
+was performed. Frames carrying a new mapping but stale FFT contents cannot be
+identified by this header-only check; no unmeasured settling delay is invented.
+
 ## Known open questions
 
 - Exact audio frame format used by local receivers.

@@ -434,6 +434,7 @@ def compose_waterfall_scale(
                 _set_pixel(rgb, waterfall.width, x, station_stem_top, STATION_BAR_RGB)
         ident = next(a.label.rsplit(':', 1)[0] for a in annotations if a.station_selected)
         label_top = station_stem_top + preset_stem_height + 1
+        ident_label_index = len(text_labels)
         text_labels.append((0, label_top, ident, (255, 255, 255)))
         station_labels.append(ident)
         ident_width = text_renderer.width(ident)
@@ -472,6 +473,15 @@ def compose_waterfall_scale(
             text_labels.append((x, label_top, label, color))
             station_labels.append(label)
             occupied_station.append(interval)
+        # Move the one ID beside the center/carrier number when no other label is crowded.
+        carrier_label = next((label for label in text_labels[ident_label_index + 1:]
+                              if label[1] == label_top and label[2] == f'{carrier_frequency:.3f} c'), None) if carrier_frequency is not None else None
+        if carrier_label is not None:
+            ident_x = carrier_label[0] - ident_width - 2 * font_scale
+            if ident_x >= 0 and all(
+                    ident_x + ident_width + font_scale <= left or ident_x >= right + font_scale
+                    for left, right in occupied_station[1:]):
+                text_labels[ident_label_index] = (ident_x, label_top, ident, (255, 255, 255))
         if not station_annotations:
             text_labels.append((ident_width + 2 * font_scale, label_top,
                                 'components offscreen', STATION_BAR_RGB))

@@ -147,6 +147,35 @@ def test_legacy_report_reconstructs_actual_center_and_includes_notes():
     assert 'center 378.425000 kHz; offset +425.0 Hz; BW 50 Hz; Copied twice clear' in text
 
 
+@pytest.mark.parametrize('answer,allowed', [('yes\n', True), ('n\n', False), ('', False)])
+def test_receiver_mismatch_prompts_on_stderr_and_never_silently_filters(tmp_path, capsys, monkeypatch, answer, allowed):
+    import io
+    import json
+    import sys
+    path = tmp_path / 'log.sqlite'
+    entry = confirmed(receiver='10.0.0.42:8073', notes='*')
+    with Logbook(path) as book:
+        book.save(entry)
+        original = book.entries()
+    profile = tmp_path / 'profile.toml'
+    profile.write_text('\n'.join(f'{key} = {json.dumps(value)}' for key, value in PROFILE.items()))
+    output = tmp_path / 'report.txt'
+    monkeypatch.setattr(sys, 'stdin', io.StringIO(answer))
+    args = ['--logbook', str(path), 'export-cle332', '--profile', str(profile), '--output', str(output)]
+    if allowed:
+        assert main(args) == 0
+        text = output.read_text()
+        assert 'REVIEW REQUIRED' in text and '10.0.0.42:8073' in text
+        assert '1 NDBs' in text and '; *' in text
+    else:
+        with pytest.raises(SystemExit): main(args)
+        assert not output.exists()
+    captured = capsys.readouterr()
+    assert '[y/N]' in captured.err and not captured.out
+    with Logbook(path) as book:
+        assert book.entries() == original
+
+
 def test_future_schema_not_modified(tmp_path):
     import sqlite3
     path = tmp_path / 'log.sqlite'

@@ -46,7 +46,8 @@ the scale: `x = round((f - start)/(end - start) * (width - 1))`, with all freque
 in kHz. Thus RJ's carrier is marked at 378.000, LSB at 377.590 and USB at 378.405;
 the CW receiver reference at 377.605 is not a station component. A personal stored
 RF center gets its own numeric label/stem, without a fourth connector.
-The station ID appears once at the left; only the carrier frequency is tagged `c`.
+The station ID appears once beside the carrier-frequency number when space permits,
+otherwise at the row's left edge; only the carrier frequency is tagged `c`.
 Frequencies on this marker display three decimal places in kHz, but their stored
 values and plotted coordinates retain full precision. The selected station is not
 repeated in the general catalogue annotation row. The horizontal
@@ -72,6 +73,15 @@ The RF filter edges remain exact, and the width test uses unclipped coordinates 
 an offscreen wide passband is not mistaken for a narrow one. Wider bars keep the
 normal small pointer. Neither glyph size nor display magnification measures filter
 selectivity.
+
+A live viewport change also changes which RF interval new rows represent. Network
+queues can still contain earlier rows after a recenter command. We start fresh display
+history and compare incoming frame start/zoom metadata to the requested interval
+before accepting rows. We do not relabel old samples as if they came from the new
+frequency. This rejects old-view rows, but cannot detect old FFT contents if the
+receiver has already attached new metadata. The synthetic transition fixture and
+regressions are in `tests/fixtures/kiwi/wf-view-transition.json` and
+`tests/harness/test_live_view_reset.py`; no receiver settling time has been measured.
 
 ## Symmetric CW bandwidth adjustment
 

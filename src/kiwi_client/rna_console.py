@@ -102,11 +102,21 @@ class RnaBrowser:
         choice = self.memory.records.get(self.selected.station.key, {}).get('choice', default)
         return next((c for c in self.components if c.kind == choice), self.components[0])
 
+    def toggle_marker(self) -> str:
+        if self.selected is None:
+            raise ValueError('no station selected')
+        key = self.selected.station.key
+        record = dict(self.memory.records.get(key, {}))
+        record.setdefault('choice', self.component.kind)
+        record['marked'] = not record.get('marked', False)
+        self.memory.update(key, record)
+        return f'{self.selected.station.ident}: marker {"* set" if record["marked"] else "cleared"}'
+
     def store_tuning(self, state) -> str:
         if self.selected is None or state.mode != 'cw':
             raise ValueError('select a station and use CW before storing tuning')
         station = self.selected.station
-        self.memory.update(station.key, dict(choice='stored', stored=dict(
+        self.memory.update(station.key, dict(self.memory.records.get(station.key, {}), choice='stored', stored=dict(
             carrier_khz=station.carrier_khz, offset_hz=(passband_center_khz(state) - station.carrier_khz) * 1000,
             bandwidth_hz=state.high_cut_hz - state.low_cut_hz)))
         self._near_anchor = self._near_expected = None
@@ -116,7 +126,9 @@ class RnaBrowser:
         if self.selected is None:
             raise ValueError('no station selected')
         station = self.selected.station
-        self.memory.update(station.key, dict(choice='usb' if station.usb_hz is not None else 'carrier'))
+        record = dict(self.memory.records.get(station.key, {}), choice='usb' if station.usb_hz is not None else 'carrier')
+        record.pop('stored', None)
+        self.memory.update(station.key, record)
         self._near_anchor = self._near_expected = None
         return f'Forgot personal tuning for {station.ident}'
 

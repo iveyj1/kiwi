@@ -399,6 +399,7 @@ def test_radio_background_routes_tune_to_snd_and_reports_both_streams():
     deadline = time.monotonic() + 1.0
     while controller.paired_session_status().wf_status != "running" and time.monotonic() < deadline:
         time.sleep(0.01)
+    assert controller.waterfall_snapshots.latest().rows[-1].sequence == 1
     tuned = controller.execute("tune 6000.125")
     centered = controller.execute("wf-center 6000.125")
     zoomed = controller.execute("wf-zoom +1")
@@ -410,7 +411,7 @@ def test_radio_background_routes_tune_to_snd_and_reports_both_streams():
     assert radio_call[1].zoom == 7
     assert radio_call[1].speed == 3
     assert radio_call[1].interp == 12
-    assert controller.waterfall_snapshots.latest().rows[-1].sequence == 1
+    assert controller.waterfall_snapshots.latest() is None  # No fresh-view frame supplied by this fake.
     assert tuned["active_command"] == "SET mod=am low_cut=-5000 high_cut=5000 freq=6000.125"
     commands = finished["operation"]["result"]["commands"]
     assert [(command.stream, command.command) for command in commands] == [

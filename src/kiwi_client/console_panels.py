@@ -70,7 +70,7 @@ def station_table_lines(table, width: int, count: int) -> list[str]:
     headers = ('ID', 'Nominal kHz', 'Logged (UTC)', 'Location', 'Distance km', 'Period s', 'Last (RNA)')
     def render(values):
         return ' │ '.join(fit(values[field], size) for field, size in zip(fields, sizes))
-    selected = next((i for i, values in enumerate(table) if values[0].startswith('> ')), 0)
+    selected = next((i for i, values in enumerate(table) if values[0].startswith('>')), 0)
     capacity = max(0, count - 1)
     start = max(0, min(selected - capacity // 2, len(table) - capacity))
     return [render(headers), *(render(values) for values in table[start:start + capacity])][:count]

@@ -103,7 +103,7 @@ def test_clipped_station_span_has_no_fake_edge_connectors():
     assert all(pixel(result.image, x, 12) == pixel(plain.image, x, 12) for x in range(1001))
 
 
-def test_identifier_is_drawn_once_at_left_and_only_carrier_is_tagged(monkeypatch):
+def test_identifier_moves_beside_carrier_when_room_and_falls_back_at_edge(monkeypatch):
     import kiwi_client.waterfall_scale as scale
     renderer = scale.scale_text_renderer('bitmap', font_scale=1)
     draw = renderer.render
@@ -117,8 +117,13 @@ def test_identifier_is_drawn_once_at_left_and_only_carrier_is_tagged(monkeypatch
     assert sum(text == 'RJ' for _, _, text, _ in labels) == 1
     assert not any(text.startswith('RJ:') for _, _, text, _ in labels)
     ident = next(item for item in labels if item[2] == 'RJ')
-    assert ident[:2] == (0, result.station_stem_top + 6)
+    carrier = next(item for item in labels if item[2] == '378.000 c')
+    assert ident[0] == carrier[0] - renderer.width('RJ') - 2
+    assert ident[0] > 0 and ident[1] == result.station_stem_top + 6
     assert {text for _, y, text, _ in labels if y == ident[1]} == {'RJ', '377.590', '378.000 c', '378.405'}
+    labels.clear()
+    compose(browser().annotations(378, 379), start=378, end=379, width=160)
+    assert next(item for item in labels if item[2] == 'RJ')[0] == 0
 
 
 def test_carrier_at_left_edge_and_coincident_sideband_keep_carrier_tag():

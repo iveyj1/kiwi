@@ -1,5 +1,41 @@
 # Dev Log
 
+## 2026-09-28 — Station flags, clean view transitions and report review
+
+Edited the explicitly requested local cle332-log.txt: removed center/offset/BW
+comments, added rounded km distances from frozen reception records, aligned columns,
+and replaced the receiver description with KiwiSDR 2. Verified all 57 distances
+and entry-column alignment. Other notes were retained. The database was opened
+read-only for this edit; the personal report/backups/scripts are not committed.
+This was a one-off report edit, not a change to the export column template.
+
+Space now atomically toggles a persistent station marker. The spreadsheet uses *
+beside the ID and keeps marked selections centered correctly. New reception drafts
+inherit * in notes; old receptions are unchanged. Store/forget/component operations
+preserve the flag, and text-entry spaces retain their normal meaning.
+
+Live recenter/zoom clears snapshot history before enqueueing the view command.
+A header-based gate rejects queued old-view or unmapped frames, including late old
+rows after new rows begin. Generation advances force raster-cache rebuild. A second
+tune while awaiting a viewport supersedes the pending target. Synthetic tests cover
+wrong zoom, receiver edge clamping, missing mapping and stale raster contents. This
+cannot detect stale FFT data carrying an already-updated header; no arbitrary frame
+settling count or live-radio result is claimed.
+
+The single selected-station ID moves beside the central carrier-frequency label
+when collision-free; narrow/offscreen cases retain the left-edge fallback. RF stems
+and marker geometry are unchanged.
+
+Receiver mismatch now produces an explicit CLI warning/prompt rather than an
+unconditional export block. Declining/EOF creates no output; accepting generates a
+review draft with a retained mismatch warning and actual logged receiver identities.
+No evidence is relabeled or silently excluded. The CLE one-receiver rule still applies.
+
+Validation: 688 offline tests passed; compileall and diff checks passed. Added
+flag persistence/write-failure/notes/short-table tests, mixed Space/browse key tests,
+viewport-transition fixture and routing tests, label-placement tests, and export
+confirmation/decline/EOF/evidence-preservation tests. No live radio connection.
+
 ## 2026-09-27 — Focus recovery and slow-output keyboard starvation
 
 User reports audio continues while keyboard and waterfall become erratic after

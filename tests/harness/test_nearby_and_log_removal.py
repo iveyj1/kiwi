@@ -56,6 +56,7 @@ def test_near_radius_validation_filter_reset_and_stored_component(nearby):
 @pytest.mark.parametrize('keys,ident,frequency', [
     ('>><q', 'BB', 300.09),
     ('..,q', 'BB', 300),
+    (' . q', 'BB', 300),
     ('>..q', 'BB', 300.09),
     ('>.q', 'AA', 300.09),
     ('>.<q', 'BB', 300.09),
@@ -89,6 +90,8 @@ def test_nearby_shell_browse_and_tune_keys(nearby, monkeypatch, keys, ident, fre
     shell.run_fixture_shell(Screen(), model=model, timeline=FixtureWaterfallTimeline.from_fixture(fixture, repeat=1),
         live_source=None, presets={}, presenter=Presenter(), levels=WaterfallLevelController(), tui_controller=None,
         tui_config=None, source_fps=20, refresh_hz=1000, scale_font_backend='bitmap', rna_browser=nearby)
+    if ' ' in keys:
+        assert nearby.memory.records[nearby.selected.station.key]['marked'] is True
     assert len(tune_calls) == sum(key in '<>' for key in keys)
     assert nearby.selected.station.ident == ident
     assert nearby.component.kind == ('usb' if ident == 'BB' else 'carrier')

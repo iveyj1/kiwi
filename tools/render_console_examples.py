@@ -32,7 +32,7 @@ def render_examples(columns=174, lines=30) -> str:
         filters='CLE332=on activity=active-unknown range<=offkm power>=offW sort=frequency',
         help_rows=['/ find n/N station ,/. show nearby </> tune nearby v band h/l small H/L large j/k BW w edit W new q quit',
                    'f freq m mode t/T steps c center +/- zoom a audio u auto : commands',
-                   'RNA :rna store / forget / near HZ / range KM / power W / sort distance'],
+                   'Space mark * | RNA :rna store / forget / near HZ / range KM / power W / sort distance'],
         message='NEAR 1/12 anchor 333.035000 kHz ±200 Hz; PH usb 333.035000; RNA filters apply',
         telemetry='RF levels manual / RX 332.2350 kHz')
     intro = ('CURRENT CONSOLE LAYOUT — EDITABLE MOCKUP\n'

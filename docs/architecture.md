@@ -30,6 +30,25 @@ Live transport startup follows the current Kiwi browser bootstrap: fetch `/VER` 
 
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md). The standalone combined viewer coordinates separate W/F and SND tasks through exact selected-frequency state and command queues; it does not merge their transport lifecycles or parsers. `WaterfallSnapshotPublisher` provides bounded immutable numeric history snapshots, preserving each row's original frequency mapping while coalescing slow consumers onto the latest generation.
 
+## Live viewport freshness and personal station flags
+
+Before a live W/F view command is queued, `ClientController` sets the requested view
+on `WaterfallSnapshotPublisher`. This clears history and advances generation so
+incremental raster caches rebuild. The publisher compares each incoming contextualized
+frame's start/zoom with the requested geometry, rejecting old or unmapped rows even
+after matching rows begin. Normal frequency changes that do not move W/F are unaffected;
+fixture remapping remains available. Pending-view retunes supersede the target.
+
+Station memory accepts an optional boolean `marked`, toggled atomically by Space.
+The spreadsheet displays it separately from selection and reception status. New
+reception drafts freeze its `*` as editable notes; existing logs are not modified.
+Store/forget/component actions preserve the marker.
+
+CLE export remains a pure validation/formatting function. Receiver identity mismatch
+raises a specific exception unless the caller explicitly acknowledges it. The CLI
+warns/prompts on stderr, defaults to cancellation, and includes the warning in an
+acknowledged review draft. Neither acceptance nor formatting changes frozen evidence.
+
 ## Integrated-console focus and render pacing
 
 `terminal_input.py` recognizes raw xterm CSI I/O focus reports and ncurses extended

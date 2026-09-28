@@ -37,6 +37,8 @@ class StationMemory:
     def _validate(record):
         if not isinstance(record, dict) or record.get('choice') not in {'carrier', 'lsb', 'usb', 'stored'}:
             raise ValueError('invalid station-memory choice')
+        if 'marked' in record and type(record['marked']) is not bool:
+            raise ValueError('invalid station marker')
         if 'stored' in record:
             stored = record['stored']
             if not isinstance(stored, dict):

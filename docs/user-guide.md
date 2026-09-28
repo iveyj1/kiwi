@@ -66,6 +66,16 @@ history remain unchanged. Larger images do not add RF resolution, and reducing t
 pane can omit source bins/rows from the displayed image. Use receiver zoom to inspect
 narrow signals rather than interpreting larger pixels as finer measurements.
 
+### Fresh waterfall history after a live view change
+
+A live recenter or zoom starts a fresh display history. Frames already queued with
+an old RF start/zoom are ignored, including late old-view rows after the first new
+row. The display waits for metadata matching the requested view (allowing server
+band-edge clamping and one source-bin position tolerance). A second tune while
+waiting updates the pending target. Tuning within the existing view does not clear
+history. This does not discard an arbitrary number of frames or prove that receiver
+FFT data bearing a new header has fully settled; that would require live evidence.
+
 ### Returning after the terminal loses focus
 
 The console enables terminal focus reporting. While unfocused it pauses graphics
@@ -120,9 +130,10 @@ Add `--rna rna-signals.csv` to the console command. The other-stations RNA row u
 are taller; sideband caps point left/right. Labels that collide are suppressed,
 not moved to false frequencies; browse co-channel stations with the keyboard.
 
-The **currently selected station** gets its own scale row, with its ID shown once
-at the left. Frequencies use three decimal places in kHz; only the carrier has a
-`c` tag. For example: `RJ    377.590    378.000 c    378.405`. Sidebands and a saved
+The **currently selected station** gets its own scale row, with its ID shown once,
+just left of the central carrier-frequency label when room permits; otherwise the
+ID stays at the row's left edge. Frequencies use three decimal places in kHz; only
+the carrier has a `c` tag. For example: `377.590    RJ 378.000 c    378.405`. Sidebands and a saved
 center have numeric labels without L/U/S suffixes. The selected station is omitted
 from the other-stations row to avoid repeating its ID. Label rounding does not
 change precise marker positions, stored frequencies or tuning. A **horizontal bar below the frequency scale**
@@ -151,6 +162,11 @@ without removing that station's other known components.
 - A station remembers its last component choice; first visits choose USB if known,
   otherwise carrier. Highlighting a search row alone still does not tune.
 - `A`: cycle active-plus-unknown, active-only, and all activity policies.
+- **Space**: set/clear a personal `*` marker for the selected station. It appears
+  beside the spreadsheet ID and persists in `rna-stations.json`. It neither tunes
+  nor confirms reception. New reception drafts start with `*` in notes when marked;
+  clearing the marker does not rewrite past logs. Existing receptions can be edited
+  explicitly with `w`. Spaces in search/command/log editors remain ordinary input.
 - `,` / `.`: show previous/next nearby station and its closest known component,
   without changing tuning, mode or bandwidth.
 - `<` / `>`: show and immediately tune previous/next nearby station.
@@ -431,10 +447,13 @@ PYTHONPATH=src python -m kiwi_client.ndb_logbook --logbook receptions.sqlite \
 The exporter selects confirmed LIVE entries explicitly tagged CLE332, uses the
 receiver-local noon window (start inclusive, end exclusive), tests even nominal
 channels 190–530 kHz and excludes UNIDs. It keeps the earliest eligible reception
-per catalogue station and explains exclusions/repeats on stderr. It refuses mixed
-receiver event logs rather than quietly dropping another receiver. Review incorrect
-event entries and mark them tentative/rejected; do not use that mechanism to conceal
-noncompliant listening. All original receptions remain in the logbook.
+per catalogue station and explains exclusions/repeats on stderr. If confirmed event entries use receiver identities different from the profile,
+export prints a warning with both identities and asks for confirmation on stderr.
+Answer `y`/`yes` to produce a **review draft**; Enter, `n` or end-of-input cancels
+without creating the output file. The draft retains a `REVIEW REQUIRED` warning.
+No receiver identities or saved evidence are rewritten or silently filtered.
+An address change may identify the same physical receiver, but genuinely using
+multiple receivers still violates the CLE rule; confirmation does not waive it.
 
 Review the draft, copy its body into a plain-text email, and use `CLE332 FINAL` as
 the subject. Nothing sends mail. Arrival deadline: **2026-09-30 08:00 UTC**.
