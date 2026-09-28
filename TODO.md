@@ -1,5 +1,17 @@
 # TODO
 
+## Requested follow-up work
+
+- [ ] Consider improving the logging flow, including starting log entry directly
+  from the main screen.
+- [ ] Collect evidence when adding a log entry: audio recording plus a snapshot
+  of the waterfall, frequency/tuning settings and displayed text, linked to the
+  reception record.
+- [ ] Further improve the text layout.
+- [ ] Investigate waterfall smoothness when connected to an 8-channel KiwiSDR;
+  the user currently observes jumpy updates. Diagnose timing/buffering/rendering
+  with harness coverage before targeted local-receiver testing.
+
 ## Current slice — explicit logbook quit controls
 
 Goal: add visible Quit and window-scoped Ctrl+Q, using normal window close rather
