@@ -1,0 +1,7 @@
+{
+    "source": "synthetic xterm DECSET 1004 focus reports, not a live terminal capture",
+    "out": ["\u001b", "[", "O"],
+    "in": ["\u001b", "[", "I"],
+    "ncurses_capabilities": {"in": "kxIN", "out": "kxOUT"},
+    "capability_evidence": "Names observed in an offline xterm-kitty PTY; numeric keycodes are deliberately not fixtures."
+}

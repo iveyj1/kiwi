@@ -18,6 +18,7 @@ from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
 from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines, station_spreadsheet
 from kiwi_client.console_panels import main_panel_rows
+from kiwi_client.terminal_input import ConsoleInput, FocusEvent, next_refresh_deadline
 from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, startup_waterfall_scale, normalize_console_cw_bandwidth
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
 from kiwi_client.state_store import load_presets_file
@@ -228,6 +229,12 @@ class KittyPanePresenter:
         self._last_key: tuple[int, ...] | None = None
         self._active_slot: int | None = None
         self._finished = False
+        self._focus_reporting = False
+
+    def set_focus_reporting(self, enabled: bool) -> None:
+        self.output.write(b'\x1b[?1004h' if enabled else b'\x1b[?1004l')
+        self.output.flush()
+        self._focus_reporting = enabled
 
     def draw(
         self,
@@ -287,8 +294,12 @@ class KittyPanePresenter:
     def finish(self) -> None:
         if self._finished:
             return
-        self.clear()
-        self._finished = True
+        try:
+            self.clear()
+        finally:
+            if self._focus_reporting:
+                self.set_focus_reporting(False)
+            self._finished = True
 
 
 def set_console_frequency(model: WaterfallGuiModel, frequency_khz: float):
@@ -470,6 +481,8 @@ def run_fixture_shell(
     started = time.monotonic()
     next_source = started
     next_refresh = 0.0
+    focused = True
+    console_input = ConsoleInput()
     dirty = True
     full_redraw = True
     entry: str | None = None
@@ -531,6 +544,9 @@ def run_fixture_shell(
         model.small_step_hz = tui_controller.state.current_small_step_hz
 
     try:
+        focus_reporting = getattr(presenter, 'set_focus_reporting', None)
+        if focus_reporting is not None:
+            focus_reporting(True)
         while True:
             now = time.monotonic()
             if demo_seconds is not None and now - started >= demo_seconds:
@@ -558,9 +574,15 @@ def run_fixture_shell(
                 receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
                 rna_browser.set_receiver(receiver, model.session.state.frequency_khz)
 
-            try:
-                key = screen.get_wch()
-            except curses.error:
+            key = console_input.read(screen, now)
+            if isinstance(key, FocusEvent):
+                focused = key == FocusEvent.IN
+                if focused:
+                    full_redraw = True
+                    dirty = True
+                    next_refresh = 0.0
+                    screen.clearok(True)
+                    presenter.invalidate()
                 key = None
             key = discard_console_mouse_event(key)
             if key == curses.KEY_RESIZE:
@@ -889,7 +911,7 @@ def run_fixture_shell(
                 if tui_controller is not None and not tui_controller.running:
                     break
 
-            if dirty and now >= next_refresh:
+            if focused and dirty and now >= next_refresh:
                 lines, columns = screen.getmaxyx()
                 if search_entry is not None or search_page is not None:
                     presenter.clear()
@@ -901,7 +923,7 @@ def run_fixture_shell(
                     _safe_line(screen, lines - 1, message, columns)
                     screen.noutrefresh()
                     curses.doupdate()
-                    next_refresh = now + 1.0 / refresh_hz
+                    next_refresh = next_refresh_deadline(now, time.monotonic(), refresh_hz)
                     dirty = False
                     full_redraw = True
                     time.sleep(0.005)
@@ -925,7 +947,7 @@ def run_fixture_shell(
                         _safe_line(screen, row_index, text, columns)
                     screen.noutrefresh()
                     curses.doupdate()
-                    next_refresh = now + 1.0 / refresh_hz
+                    next_refresh = next_refresh_deadline(now, time.monotonic(), refresh_hz)
                     dirty = False
                     full_redraw = True
                     time.sleep(0.005)
@@ -1067,7 +1089,8 @@ def run_fixture_shell(
                 curses.doupdate()
                 if image is not None and snapshot is not None:
                     presenter.draw(image, layout, generation=snapshot.generation)
-                next_refresh = now + 1.0 / refresh_hz
+                # Leave keyboard service time even when output exceeded the frame period.
+                next_refresh = next_refresh_deadline(now, time.monotonic(), refresh_hz)
                 dirty = False
                 full_redraw = False
             time.sleep(0.005)

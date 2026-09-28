@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — focus recovery and slow-render input starvation
+
+Goal: consume terminal focus reports instead of interpreting them as keys; pause
+presentation while unfocused, redraw latest history on return, and leave an input
+service interval after slow rendering. Audio/acquisition must continue unchanged.
+Done: synthetic focus/fragment/escape and slow-render regressions, full offline
+suite and docs. No live receiver testing; user reproduction remains necessary.
+Completed: raw/terminfo focus handling, presentation pause/latest redraw and slow
+render input gaps. 674 offline tests and fixture-only PTY checks passed; compileall
+and diff checks passed. Physical terminal behavior still needs user confirmation.
+
 ## Current slice — separate nearby browsing from tuning
 
 Goal: comma/period show previous/next nearby candidates without tuning; angle

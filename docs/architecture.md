@@ -30,6 +30,20 @@ Live transport startup follows the current Kiwi browser bootstrap: fetch `/VER` 
 
 Waterfall decoding and rendering should follow the same separation rule: W/F protocol parsing and the display model must be testable without UI or network access. See [Waterfall display specification](waterfall-spec.md). The standalone combined viewer coordinates separate W/F and SND tasks through exact selected-frequency state and command queues; it does not merge their transport lifecycles or parsers. `WaterfallSnapshotPublisher` provides bounded immutable numeric history snapshots, preserving each row's original frequency mapping while coalescing slow consumers onto the latest generation.
 
+## Integrated-console focus and render pacing
+
+`terminal_input.py` recognizes raw xterm CSI I/O focus reports and ncurses extended
+`kxIN`/`kxOUT` key names (numeric codes vary by terminfo). A bounded prefix decoder
+preserves ordinary keys and times out a standalone Escape. The Kitty presenter owns
+DECSET/DECRST 1004 reporting lifetime. Focus loss suppresses presentation only;
+source polling, audio and bounded history remain active. Focus gain invalidates the
+image cache and forces a full text redraw from the current snapshot.
+
+Render deadlines retain normal fast-frame cadence but reserve keyboard service time
+after completion. Late frames wait another frame period instead of immediately
+rendering again with only one input poll between slow writes. Terminal writes remain
+synchronous; a single blocked write cannot be interrupted by this policy.
+
 ## Integrated-console radio-state checkpoints
 
 `console_state.py` checkpoints zoom, per-mode passbands, step-pair indices and display

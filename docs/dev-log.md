@@ -1,5 +1,33 @@
 # Dev Log
 
+## 2026-09-27 — Focus recovery and slow-output keyboard starvation
+
+User reports audio continues while keyboard and waterfall become erratic after
+extended focus loss. Inspection found synchronous terminal output shares the input
+thread, and expired start-time redraw deadlines could cause immediate repeated
+slow renders with only one keyboard poll between them. Focus reports had no explicit
+handling. These are plausible failure modes, not a confirmed reproduction of the
+user's terminal-specific fault.
+
+Enabled focus reporting, decoded raw CSI I/O and terminfo focus keys, paused only
+presentation while unfocused, and forced latest-history/full-text redraw on gain.
+Reporting is disabled on exit. Late redraws now reserve a full frame interval for
+input processing; fast renders retain normal cadence with a minimum input gap.
+No receiver restart, history replay or audio-pipeline change is involved. Individual
+writes remain synchronous and can still block.
+
+The first offline PTY check caught an incomplete raw-only decoder: xterm-kitty
+terminfo emits extended ncurses keys named kxIN/kxOUT. Added name-based handling
+and a regression rather than assuming fixed numeric codes. Repeated fixture-only
+PTY check exited cleanly: zero images during the paused interval, five on return,
+and focus reporting disabled at exit. This was not a physical window-focus test.
+
+Validation: 674 offline tests passed; compileall/diff checks passed. Synthetic tests
+cover fragmented focus reports, Escape timeout, ordinary-key preservation, reporting
+cleanup, continued fixture acquisition during focus loss, and keyboard service
+between deliberately 200 ms renders. No live receivers or real user state touched.
+User verification after restarting is still needed.
+
 ## 2026-09-27 — Separate nearby browsing and tuning keys
 
 Comma/period now show previous/next nearby station/component without tuning.

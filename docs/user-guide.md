@@ -66,6 +66,22 @@ history remain unchanged. Larger images do not add RF resolution, and reducing t
 pane can omit source bins/rows from the displayed image. Use receiver zoom to inspect
 narrow signals rather than interpreting larger pixels as finer measurements.
 
+### Returning after the terminal loses focus
+
+The console enables terminal focus reporting. While unfocused it pauses graphics
+and text presentation, not receiver acquisition or audio. On return it redraws the
+latest buffered history and the full text screen rather than replaying old displays.
+Focus reports are consumed separately from keyboard commands (including Kitty's
+extended ncurses focus keys), so their bytes cannot change scale or cancel forms.
+Reporting is disabled on exit. Terminals without focus-report support continue
+normal presentation.
+
+Slow renders now leave time to service keyboard input before another frame starts,
+rather than continuously chasing an expired redraw deadline. A single terminal write
+can still block; this is not an asynchronous-output implementation. If trouble remains,
+record the terminal application/version and whether it followed switching windows,
+minimizing, resizing, or system sleep. No reconnect is performed on focus changes.
+
 ### Remembered zoom, bandwidth, tuning steps and display scale
 
 The live console checkpoints the waterfall **zoom level, per-mode passbands and
