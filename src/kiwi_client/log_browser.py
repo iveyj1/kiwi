@@ -18,7 +18,9 @@ COLUMNS = ('UTC', 'ID', 'kHz', 'Location', 'Country', 'Region', 'km', 'Receiver 
 def cells(record):
     stamp = record.heard_utc.replace('T', ' ').removesuffix('Z')
     if record.precision == 'minute': stamp = stamp[:16]
-    return (stamp, record.ident, f'{record.frequency_khz:g}' if record.frequency_khz else '?',
+    frequency = f'{record.frequency_khz:g}' if record.frequency_khz else '?'
+    if record.frequency_basis == 'label': frequency += '*'
+    return (stamp or '—', record.ident, frequency,
             record.location, record.country, record.region,
             '?' if record.distance_km is None else f'{record.distance_km:.0f}',
             record.receiver, record.status, record.notes, record.source, record.event, '; '.join(record.flags))
@@ -32,7 +34,8 @@ def reception_summary(record):
     signal = raw.get('log', {}).get('SignalStrength', '').strip()
     comments = raw.get('station', {}).get('GenNotes', '').strip()
     basis = raw.get('distance_basis', 'frozen native distance' if record.source.startswith('Native') else 'see report evidence')
-    return (f'{record.ident}   {record.frequency_khz:g} kHz   |   {cells(record)[0]} UTC ({record.precision} precision)\n'
+    when = f'{cells(record)[0]} UTC ({record.precision} precision)' if record.heard_utc else 'Undated label — not a reception'
+    return (f'{record.ident}   {record.frequency_khz:g} kHz ({record.frequency_basis} frequency)   |   {when}\n'
             f'{record.location}   {record.region} {record.country}\n'
             f'Receiver / setup: {record.receiver}\n'
             f'Status: {record.status}   |   Source: {record.source}   |   Event: {record.event or "none"}\n'
@@ -80,6 +83,8 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
                 if role == Qt.ItemDataRole.ForegroundRole: return QtGui.QColor('#202020')
             return None
         def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+            if role == Qt.ItemDataRole.ToolTipRole and section == 2:
+                return 'Unmarked: nominal channel. *: original label frequency, possibly a sideband.'
             if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
                 return COLUMNS[section]
             return None
@@ -128,7 +133,11 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
             layout = QtWidgets.QVBoxLayout(body)
             toolbar = QtWidgets.QHBoxLayout()
             self.view = QtWidgets.QComboBox()
-            self.view.addItems(['All receptions', 'Needs review', 'Tentative', *self.custom_views])
+            for name, fields in (('All records', {}), ('Needs review', {'review_only': True}),
+                                 ('Tentative', {'status': 'tentative'})):
+                self.view.addItem(name, fields)
+            for name, fields in self.custom_views.items():
+                self.view.addItem(name + ' (saved)', fields)
             toolbar.addWidget(QtWidgets.QLabel('View'))
             toolbar.addWidget(self.view)
             for text, action in [('Save view…', self.save_view), ('Add source…', self.add_source),
@@ -240,18 +249,23 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
                 self.proxy.invalidateFilter()
             issues = list(workspace.errors)
             if self.settings_error: issues.append('Saved views unavailable: ' + self.settings_error)
-            self.notice.setText(f'{self.proxy.rowCount()} shown / {len(workspace.records)} receptions — READ ONLY. '
-                                'Historical/review records are not live confirmations. ' + '\n'.join(issues))
+            undated = sum(record.row_kind == 'label' for record in workspace.records)
+            self.notice.setText(f'{self.proxy.rowCount()} shown / {len(workspace.records)} rows '
+                                f'({undated} undated label references) — READ ONLY. '
+                                'kHz*: label frequency, not nominal. Historical/review rows are not live confirmations. '
+                                + '\n'.join(issues))
             if self.station_key:
                 try:
-                    ident, frequency, country, region = json.loads(self.station_key)
+                    ident, frequency, country, region = json.loads(self.station_key.removeprefix('label:'))
                     label = f'{ident} · {frequency:g} kHz · {country} {region}'
                 except (ValueError, TypeError):
                     label = 'unresolved record only'
-                self.context.setText(f'Station history: {label} — exact ID, nominal frequency and country/region')
+                grouping = 'exact label text/frequency; no nominal-channel association' if self.station_key.startswith('label:') else 'exact ID, nominal frequency and country/region'
+                self.context.setText(f'Station history: {label} — {grouping}')
             else:
                 self.context.setText('Combined view only — no records merged into the live logbook')
             if self.proxy.rowCount() and not self.table.currentIndex().isValid(): self.table.selectRow(0)
+            if self.table.currentIndex().isValid(): self.table.scrollTo(self.table.currentIndex())
             self.selection_changed()
 
         def selected(self):
@@ -284,6 +298,7 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
                 for row in range(self.proxy.rowCount()):
                     if self.proxy.index(row, 0).data(Qt.ItemDataRole.UserRole) == selected.id:
                         self.table.selectRow(row)
+                        self.table.scrollTo(self.table.currentIndex())
                         break
 
         @staticmethod
@@ -327,9 +342,7 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
             self.restore_filter(previous)
 
         def choose_view(self, *_):
-            name = self.view.currentText()
-            builtins = {'All receptions': {}, 'Needs review': {'review_only': True}, 'Tentative': {'status': 'tentative'}}
-            self.restore_filter(builtins.get(name, self.custom_views.get(name, {})))
+            self.restore_filter(self.view.currentData() or {})
 
         def save_view(self):
             if settings_path is None or self.settings_error:
@@ -338,7 +351,7 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
             name, okay = QtWidgets.QInputDialog.getText(self, 'Save current view', 'View name:')
             name = name.strip()
             if not okay or not name: return
-            if name in ('All receptions', 'Needs review', 'Tentative'):
+            if name in ('All records', 'All receptions', 'Needs review', 'Tentative'):
                 QtWidgets.QMessageBox.warning(self, 'Reserved name', 'Choose a different view name.')
                 return
             updated = self.custom_views | {name: asdict(self.proxy.filters)}
@@ -347,8 +360,13 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
                 QtWidgets.QMessageBox.warning(self, 'View not saved', str(exc))
                 return
             self.custom_views = updated
-            if self.view.findText(name) < 0: self.view.addItem(name)
-            self.view.setCurrentText(name)
+            label = name + ' (saved)'
+            index = self.view.findText(label)
+            if index < 0:
+                self.view.addItem(label, updated[name])
+            else:
+                self.view.setItemData(index, updated[name])
+            self.view.setCurrentText(label)
 
         def add_source(self):
             filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Open read-only log source', '',
@@ -364,22 +382,23 @@ def create_window(workspace: LogWorkspace, *, settings_path: Path | None = None)
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Standalone read-only reception browser; no radio connection or import')
     parser.add_argument('--logbook', type=Path, action='append', help='native SQLite source; repeatable')
-    parser.add_argument('--stage', type=Path, action='append', help='WWSU review JSON; repeatable')
-    parser.add_argument('--native-only', action='store_true', help='omit the default data/wwsu-stage.json')
+    parser.add_argument('--stage', type=Path, action='append', help='history review JSON; repeatable, replaces default stages')
+    parser.add_argument('--native-only', action='store_true', help='omit default WWSU and Kiwi label stages')
     parser.add_argument('--settings', type=Path, default=Path.home() / '.config/kiwi-client/log-browser.json')
     parser.add_argument('--dry-run', action='store_true', help='read and summarize sources without starting Qt')
     args = parser.parse_args(argv)
     native_paths = args.logbook if args.logbook is not None else ([Path('receptions.sqlite')] if Path('receptions.sqlite').is_file() else [])
     sources = [NativeLogSource(path) for path in native_paths]
-    stages = args.stage if args.stage is not None else ([] if args.native_only or not Path('data/wwsu-stage.json').is_file()
-                                                     else [Path('data/wwsu-stage.json')])
+    defaults = [Path('data/wwsu-stage.json'), Path('data/kiwi-label-stage.json')]
+    stages = args.stage if args.stage is not None else ([] if args.native_only else [p for p in defaults if p.is_file()])
     sources.extend(StagedLogSource(path) for path in stages)
     workspace = LogWorkspace(sources)
     if args.dry_run:
         from collections import Counter
         workspace.reload()
         print(json.dumps(dict(records=len(workspace.records), sources=Counter(r.source for r in workspace.records),
-                              statuses=Counter(r.status for r in workspace.records), errors=workspace.errors), indent=2))
+                              statuses=Counter(r.status for r in workspace.records),
+                              row_kinds=Counter(r.row_kind for r in workspace.records), errors=workspace.errors), indent=2))
         return 1 if workspace.errors else 0
     try:
         from PySide6.QtWidgets import QApplication

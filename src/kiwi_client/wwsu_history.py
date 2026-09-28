@@ -12,13 +12,12 @@ from datetime import datetime, timezone
 import hashlib
 import io
 import json
-import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import tempfile
 
+from kiwi_client.history_staging import write_stage
 from kiwi_client.log_browser_data import BrowserRecord, RecordRef, fingerprint, utc_timestamp
 from kiwi_client.rna_catalogue import distance_km
 
@@ -262,22 +261,6 @@ def build_stage(root: Path, read_table) -> dict:
     return dict(schema=1, kind='wwsu-review-stage', root=str(root), newest_backup=str(backups[-1]),
                 created_utc=datetime.now(timezone.utc).isoformat(), sources=manifest,
                 records=[asdict(record) for record in records])
-
-
-def write_stage(path: Path, data: dict) -> None:
-    content = json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
-    path = path.expanduser()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    name = None
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent, delete=False) as stream:
-            name = stream.name
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(name, path)  # Exclusive publication; never overwrite a reviewed stage.
-    finally:
-        if name and os.path.exists(name): os.unlink(name)
 
 
 def main(argv=None):

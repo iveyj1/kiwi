@@ -1,5 +1,19 @@
 # TODO
 
+## Current slice — Kiwi label history
+
+Goal: stage the supplied label JSON alongside existing sources, read-only. Use
+190–530 kHz and exclude obvious non-NDB services. User authorizes UTC for unzoned
+note times. Preserve separate hearings, original label frequencies (not nominal
+channels), raw fields and source references; retain undated/malformed/date-only
+notes explicitly without invented times. Do not merge/deduplicate other sources.
+Done criteria: synthetic parser/model/UI regressions, actual-file staging/hash
+checks, full offline suite, docs and tested commit. No receiver access.
+Completed: 538 selected labels -> 289 timed + one date-only candidate and 278
+undated reference/review rows. Separate default stage, explicit label-frequency
+basis, no fabricated timestamps or station association. 719 offline tests and
+actual-data Qt/hash checks pass; 1,250 combined rows. Restart browser for new source.
+
 ## Current slice — standalone historical log browser
 
 Goal: separate read-only desktop browser for native SQLite receptions and staged

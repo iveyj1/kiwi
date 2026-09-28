@@ -1,5 +1,40 @@
 # Dev Log
 
+## 2026-09-28 — Add Kiwi DX label history as a separate review source
+
+User authorized treating note times without Z as UTC. Added the offline
+kiwi_label_history stager and automatic loading of data/kiwi-label-stage.json by
+./logbook. Original JSON, native database and WWSU stage remain unchanged. Source
+JSON and generated personal stages are ignored by Git; only synthetic fixtures
+are committed. Shared exclusive/atomic stage publication moved to history_staging.
+
+Selection: 190–530 kHz inclusive, CW/CWN/IQ, excluding obvious non-NDB services
+and FSK/NAVTEX/WSPR plugin labels. The supplied archive has 538 selected labels,
+yielding 289 complete timestamps, one date-only candidate and 278 undated rows
+(274 references + four malformed timestamps). Multiple note timestamps become
+separate candidates; duplicate same-time notes remain separate. The isolated 2011
+date is preserved with an early-date warning. No partial timestamp salvage, midnight
+invention, confirmation, nominal-frequency inference or cross-source deduplication.
+
+Browser projections now carry frequency_basis and row_kind, with explicit day and
+unknown time precision. Label frequencies display with a star; their station history
+uses exact label text/frequency rather than pretending to match nominal channels.
+ID search spans all sources. Undated rows are not counted as receptions and are
+excluded by date filters. Full original fields, label/note addresses, content hashes,
+UTC basis and per-hearing note segments support later audited reconciliation/editing.
+Historical receiving equipment/country/region/distance are not inferred from archive
+origin or free-form names. Filtering/reload now keeps the selected row visible.
+
+Validation: 719 offline tests pass; compileall/diff checks clean. Synthetic fixtures
+cover multiple dates, case/UTC suffixes, malformed/calendar errors, date-only/blank
+notes, early dates, percent escapes, band boundaries/services, stable source IDs,
+frequency-basis isolation and offscreen source/history/date filtering. Actual-data
+Qt smoke: 1,250 combined rows, 568 label rows, 290 dated label candidates; LKG has
+three source rows and two dated hearings in its selected label history. Original
+JSON/native DB/WWSU-stage SHA256 checks unchanged. No receiver access. Screenshot
+outside Git: /tmp/kiwi-label-browser.png. Restart the desktop app to load new code
+and the additional default stage; physical desktop inspection remains with the user.
+
 ## 2026-09-28 — Standalone historical log browser and WWSU review staging
 
 Added `./logbook` / `kiwi-logbook`, a separate PySide6 desktop application with no

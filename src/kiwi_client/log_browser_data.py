@@ -7,7 +7,7 @@ Historical staging is never treated as newly confirmed live reception evidence.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 from html import unescape
 import json
@@ -62,6 +62,8 @@ class BrowserRecord:
     flags: tuple[str, ...] = ()
     # Immutable serialization preserves all source fields, including unknown ones.
     evidence_json: str = '{}'
+    frequency_basis: str = 'nominal'
+    row_kind: str = 'reception'
 
     def __post_init__(self):
         for name in ('id', 'heard_utc', 'ident', 'country', 'region', 'location', 'receiver',
@@ -72,8 +74,20 @@ class BrowserRecord:
             raise ValueError('invalid review flags')
         if not isinstance(json.loads(self.evidence_json), dict):
             raise ValueError('source evidence must be an object')
+        if self.frequency_basis not in ('nominal', 'label') or self.row_kind not in ('reception', 'label'):
+            raise ValueError('invalid frequency basis or row kind')
+        if self.precision == 'unknown':
+            if self.heard_utc or self.row_kind != 'label':
+                raise ValueError('unknown time must be an undated label, not a reception')
+        elif self.precision == 'day':
+            if date.fromisoformat(self.heard_utc).isoformat() != self.heard_utc:
+                raise ValueError('invalid date-only evidence')
+        elif self.precision in ('minute', 'second'):
+            utc_timestamp(self.heard_utc)
+        else:
+            raise ValueError('unsupported time precision')
         if not math.isfinite(self.frequency_khz) or self.frequency_khz < 0:
-            raise ValueError('invalid nominal frequency')
+            raise ValueError('invalid frequency')
         if self.distance_km is not None and (not isinstance(self.distance_km, (int, float))
                 or not math.isfinite(self.distance_km) or self.distance_km < 0):
             raise ValueError('invalid distance')
@@ -82,6 +96,10 @@ class BrowserRecord:
     def station_key(self) -> str:
         if self.ident in ('', '?') or not self.frequency_khz:
             return 'unresolved:' + self.id
+        if self.frequency_basis == 'label':
+            # No inferred carrier/channel or fuzzy cross-source station association.
+            return 'label:' + station_identity(f'{self.ident} {self.location}'.strip(),
+                                               self.frequency_khz, self.country, self.region)
         return station_identity(self.ident, self.frequency_khz, self.country, self.region)
 
     def details(self) -> str:
@@ -137,19 +155,30 @@ class StagedLogSource:
 
     def load(self) -> list[BrowserRecord]:
         data = json.loads(self.path.expanduser().read_text(encoding='utf-8'))
-        if data.get('schema') != 1 or data.get('kind') != 'wwsu-review-stage':
-            raise ValueError('not a supported WWSU review stage')
+        kinds = {'wwsu-review-stage': ('wwsu-access', 'wwsu-report'),
+                 'kiwi-label-review-stage': ('kiwi-label-json',)}
+        if data.get('schema') != 1 or data.get('kind') not in kinds:
+            raise ValueError('not a supported history review stage')
+        is_labels = data['kind'] == 'kiwi-label-review-stage'
         records = []
         for row in data['records']:
             fields = dict(row)
             fields['reference'] = RecordRef(**fields['reference'])
             fields['flags'] = tuple(fields.get('flags', ()))
-            fields['heard_utc'] = utc_timestamp(fields['heard_utc'])
+            if not is_labels or fields.get('precision', 'second') in ('minute', 'second'):
+                fields['heard_utc'] = utc_timestamp(fields['heard_utc'])
             record = BrowserRecord(**fields)
-            if record.reference.source_kind not in ('wwsu-access', 'wwsu-report'):
+            if record.reference.source_kind not in kinds[data['kind']]:
                 raise ValueError('staged history cannot address a writable native source')
-            if record.event or record.status not in ('historical', 'review'):
+            statuses = ('historical', 'review', 'reference') if is_labels else ('historical', 'review')
+            if record.event or record.status not in statuses:
                 raise ValueError('staged history must not claim live confirmation/event membership')
+            if is_labels:
+                if record.frequency_basis != 'label':
+                    raise ValueError('label frequency must not be promoted to a nominal channel')
+                if (record.row_kind == 'label' and (record.heard_utc or record.status == 'historical')
+                        or record.row_kind == 'reception' and record.status == 'reference'):
+                    raise ValueError('label/reception classification contradicts date evidence')
             records.append(record)
         if len({r.id for r in records}) != len(records):
             raise ValueError('duplicate staged record IDs')
@@ -218,6 +247,8 @@ class BrowserFilter:
         if self.event and record.event != self.event:
             return False
         day = record.heard_utc[:10]
+        if not day and (self.date_from or self.date_to):
+            return False
         if self.date_from and day < self.date_from or self.date_to and day > self.date_to:
             return False
         if self.minimum_khz is not None and record.frequency_khz < self.minimum_khz:

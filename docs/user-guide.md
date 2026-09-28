@@ -4,8 +4,9 @@
 
 Run `./logbook` from this worktree. It opens a separate PySide6 desktop application;
 no receiver or console process is needed and no network connection is made. The
-current `receptions.sqlite` and, if present, `data/wwsu-stage.json` are displayed
-side by side, not merged. `./logbook --native-only` omits the default WWSU stage.
+current `receptions.sqlite` and, if present, `data/wwsu-stage.json` and
+`data/kiwi-label-stage.json` are displayed together, not merged.
+`./logbook --native-only` omits both default historical stages.
 The `gui-pyside` optional dependency is required (already available in the shared
 local virtual environment). Installed entry point: `kiwi-logbook`.
 
@@ -14,28 +15,77 @@ local virtual environment). Installed entry point: `kiwi-logbook`.
 - Search matches all entered words across ID, location, notes, receiver, source,
   event and review flags; `id:CH` matches the callsign exactly. Use **Ctrl+F** to
   focus it. Separate filters cover source,
-  status, event, inclusive UTC dates and nominal-kHz range. Blank dates and `Any`
+  status, event, inclusive UTC dates and shown-kHz range (nominal unless marked `*`). Blank dates and `Any`
   frequency endpoints impose no limit. Invalid ranges leave the last valid view intact.
 - Select a row for its reception summary or **Source / raw evidence**. Original
   fields, source IDs/fingerprints, backup versions and associated report rows remain
   available. Amber status cells have staging review flags; hover for the flags.
 - **Station history** (or double-click) clears other filters and shows exact matches
   on ID, nominal frequency and country/region across sources. **Back** restores the
-  previous filters. This is deliberately conservative: frequency changes and uncertain
+  previous filters. Label-source history instead matches exact label text/frequency;
+  use `id:YTL`, for example, to see all sources and both sidebands. This is deliberately
+  conservative: frequency changes and uncertain
   station associations are not silently combined. Search the ID to see alternatives.
 - **Save view** stores named filter presets separately in
   `~/.config/kiwi-client/log-browser.json`. Column widths/order/sort are session-only.
-  Presets for all receptions, staging review flags and tentative entries are built in.
+  Presets for all records, staging review flags and tentative entries are built in.
 - **F5 / Reload** rereads committed source data. There is no polling. Read failures
   are displayed and retain the prior snapshot for that source. **Add source** accepts
   native SQLite files or staged-history JSON, not raw Access files. Repeat
-  `--logbook PATH` / `--stage PATH` for explicit sources; `--dry-run` summarizes them
+  `--logbook PATH` / `--stage PATH` for explicit sources (`--stage` replaces the default
+  stage list, so repeat it to include both); `--dry-run` summarizes them
   without Qt or preference writes.
 
 This milestone is read-only: no cell editing, deletion, permanent import, report
 submission or CLE membership changes. Native data includes current records, not
 entries previously deleted into the audit trail. WWSU entries are labeled
 **historical** or **review**, never relabeled as live confirmations.
+
+### Kiwi label history
+
+The supplied `kiwisdr-label-dx.10.0.0.41_2026-09-28T19_11_07Z.json` remains untouched.
+Its separate ignored review copy is `data/kiwi-label-stage.json`; restart `./logbook`
+after updating the application to load this third source. Select **Kiwi labels** in
+the Source filter. All source fields and unknown attributes remain in raw evidence;
+the bundle also retains the complete original JSON and exclusion reasons.
+
+The selection is **190–530 kHz inclusive**, in CW/CWN/IQ, excluding obvious
+broadcast, FSK, NAVTEX/NOTAMS and WSPR services. This is a candidate-label selection,
+not proof of NDB identification. The local result contains 538 selected labels:
+
+- **289 complete timestamps** become separate dated hearing candidates, including
+  multiple timestamps in a single note. Unmarked times are assumed UTC by explicit
+  user instruction; `Z`/`z` is retained as explicit UTC evidence.
+- **One date-only note** retains day precision, without inventing midnight.
+- **274 undated labels** are references, not receptions. Four malformed timestamps
+  remain additional undated review rows; no valid-looking prefix is salvaged.
+- The isolated **2011** date is preserved and flagged, not corrected. By default,
+  dates before 2020 receive an early-date warning, configurable when staging.
+
+Thus the source contributes **568 rows: 290 dated candidates and 278 undated
+references/review items**, not 568 hearings. Date filters exclude undated rows.
+Minute and day precision are displayed without fabricated seconds/time-of-day.
+
+A `*` after a kHz value means **original label frequency**, which may mark a
+sideband rather than the nominal channel. No carrier frequency, country/region,
+distance or historical receiving equipment is guessed. Notes such as LOG40,
+Wellbrook and Bev remain attached to their dated note segments; the full original
+note is also retained. The export's receiver address is not proof of the equipment
+used for every old hearing. No deduplication or station association with WWSU/native
+records is performed; use exact-ID search to compare them before reconciliation.
+
+To generate a new stage without overwriting an existing one:
+
+```bash
+PYTHONPATH=src /home/user/kiwi/.kiwi-venv/bin/python -m kiwi_client.kiwi_label_history \
+    kiwisdr-label-dx.10.0.0.41_2026-09-28T19_11_07Z.json \
+    --output data/kiwi-label-stage-next.json
+```
+
+The parser accepts compact `YYYY-MM-DDTHHMM[Z]` (including lower-case t/z) and
+standalone ISO dates. Other date-like tokens remain review items. Frequencies and
+early-date warning thresholds can be set with `--minimum-khz`, `--maximum-khz`,
+and `--review-before-year`. All staging is offline; no receiver connection occurs.
 
 ### Staging WWSU history
 

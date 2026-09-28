@@ -48,6 +48,7 @@ kiwi-gui = "kiwi_client.gui_app:main"
 kiwi-console = "kiwi_client.integrated_terminal:main"
 kiwi-logbook = "kiwi_client.log_browser:main"
 kiwi-wwsu-stage = "kiwi_client.wwsu_history:main"
+kiwi-label-stage = "kiwi_client.kiwi_label_history:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

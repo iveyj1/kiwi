@@ -28,8 +28,10 @@ The standalone browser deliberately does not depend on the receiver controller:
 log_browser (Qt views, filters, selection by record ID)
     -> LogWorkspace / BrowserRecord / RecordRef (log_browser_data)
         -> NativeLogSource (SQLite mode=ro, committed current records)
-        -> StagedLogSource (immutable WWSU review bundle)
+        -> StagedLogSource (immutable WWSU or Kiwi label review bundle)
 wwsu_history (offline MDBTools/report adapter) -> separate review bundle
+kiwi_label_history (offline JSON/note adapter) -> separate review bundle
+history_staging -> exclusive atomic publication (never overwrite reviewed stages)
 ```
 
 `BrowserRecord` is a frozen display projection, **not the authoritative editable
@@ -40,6 +42,16 @@ not when sorting/filtering. WWSU display IDs use archive namespace + logical eve
 key + same-minute occurrence; raw source row references are tied to hashed backup
 files. Report candidates retain source line references. Moving an archive changes
 its staging namespace; a stage is not yet a durable imported database identity.
+
+Label-source projections explicitly distinguish `frequency_basis=label` from nominal
+channels, and `row_kind=label` (undated reference) from reception candidates. Unknown
+time is an empty value with `precision=unknown`, never epoch/midnight; day-only
+values use an ISO date with `precision=day`. Native/WWSU defaults remain nominal
+frequency and dated receptions. The loader restricts source reference kinds/statuses
+by bundle type. Labels never join nominal-channel station history automatically;
+original row plus note occurrence and archive hash address their source evidence.
+User-authorized UTC assumptions and original note segments are retained separately.
+These fields must remain distinct in future edit/import commands and report selection.
 
 This split is intentional preparation for editing, not a read-only storage design:
 

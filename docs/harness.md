@@ -16,6 +16,12 @@ The optional PySide6 test uses the offscreen platform to exercise the real table
 sorting/filtering, station history, reload and noneditable cells; source hashes stay
 unchanged. Actual MDBTools extraction was separately checked against the local archive.
 
+`tests/fixtures/kiwi/label-history.json` and `test_kiwi_label_history.py` cover offline
+DX-label staging: band/service selection, repeated hearings, malformed timestamps,
+UTC assumptions, date-only/undated distinctions, original-field preservation,
+label-versus-nominal frequency isolation, and real offscreen table/history filters.
+A long-table case verifies filter changes keep the selected row visible.
+
 ```bash
 PYTHONPATH=src /home/user/kiwi/.kiwi-venv/bin/python -m pytest -q \
     tests/harness/test_log_browser.py tests/harness/test_wwsu_reports.py
