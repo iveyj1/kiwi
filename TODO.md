@@ -1,5 +1,22 @@
 # TODO
 
+## Current slice — standalone historical log browser
+
+Goal: separate read-only desktop browser for native SQLite receptions and staged
+WWSU history. Sort/search/filter, station history, provenance/raw details and saved
+views. Source adapters own stable record references and revision fingerprints;
+Qt is only a projection, leaving room for audited/conflict-checked edit commands.
+Stage overlapping WWSU backups/reports without merging into receptions.sqlite or
+promoting historical entries to confirmed/CLE records. Preserve same-minute rows,
+flag older-only/conflicting records, and keep original files untouched. Done:
+synthetic import/read-only/filter/UI harnesses, actual-data staging and offscreen
+GUI smoke check, docs and full offline suite. No radio access.
+Completed: standalone desktop browser and source adapters, lossless-source review
+stager, isolated preferences and edit-ready record references. Local combined view:
+682 rows (61 native + 621 WWSU review rows); no permanent merge. Synthetic/offscreen
+harnesses and actual-data read-only smoke pass; 704 offline tests pass. Original
+WWSU inputs and native database unchanged. Physical desktop inspection pending.
+
 ## Current slice — export layout and latest confirmed reception
 
 Goal: apply the requested report edits to future exports: aligned UTC/frequency/ID/

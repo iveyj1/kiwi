@@ -1,5 +1,85 @@
 # User Guide
 
+## Standalone logbook browser
+
+Run `./logbook` from this worktree. It opens a separate PySide6 desktop application;
+no receiver or console process is needed and no network connection is made. The
+current `receptions.sqlite` and, if present, `data/wwsu-stage.json` are displayed
+side by side, not merged. `./logbook --native-only` omits the default WWSU stage.
+The `gui-pyside` optional dependency is required (already available in the shared
+local virtual environment). Installed entry point: `kiwi-logbook`.
+
+- Click column headers to sort; numeric frequency/distance columns sort numerically.
+  Resize or drag headers, and scroll horizontally for event/review columns.
+- Search matches all entered words across ID, location, notes, receiver, source,
+  event and review flags; `id:CH` matches the callsign exactly. Use **Ctrl+F** to
+  focus it. Separate filters cover source,
+  status, event, inclusive UTC dates and nominal-kHz range. Blank dates and `Any`
+  frequency endpoints impose no limit. Invalid ranges leave the last valid view intact.
+- Select a row for its reception summary or **Source / raw evidence**. Original
+  fields, source IDs/fingerprints, backup versions and associated report rows remain
+  available. Amber status cells have staging review flags; hover for the flags.
+- **Station history** (or double-click) clears other filters and shows exact matches
+  on ID, nominal frequency and country/region across sources. **Back** restores the
+  previous filters. This is deliberately conservative: frequency changes and uncertain
+  station associations are not silently combined. Search the ID to see alternatives.
+- **Save view** stores named filter presets separately in
+  `~/.config/kiwi-client/log-browser.json`. Column widths/order/sort are session-only.
+  Presets for all receptions, staging review flags and tentative entries are built in.
+- **F5 / Reload** rereads committed source data. There is no polling. Read failures
+  are displayed and retain the prior snapshot for that source. **Add source** accepts
+  native SQLite files or staged-history JSON, not raw Access files. Repeat
+  `--logbook PATH` / `--stage PATH` for explicit sources; `--dry-run` summarizes them
+  without Qt or preference writes.
+
+This milestone is read-only: no cell editing, deletion, permanent import, report
+submission or CLE membership changes. Native data includes current records, not
+entries previously deleted into the audit trail. WWSU entries are labeled
+**historical** or **review**, never relabeled as live confirmations.
+
+### Staging WWSU history
+
+The local archive has been staged separately in ignored `data/wwsu-stage.json`.
+To create another review generation (existing outputs are never overwritten):
+
+```bash
+PYTHONPATH=src /home/user/kiwi/.kiwi-venv/bin/python -m kiwi_client.wwsu_history \
+    ~/wwsu --output data/wwsu-stage-next.json
+./logbook --stage data/wwsu-stage-next.json
+```
+
+Staging requires MDBTools `mdb-export`; use `--mdb-export PATH` if necessary. It is
+found on PATH or at `~/.local/share/kiwi-client/mdbtools/bin/mdb-export`. The local
+reader was built there from MDBTools 1.0.1; the GUI needs no Access reader once a
+stage exists. No WWSU executable, installer or registry backup is executed.
+
+The stage uses the newest named database backup as its baseline. Overlapping
+backups supply provenance/version evidence, not additional copies of each reception.
+Same-minute database rows are retained separately. Earlier-only records are visible
+as review candidates, not silently restored. Personal beacon IDs use WWSU's observed
+`100000 + NewBeacon_ID` convention; unresolved references are flagged.
+
+Text/CSV report rows with one matching UTC/ID/frequency/country database record are
+attached as report evidence. This is a candidate association, not a confirmed station
+or receiver reconciliation; original report setup labels remain visible. Report-only,
+ambiguous and frequency-conflicting rows remain separate review items. Exact repeated
+report rows across report files are coalesced, preserving within-report multiplicity.
+KML, installer data and registry settings are not imported. Report comment references
+are resolved where available; New flags are preserved without inventing confirmation.
+
+Legacy times retain minute precision. Database dates/times are interpreted as UTC,
+consistent with report headers; no local-time correction is guessed. Native distances
+remain frozen. WWSU database distances are calculated from backup station/setup
+coordinates (not historical measurements); report miles are converted to km. Distance
+basis and original fields are available in details. Catalogue attributes can change
+between backups: the view does not claim the latest description was frozen at hearing.
+
+The initial local review contains 526 newest-backup rows, one older-only candidate
+and 94 report-only/reconciliation candidates (91 from December 2024, plus CH/ZWW
+frequency discrepancies and an ambiguous IM match). These are **621 review rows,
+not a claim of 621 distinct hearings**. CH and ZWW illustrate why inspection should
+precede any permanent merge.
+
 ## Main and logging page layout
 
 The console uses a **spreadsheet main page + B logging page**, with Unicode

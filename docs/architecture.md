@@ -20,6 +20,48 @@ Receiver Client API
            +--> Status / S-meter / Metadata
 ```
 
+## Standalone logbook application
+
+The standalone browser deliberately does not depend on the receiver controller:
+
+```text
+log_browser (Qt views, filters, selection by record ID)
+    -> LogWorkspace / BrowserRecord / RecordRef (log_browser_data)
+        -> NativeLogSource (SQLite mode=ro, committed current records)
+        -> StagedLogSource (immutable WWSU review bundle)
+wwsu_history (offline MDBTools/report adapter) -> separate review bundle
+```
+
+`BrowserRecord` is a frozen display projection, **not the authoritative editable
+record**. Its immutable evidence serialization retains original/unknown fields.
+`RecordRef` carries source kind, path, original key and revision fingerprint.
+Native keys are SQLite reception IDs; their payload fingerprints change on edits,
+not when sorting/filtering. WWSU display IDs use archive namespace + logical event
+key + same-minute occurrence; raw source row references are tied to hashed backup
+files. Report candidates retain source line references. Moving an archive changes
+its staging namespace; a stage is not yet a durable imported database identity.
+
+This split is intentional preparation for editing, not a read-only storage design:
+
+- Future commands receive the selected record reference and expected original
+  snapshot, never a table row number or reconstructed display cells.
+- A native write adapter should use the existing audited `Logbook.revise/delete`
+  paths and optimistic expected-record checks, then reload the projection. The
+  read adapter must not instantiate `Logbook`, whose constructor initializes schema.
+- Historical acceptance/editing needs an audited historical store or overlay with
+  durable IDs and links back to immutable source evidence. Do not write to Access
+  backups/stages, route staged references to native write commands, fabricate missing
+  RF evidence, or force legacy data through the live-reception validator.
+- Commands must validate source capabilities and current revisions before writes;
+  import reconciliation is explicit. Frozen display objects do not preclude edits:
+  a successful command produces a new projection while preserving prior revisions.
+
+Qt owns no SQL connections or protocol state. Loaders and filters are testable without
+Qt. Failed source refreshes retain the previous source snapshot with visible errors.
+UTC precision, computed versus recorded distance, backup versions and ambiguous
+report matches remain distinct; the combined view is not a permanent database merge.
+See [user guide](user-guide.md#standalone-logbook-browser) for operation and limitations.
+
 ## Rule
 
 Protocol handling must be usable without the desktop UI.

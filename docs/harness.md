@@ -4,6 +4,24 @@
 
 The harness allows development and regression testing without requiring live KiwiSDR hardware.
 
+## Standalone logbook / WWSU review regressions
+
+`tests/fixtures/wwsu/` contains synthetic exported table data and a report, not
+personal logs or a bundled Access executable. `test_log_browser.py` and
+`test_wwsu_reports.py` cover read-only native SQLite (including WAL), source-isolated
+refresh caches, stable record references/revisions, snapshot reconciliation,
+personal IDs, same-minute multiplicity, older-only rows, report comments/units and
+frequency conflicts. Pure loader/filter tests need no Qt or external MDBTools.
+The optional PySide6 test uses the offscreen platform to exercise the real table,
+sorting/filtering, station history, reload and noneditable cells; source hashes stay
+unchanged. Actual MDBTools extraction was separately checked against the local archive.
+
+```bash
+PYTHONPATH=src /home/user/kiwi/.kiwi-venv/bin/python -m pytest -q \
+    tests/harness/test_log_browser.py tests/harness/test_wwsu_reports.py
+./logbook --dry-run
+```
+
 ## Pixel-native graphical scale regressions
 
 `tests/fixtures/terminal/pixel-geometry.json` contains synthetic TIOCGWINSZ cases

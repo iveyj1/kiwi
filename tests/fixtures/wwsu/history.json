@@ -1,0 +1,20 @@
+{
+    "stations": [
+        {"Beacon_ID": "1", "Ident": "AAA", "Frequency": "200", "Country": "CAN", "State": "ON", "City": "Example", "Latitude": "N44000000", "Longitude": "W080000000"},
+        {"Beacon_ID": "2", "Ident": "BBB", "Frequency": "300", "Country": "CAN", "State": "ON", "City": "Earlier only", "Latitude": "N45000000", "Longitude": "W081000000"}
+    ],
+    "personal": [{"NewBeacon_ID": "1", "Ident": "UUU", "Frequency": "205", "Country": "XUU", "State": "XX", "City": "", "Latitude": "N00000000", "Longitude": "W000000000", "GenNotes": "uncertain identity"}],
+    "sites": [{"ID": "1", "LocationName": "Fixture Beverage", "Radio": "Fixture receiver", "Latitude": "430000N", "Longitude": "0800000W"}],
+    "older": [
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0100", "ReceptionComments": "old", "SignalStrength": "S-1"},
+        {"Beacon_ID": "2", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0101", "ReceptionComments": "", "SignalStrength": "S-2"},
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0102", "ReceptionComments": "", "SignalStrength": "S-1"},
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0102", "ReceptionComments": "", "SignalStrength": "S-1"}
+    ],
+    "newer": [
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0100", "ReceptionComments": "new", "SignalStrength": "S-1"},
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0102", "ReceptionComments": "", "SignalStrength": "S-1"},
+        {"Beacon_ID": "1", "LoggedLocation": "1", "ReceptionDate": "20240101", "ReceptionTime": "0102", "ReceptionComments": "", "SignalStrength": "S-1"},
+        {"Beacon_ID": "100001", "LoggedLocation": "1", "ReceptionDate": "20240102", "ReceptionTime": "0330", "ReceptionComments": "listen again", "SignalStrength": "S-0"}
+    ]
+}

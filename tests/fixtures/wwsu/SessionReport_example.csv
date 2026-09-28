@@ -1,0 +1,8 @@
+Session Report for Fixture Listener
+Listening Location: Fixture Beverage
+YYYY-MM-DD ,UTC ,kHz ,Call ,mi ,Cmt ,New ,Grid ,Location ,State ,Country
+2024-01-01 ,01:00 ,200 ,AAA ,10 ,1 , ,EN00aa ,Example ,ON ,CAN
+2024-02-01 ,04:10 ,400 ,ZZZ ,10 ,1 ,Y ,EN00aa ,Other example ,ON ,CAN
+2024-01-01 ,01:02 ,200 ,AAA ,10 , , ,EN00aa ,Example ,ON ,CAN
+Session Comments:
+ 1 - Sending YY

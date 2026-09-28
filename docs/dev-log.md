@@ -1,5 +1,47 @@
 # Dev Log
 
+## 2026-09-28 — Standalone historical log browser and WWSU review staging
+
+Added `./logbook` / `kiwi-logbook`, a separate PySide6 desktop application with no
+receiver lifecycle. Sortable/resizable/reorderable spreadsheet, exact-ID or general
+search, date/frequency/source/status/event filters, conservative cross-source station
+history, readable details/raw provenance, explicit reload and named filter presets.
+Native reads use SQLite mode=ro rather than the schema-initializing Logbook class;
+committed WAL updates are visible. Reload errors retain a visibly stale snapshot.
+
+Kept editing architecture open: frozen display projections retain original fields,
+source keys and revision fingerprints independently of Qt row positions. Future
+native commands can use existing audited revise/delete operations with expected
+snapshots; historical acceptance needs durable audited records/overlays without
+writing back to Access or inventing live RF/confirmation evidence. No edit or merge
+commands are enabled in this milestone.
+
+Built MDBTools 1.0.1 under ~/.local/share/kiwi-client/mdbtools for local read-only
+Access inspection (not a project dependency/binary commit). The offline stager reads
+all named WWSU backups and text/CSV reports, retaining original fields, receiving
+setups, source SHA256s, backup versions, report headers/footers/comments and source
+references. Latest-backup rows remain the baseline; earlier-only, ambiguous and
+frequency-discrepant rows are review candidates. Preserve same-minute multiplicity;
+do not concatenate snapshot copies or treat catalogue DELETED as reception deletion.
+
+Local stage: 526 latest-backup records + 1 earlier-only + 94 report candidates = 621
+rows, combined with 61 current native records = 682 view rows, not unique hearings.
+The 94 include 91 December 2024 rows and three reconciliation cases: CH 328 versus
+329 kHz, ZWW 214 versus 215 kHz at the same respective UTC/ID, and an IM report
+matching multiple same-minute database rows. Report candidates remain separate and
+flagged. Original sources/checksums are unchanged; generated personal staging stays
+ignored in data/wwsu-stage.json. No live receiver access, application execution,
+registry loading, database merge, source relabeling or CLE event assignment.
+
+Validation: synthetic fixtures exercise overlapping/changed/older-only/personal and
+duplicate records, report units/encoding/comments, metadata-frequency discrepancies,
+read-only SQLite/WAL, stable IDs/revision checks, cache isolation, filtering and the
+offscreen Qt browser. Full offline suite: 704 passed; compileall/diff checks clean.
+Actual-data offscreen smoke: 682 rows, filters/details working, source and stage byte
+hashes unchanged. Screenshot kept outside Git at /tmp/kiwi-logbook-browser.png.
+Physical desktop interaction remains for user inspection. See the user guide for
+commands, dependencies, grouping limits and saved-view behavior.
+
 ## 2026-09-28 — Apply report cleanup to export code; retain latest hearing
 
 Future CLE exports now use space-aligned date/time, nominal kHz, callsign and rounded

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Standalone log browser; no receiver process or connection is started.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -n "${KIWI_PYTHON:-}" ]]; then
+    PYTHON="$KIWI_PYTHON"
+elif [[ -x "$ROOT/.kiwi-venv/bin/python" ]]; then
+    PYTHON="$ROOT/.kiwi-venv/bin/python"
+elif [[ -x "$ROOT/../kiwi/.kiwi-venv/bin/python" ]]; then
+    VENV="$(cd "$ROOT/../kiwi/.kiwi-venv" && pwd -P)"
+    PYTHON="$VENV/bin/python"
+else
+    PYTHON=python3
+fi
+cd "$ROOT"
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PYTHON" -m kiwi_client.log_browser "$@"
