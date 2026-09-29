@@ -80,7 +80,7 @@ def test_optimistic_revision_preserves_external_edits(tmp_path):
 @pytest.mark.parametrize('action,expected_count,expected_status', [
     ('edit', 1, 'tentative'), ('cancel', 1, 'confirmed'), ('new', 2, 'confirmed'),
     ('not-heard', 1, 'not-heard'), ('delete', 0, None), ('delete-cancel', 1, 'confirmed')])
-def test_shell_w_edits_existing_without_retune_W_creates_repeat(tmp_path, monkeypatch, action, expected_count, expected_status):
+def test_shell_B_edits_existing_without_retune_W_F2_creates_repeat(tmp_path, monkeypatch, action, expected_count, expected_status):
     import kiwi_client.integrated_terminal as shell
     from kiwi_client.waterfall_levels import WaterfallLevelController
     browser, model, record = sample()
@@ -94,9 +94,9 @@ def test_shell_w_edits_existing_without_retune_W_creates_repeat(tmp_path, monkey
         monkeypatch.setattr(shell.curses, name, lambda *args: None)
     monkeypatch.setattr(shell.curses, 'has_colors', lambda: False)
     drawn = []
-    sequences = {'edit': [None, 'w', '\n', 't', 'q'], 'cancel': [None, 'w', '\x1b', 'q'],
-                 'new': [None, 'W', '\n', 'y', 'q'], 'not-heard': [None, 'w', '\n', 'n', 'q'],
-                 'delete': [None, 'w', '\n', 'd', 'D', 'q'], 'delete-cancel': [None, 'w', '\n', 'd', '\x1b', 'q']}
+    sequences = {'edit': [None, 'B', '\n', 't', 'q'], 'cancel': [None, 'B', '\x1b', 'q'],
+                 'new': [None, 'W', shell.curses.KEY_F2, '\n', 'y', 'q'], 'not-heard': [None, 'B', '\n', 'n', 'q'],
+                 'delete': [None, 'B', '\n', 'd', 'D', 'q'], 'delete-cancel': [None, 'B', '\n', 'd', '\x1b', 'q']}
 
     class Screen:
         keys = iter(sequences[action])

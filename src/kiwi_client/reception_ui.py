@@ -6,7 +6,22 @@ from pathlib import Path
 import sqlite3
 
 from kiwi_client.ndb_logbook import utc_time, validate_reception
-from kiwi_client.console_panels import log_panel_rows
+from kiwi_client.console_panels import cell_width, fit, log_panel_rows
+
+
+def quick_log_line(draft: dict, width: int) -> str:
+    operation = 'UPDATE' if draft.get('log_id') is not None else 'NEW'
+    component = draft['component'].upper()
+    status = draft['status'].upper()
+    stamp = utc_time(draft['heard_utc']).strftime('%Y-%m-%d %H:%M:%S')
+    number = f" #{draft['log_id']}" if draft.get('log_id') is not None else ''
+    prefix = (f"LOG {operation}{number} {draft['ident']} {draft['carrier_khz']:g} {component} | "
+              f"{status} | {stamp} UTC | Note: ")
+    if cell_width(prefix) > width - 8:
+        prefix = f"LOG {operation} {draft['ident']} {draft['carrier_khz']:g}{component[:1]} {status} | "
+    room = max(0, width - cell_width(prefix))
+    # Scroll only the note, never replace the station/status prefix with its tail.
+    return fit(prefix + fit(draft.get('notes', '') + '_', room, tail=True), width)
 
 
 def scope_key(station_key, receiver, event, source_kind):

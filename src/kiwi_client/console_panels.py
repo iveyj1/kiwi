@@ -79,18 +79,22 @@ def station_table_lines(table, width: int, count: int) -> list[str]:
 def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str],
                     reception: list[str], filters: str, help_rows: list[str],
                     message: str, prompt: str = ':', telemetry: str = '', radio_title: str = 'RADIO',
-                    table: list[tuple[str, ...]] | None = None, table_title: str = 'STATIONS') -> list[str]:
+                    table: list[tuple[str, ...]] | None = None, table_title: str = 'STATIONS',
+                    log_line: str | None = None) -> list[str]:
     """Full-width radio, compact station spreadsheet, and filter/help bands."""
     width = max(12, columns - 1)  # Leave curses' final column unused, including borders.
     active_prompt = prompt != ':'
-    if height < 12 + int(active_prompt):
+    log_rows = int(log_line is not None)
+    if height < 12 + int(active_prompt) + log_rows:
         # Compact terminals can still separate keys/messages without a table or telemetry.
-        if height >= 8 + int(active_prompt):
+        if height >= 8 + int(active_prompt) + log_rows:
             rows = [rule(width, 'RADIO / STATION', left='╭', right='╮'),
                     row(width, station[0] if station else radio),
                     row(width, reception[0] if reception else radio)]
-            if height >= 9 + int(active_prompt):
+            if height >= 9 + int(active_prompt) + log_rows:
                 rows.append(row(width, station[1] if len(station) > 1 else radio))
+            if log_line is not None:
+                rows.append(row(width, log_line))
             rows.extend([rule(width, 'KEYS'), row(width, help_rows[0] if help_rows else ''),
                          rule(width, 'MESSAGE'), row(width, message)])
             if active_prompt:
@@ -99,14 +103,17 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
         # Very short terminals keep identity, logging and input/error visible.
         body = [station[0] if station else radio, reception[0] if reception else radio,
                 *station[1:2], 'Message: ' + message]
+        if log_line is not None:
+            body = ['Message: ' + message, station[0] if station else radio]
+        body = body[:max(0, height - 2 - int(active_prompt) - log_rows)]
+        if log_line is not None:
+            body.append(log_line)
         if active_prompt:
-            body = body[:max(0, height - 3)] + [prompt]
-        else:
-            body = body[:max(0, height - 2)]
+            body.append(prompt)
         return [rule(width, 'RADIO / STATION', left='╭', right='╮'),
                 *(row(width, text, tail=text == prompt) for text in body),
                 rule(width, left='╰', right='╯')][:height]
-    body_count = max(2, min(6, height - 10 - int(active_prompt)))
+    body_count = max(2, min(6, height - 10 - int(active_prompt) - log_rows))
     rows = [rule(width, radio_title, left='╭', right='╮'), row(width, radio)]
     rows.append(rule(width, table_title))
     if table:
@@ -117,6 +124,8 @@ def main_panel_rows(*, columns: int, height: int, radio: str, station: list[str]
     rows.extend(row(width, text) for text in body[:body_count])
     rows.append(rule(width, 'FILTERS'))
     rows.append(row(width, filters))
+    if log_line is not None:
+        rows.append(row(width, log_line))
     rows.append(rule(width, 'KEYS'))
     rows.append(row(width, help_rows[0] if help_rows else ''))
     # Reserve a separate message band and keep the active input visible.

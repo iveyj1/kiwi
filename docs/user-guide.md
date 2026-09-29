@@ -136,7 +136,7 @@ precede any permanent merge.
 
 ## Main and logging page layout
 
-The console uses a **spreadsheet main page + B logging page**, with Unicode
+The console uses a **spreadsheet main page with inline logging + B detailed editor**, with Unicode
 box-drawing borders (`╭─╮`, `├┬┤`, `│`, `╰─╯`) and fixed vertical separators.
 Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration).
 
@@ -154,15 +154,21 @@ Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration)
   a non-confirmed status means an older confirmed reception still exists.
   **Last (RNA)** is the catalogue's last-logged date, not your personal hearing time.
   The table title retains the selected component/frequency and logging scope.
-- `w`/`W` opens a **full-screen logging page**: editable UTC/status/notes on the left,
-  frozen station/receiver/source/center/offset/bandwidth evidence on the right.
-  The waterfall placement is hidden while the form is open; receiver/audio workers
-  keep their existing lifecycle. Save/cancel returns to the waterfall with a full
-  repaint. The form never relabels current tuning as old reception evidence.
-- The existing `UTC timestamp | notes` input remains in the bottom edit band;
-  Enter reviews it, `y` confirms, `t` saves tentative, `n` saves not-heard,
-  `d` requests deletion of an existing entry (uppercase `D` confirms), Esc cancels. This is the new
-  layout, not yet a Tab-driven field editor or an older-entry picker.
+- `w`/`W` opens a **one-line log editor above KEYS**, leaving the waterfall visible
+  and audio running. It displays NEW/UPDATE, frozen station/component, status and
+  hearing time. Type an optional note; **Tab** toggles confirmed/tentative;
+  **Enter saves the displayed status**; **Esc cancels**. New hearings default to
+  confirmed, but updates retain their existing status, time and tuning evidence.
+  Input letters (including y/t/n/q), Space and digits are note text, not radio commands.
+  Long notes scroll independently of the station/status prefix. Backspace edits
+  the note; shorter lines omit secondary fields rather than hiding the status.
+- **B** on the main page, or **F2** from inline entry, opens the detailed editor:
+  editable UTC/status/notes on the left and frozen evidence on the right. F2 carries
+  the unsaved draft into this form. Only this page hides the waterfall placement;
+  acquisition/audio continue. In its `UTC | notes` field, Enter reviews; then `y`
+  confirms, `t` saves tentative, `n` saves not-heard, `d` requests deletion of an
+  existing entry and uppercase `D` confirms. Esc cancels. This remains a separate
+  advanced workflow, not an older-entry picker.
 - At narrow widths the spreadsheet drops secondary columns; logging panels stack
   instead of squeezing two columns. Small windows
   retain identity, log state and input; optional details/telemetry are omitted.
@@ -290,7 +296,10 @@ not detected signals or proof of an ID. Coordinates are RF frequencies, not the 
 receiver reference. Switching stations replaces the guides; `v` changes emphasis
 without removing that station's other known components.
 
-- `n` / `N`: select and immediately tune the next/previous filtered station in CW.
+- `n` / `N`: select and immediately tune the next/previous filtered station in CW,
+  and recenter the waterfall even when the new frequency is already visible.
+  This uses the same selected-reference center as `c`, subject to receiver band-edge
+  clamping. A pending live view is superseded through the existing fresh-view gate.
 - `v`: cycle and immediately tune carrier/LSB/USB/stored, skipping unavailable entries.
 - `y`: retune the selected component in CW using the existing CW offset.
 - A station remembers its last component choice; first visits choose USB if known,
@@ -479,21 +488,24 @@ Omit `--log-event` for general listening (those entries do not enter the CLE rep
 After listening and copying the ident:
 
 1. Select the correct catalogue station/component (search acceptance, n/N and v tune automatically); `y` retunes it.
-2. Press `w`. If this station has an entry for the current receiver, event and
-   source (LIVE versus fixture), the form edits the latest **hearing time** entry,
-   using the highest log ID to break ties. Its original time and notes are prefilled;
-   you can edit it even while tuned elsewhere. `EDIT LOG #N` identifies the record.
-   Otherwise `w` starts a `NEW RECEPTION` snapshot of station, nominal/component
-   frequency, receiver, site, mode/filter and catalogue fields/hash. Its initial
-   time is now, not when you first tuned; edit it to the actual hearing time.
-   Use uppercase `W` to deliberately add a repeat reception instead of editing.
-3. Edit `UTC timestamp | notes` with Backspace/typing; Enter accepts the fields.
-   Timestamp needs `Z` or a UTC offset. There is no automatic ID confirmation.
-4. At the review prompt, press `y` for confirmed, `t` for tentative, `n` for
-   **not-heard**, or Esc to cancel. Not-heard retains the entry and its history but
-   excludes that entry from the CLE report. Only a successful transaction reports
-   a saved entry number.
-5. To delete an existing entry, press `d` at the review prompt, then uppercase `D`
+2. Press `w` to open the main-page log line. It updates the latest scoped hearing
+   (station/receiver/event/LIVE-or-fixture, highest log ID breaks equal-time ties),
+   or opens a new draft if none exists. **UPDATE** retains the old time, status,
+   note and tuning evidence; **NEW** freezes current station, time, tuning and
+   catalogue evidence and defaults to confirmed. Uppercase `W` always creates a
+   new hearing. The selection must match current tuning before either inline
+   operation opens; use `y` first if a nearby candidate was only shown, not tuned.
+3. Type a short note if desired. **Tab** switches confirmed/tentative, **Enter**
+   saves, **Esc** cancels. There is no second y/t confirmation step in inline mode;
+   those letters are ordinary note text. `w`, Enter is the empty-note quick path.
+   Existing tentative entries are not promoted unless you explicitly change status.
+4. For a different hearing time or not-heard status, use **F2** for the detailed
+   form (or **B** directly from the main page). Edit `UTC timestamp | notes`, then
+   Enter and `y`/`t`/`n` for confirmed/tentative/not-heard. Timestamp requires Z or a
+   UTC offset. New draft time is when entry opened, not when tuning began. B may
+   edit an existing historical entry while tuned elsewhere, retaining its evidence.
+   Only a successful transaction reports a saved entry number.
+5. To delete an existing entry, use the detailed form and press `d` at its review prompt, then uppercase `D`
    at the explicit entry-ID/station confirmation. Esc cancels without deleting.
    Deletion removes the current reception row from status/search/report results;
    its revision history and a deletion audit record remain. IDs are never reused.
@@ -513,8 +525,9 @@ station. An older confirmed reception remains confirmed until separately reviewe
 The current latest entry opens with `w`; use CLI IDs below to revise/delete older
 entries while the visual older-entry picker remains unimplemented.
 
-`w` changes the existing row's hearing time/status/notes with revision history;
-it never replaces original receiver, station, tuning, catalogue or source evidence
+Inline `w` changes the existing row's status/notes with revision history; B/F2
+also permits hearing-time edits. Neither workflow
+replaces original receiver, station, tuning, catalogue or source evidence
 with whatever is currently on screen. An external change while the form is open
 blocks saving stale edits; cancel and reopen. Esc makes no changes. To edit an
 older entry rather than the latest hearing, use its ID with the CLI below; a
@@ -525,7 +538,9 @@ Explicit `W` repeats remain stored with a warning count. Fixture-mode entries re
 they cannot enter the event report. Confirmation says what **you** heard, not what
 the catalogue predicts. Database activity is not proof of current reception.
 
-Layout alternatives with sample main/logging screens are in
+The current inline workflow has a synthetic renderer example in
+[`docs/ui-inline-log-174.txt`](ui-inline-log-174.txt). Earlier editable mockups are
+preserved, not overwritten. Layout alternatives with sample main/logging screens are in
 [`docs/ui-layout-workshop.txt`](ui-layout-workshop.txt): compact bands (A), fixed
 two-column blocks (B), and a station/history sidebar (C). The main page now replaces
 A's station/log split with a spreadsheet; B logging retains its Unicode borders.

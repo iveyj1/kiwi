@@ -1,9 +1,25 @@
 # TODO
 
+## Current slice — inline reception entry and centered catalogue stepping
+
+Goal: w/W open a one-line main-page log editor (update latest / new hearing).
+Enter saves the displayed status and comment; Tab toggles confirmed/tentative;
+Esc cancels. New hearings default confirmed; updates retain status and original
+hearing/tuning evidence. Guard selection/tuning consistency and consume typing
+before radio shortcuts. Keep detailed editing available separately. Audio and
+waterfall presentation continue. n/N immediately tune and center the selected
+frequency, including selections already inside the viewport. Done: synthetic
+input/layout/persistence/centering regressions, full offline suite, docs and commit;
+no receiver access or personal log changes.
+Completed: inline draft/save/status flow, B/F2 advanced editor, Unicode-safe active
+line, and unconditional n/N recenter via existing view actions. 752 offline tests
+pass; a real-curses offline PTY saved a tentative note while graphics continued.
+Current synthetic layout: docs/ui-inline-log-174.txt; older editable mockups retained.
+
 ## Requested follow-up work
 
-- [ ] Consider improving the logging flow, including starting log entry directly
-  from the main screen.
+- [x] Improve the logging flow with one-line entry directly on the main screen
+  (w/W, Enter save, Tab confirmed/tentative, Esc cancel; B/F2 for details).
 - [ ] Collect evidence when adding a log entry: audio recording plus a snapshot
   of the waterfall, frequency/tuning settings and displayed text, linked to the
   reception record.

@@ -184,9 +184,20 @@ of the filtered shortlist, joining read-only scoped log status without database
 writes. Personal UTC status and RNA's last-logged date remain separate fields.
 It clips within fixed columns and adapts to narrow/short terminals. Full-screen
 forms clear only the Kitty placement, leaving source workers running, and trigger
-a full console repaint on return. `w` revises the latest scoped hearing, while `W`
-explicitly creates a repeat. Form edits retain frozen evidence; optimistic checks
-reject stale edits when another writer has changed the record. Offline report generation independently
+a full console repaint on return. `quick_log.py` owns independent main-page drafts:
+`w` opens the latest scoped hearing or a new draft, and `W` always opens a repeat.
+Both validate current selection/tuning before opening. New drafts default confirmed;
+updates retain status/time/evidence. The inline input branch consumes typing before
+radio shortcuts; Tab changes status, Enter commits and Esc discards. Main-page
+rendering/acquisition continue while the draft is open. `reception_ui.quick_log_line`
+clips only the note tail, keeping station/status visible; the renderer reserves a
+line above KEYS. B/F2 retains the advanced full-screen workflow for time/not-heard/
+delete operations, with F2 transferring the same pending draft and expected snapshot.
+Neither rendering nor opening a draft writes a reception. Optimistic checks
+reject stale edits when another writer has changed the record. n/N now request the
+same recenter action as manual c after tuning, even inside the viewport. Existing
+view-transition gating and band-edge rules remain in effect; other tune actions
+retain their prior edge-triggered recenter behavior. Offline report generation independently
 validates event/source/time/channel/receiver constraints. Fixture receptions retain
 their provenance and cannot become live CLE evidence. There is no DSP, automatic
 station identification, database download, or email submission in this branch.

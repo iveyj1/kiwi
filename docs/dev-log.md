@@ -1,5 +1,38 @@
 # Dev Log
 
+## 2026-09-29 — Inline log entry and n/N waterfall centering
+
+Implemented the agreed main-page workflow: w opens the latest scoped entry or a
+new draft, W always creates a new hearing. The dedicated line above KEYS shows
+NEW/UPDATE, station/component, status and hearing time; Enter saves, Tab toggles
+confirmed/tentative, Esc cancels. New drafts default confirmed; existing status,
+hearing time and tuning evidence remain unchanged unless explicitly edited via
+the detailed form. Printable keys are notes, not radio commands. Long notes scroll
+without losing the station/status prefix. Both inline paths require the selected
+component to match current tuning; B can still review existing history while tuned
+elsewhere. F2 transfers the pending draft to the old UTC/not-heard/delete workflow.
+
+QuickLogEntry owns draft creation/frozen snapshots and uses existing audited,
+optimistically checked SQLite writes. No write occurs on opening/cancelling.
+Source polling and main-page graphics continue during entry; errors keep the draft
+for retry/cancel. Audio lifecycle is unchanged. No audio/image evidence capture was
+added yet. Rendering remains separate from persistence and future logbook editing.
+
+n/N now recenter even for an in-view selection, using the manual-c selected-reference
+center and existing fresh-view gate. Edge-triggered recentering is not duplicated;
+fixture mapping is initialized before deciding the new view. Other tuning controls
+retain their previous behavior. Updated docs and added a new renderer-generated
+synthetic inline example without overwriting earlier editable mockups.
+
+Validation: 752 offline tests pass; compileall/diff checks clean. New fixtures cover
+normal/tentative/repeat/cancel flows, radio-key isolation, Unicode/backspace, frozen
+metadata and stale-write protection, retry, F2, compact layout and n/N centering.
+Existing advanced-form regressions now use B/F2. An isolated real-curses PTY saved
+RJ/tentative/weak and observed continuing Kitty graphics packets while editing;
+clean exit, fixture provenance, all artifacts under /tmp/kiwi-inline-pty-38msix_v.
+No live receiver access or personal log/state modifications; physical live use
+remains for user inspection.
+
 ## 2026-09-28 — Explicit logbook quit action
 
 Added a visible Quit (Ctrl+Q) button and a window-scoped Ctrl+Q QAction. Both

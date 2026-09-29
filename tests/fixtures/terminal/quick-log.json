@@ -1,0 +1,7 @@
+[
+    {"keys": ["w", "\n", "q"], "status": "confirmed", "notes": ""},
+    {"keys": ["w", "\t", "y", "n", "N", "h", "j", "k", "a", "/", " ", ":", "w", "q", "\n", "q"], "status": "tentative", "notes": "ynNhjka/ :wq"},
+    {"keys": ["w", "\u001b", "q"], "status": null, "notes": ""},
+    {"keys": ["w", "\t", "\t", "\n", "q"], "status": "confirmed", "notes": ""},
+    {"keys": ["w", "é", "\u007f", "弱", "\n", "q"], "status": "confirmed", "notes": "弱"}
+]

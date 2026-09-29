@@ -4,6 +4,21 @@
 
 The harness allows development and regression testing without requiring live KiwiSDR hardware.
 
+## Inline reception entry / catalogue centering
+
+`tests/fixtures/terminal/quick-log.json` drives real shell input paths in
+`test_quick_log.py`: Enter save, Tab status, ordinary radio-key letters as note
+text, Unicode/backspace and cancellation. Tests cover frozen new/update evidence,
+retained tentative status, repeats, stale updates, retry after write failure,
+F2 handoff, note-tail clipping and main-page graphics during entry. n/N cases
+center selections already inside the viewport; initial fixture mapping and a
+superseded pending view are also covered. Existing detailed-form tests now use B
+(or W then F2), including editing while tuned elsewhere and audited deletion.
+
+An isolated offline PTY smoke run also saved RJ/tentative/weak from real curses
+keystrokes while Kitty graphics packets continued during inline editing. No
+receiver connection was made and all generated state/log files stayed in /tmp.
+
 ## Standalone logbook / WWSU review regressions
 
 `tests/fixtures/wwsu/` contains synthetic exported table data and a report, not

@@ -16,7 +16,8 @@ from typing import Any, BinaryIO, Mapping
 
 from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
-from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, reception_panel_lines, station_spreadsheet
+from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, quick_log_line, reception_panel_lines, station_spreadsheet
+from kiwi_client.quick_log import QuickLogEntry
 from kiwi_client.console_panels import main_panel_rows
 from kiwi_client.terminal_input import ConsoleInput, FocusEvent, next_refresh_deadline
 from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, startup_waterfall_scale, normalize_console_cw_bandwidth
@@ -403,7 +404,7 @@ def _apply_preset(model: WaterfallGuiModel, preset: Mapping[str, Any]) -> None:
         model.session.state = replace(state, **changes)
 
 
-def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller=None) -> str:
+def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller=None, *, center=False) -> str:
     """Pass the RF component to normal tuning; never pre-apply the CW offset."""
     component = browser.component
     if component is None:
@@ -427,7 +428,9 @@ def tune_rna_component(browser: RnaBrowser, model: WaterfallGuiModel, controller
             model.session.state = replace(state, low_cut_hz=low, high_cut_hz=high)
         # A stored frequency means actual RF passband center, not the CW UI reference.
         frequency_khz -= (model.session.state.cw_offset_hz + (low + high) / 2) / 1000
-    set_console_frequency(model, frequency_khz)
+    _tuned, recentered = set_console_frequency(model, frequency_khz)
+    if center and recentered is None:
+        model.recenter()
     return f"RNA {browser.selected.station.ident} {component.kind} {component.frequency_khz:.3f} kHz; ID not confirmed"
 
 
@@ -492,6 +495,7 @@ def run_fixture_shell(
     search_entry: str | None = None
     search_page: CallsignSearchPage | None = None
     catalogue_command: str | None = None
+    quick_log: QuickLogEntry | None = None
     log_draft: dict | None = None
     log_original: dict | None = None
     log_delete_pending = False
@@ -591,6 +595,30 @@ def run_fixture_shell(
             if key == curses.KEY_RESIZE:
                 presenter.invalidate()
                 full_redraw = True
+                dirty = True
+            elif quick_log is not None and key is not None:
+                if key == '\x1b':
+                    quick_log = None
+                    message = 'logging cancelled; no changes saved'
+                elif key == '\t':
+                    quick_log.toggle_status()
+                elif key == curses.KEY_F2:
+                    log_draft, log_original = quick_log.draft, quick_log.original
+                    log_entry = log_draft['heard_utc'] + ' | ' + log_draft.get('notes', '')
+                    log_delete_pending = False
+                    quick_log = None
+                    message = 'Detailed editor: UTC | notes; Enter then y/t/n, or d delete; Esc cancels'
+                elif key in ('\n', '\r'):
+                    try:
+                        message = quick_log.save(logbook_path)
+                        reception_index.refresh()
+                        quick_log = None
+                    except (OSError, ValueError, sqlite3.Error) as exc:
+                        message = f'log NOT saved: {exc}; retry or Esc'
+                elif key in ('\b', '\x7f', curses.KEY_BACKSPACE):
+                    quick_log.draft['notes'] = quick_log.draft.get('notes', '')[:-1]
+                elif isinstance(key, str) and key.isprintable():
+                    quick_log.draft['notes'] = quick_log.draft.get('notes', '') + key
                 dirty = True
             elif log_draft is not None and key is not None:
                 if key == "\x1b":
@@ -760,7 +788,7 @@ def run_fixture_shell(
             elif rna_browser is not None and tui_input is None and key == ":":
                 catalogue_command = ""
                 dirty = True
-            elif rna_browser is not None and key in ("w", "W"):
+            elif rna_browser is not None and key in ("w", "W", "B"):
                 try:
                     if logbook_path is None:
                         raise ValueError("logging requires --logbook PATH")
@@ -772,14 +800,19 @@ def run_fixture_shell(
                     if reception_index.error:
                         raise ValueError(reception_index.error)
                     existing = (reception_index.latest(rna_browser.selected.station.key, receiver, log_event, source_kind)
-                                if key == "w" else None)
-                    log_delete_pending = False
-                    log_original = None if existing is None else dict(existing)
-                    log_draft = existing if existing is not None else reception_draft(
-                        rna_browser, model.session.state, receiver=receiver, source_kind=source_kind, event=log_event)
-                    log_entry = log_draft["heard_utc"] + " | " + log_draft.get('notes', '')
-                    message = (f"Editing latest hearing #{log_draft['log_id']}; time/status/notes only; Esc cancels"
-                               if existing is not None else "New reception: edit actual hearing time | notes; Enter then confirm")
+                                if key in ("w", "B") else None)
+                    if key == 'B':
+                        log_delete_pending = False
+                        log_original = None if existing is None else dict(existing)
+                        log_draft = existing if existing is not None else reception_draft(
+                            rna_browser, model.session.state, receiver=receiver, source_kind=source_kind, event=log_event)
+                        log_entry = log_draft['heard_utc'] + ' | ' + log_draft.get('notes', '')
+                        message = 'Detailed editor: UTC | notes; Enter then y/t/n, or d delete; Esc cancels'
+                    else:
+                        quick_log = QuickLogEntry.open(rna_browser, model.session.state, receiver=receiver,
+                            source_kind=source_kind, event=log_event, existing=existing)
+                        message = ('UPDATE draft (unsaved): original hearing time/tuning retained' if existing else
+                                   'NEW draft (unsaved): time/tuning frozen at entry')
                 except ValueError as exc:
                     message = str(exc)
                 dirty = True
@@ -811,7 +844,7 @@ def run_fixture_shell(
                     elif key == "A":
                         rna_browser.cycle_activity(model.session.state.frequency_khz)
                     if key != "A":
-                        message = tune_rna_component(rna_browser, model, tui_controller)
+                        message = tune_rna_component(rna_browser, model, tui_controller, center=key in ('n', 'N'))
                     else:
                         message = rna_browser.status()
                 except (ValueError, RuntimeError, OSError) as exc:
@@ -1075,7 +1108,7 @@ def run_fixture_shell(
                 elif rna_browser is not None:
                     station_rows = [rna_browser.status()]
                 help_rows = [("/ find n/N station ,/. show nearby </> tune nearby v band " if rna_browser is not None else "") +
-                             "h/l small H/L large j/k BW w edit W new q quit"]
+                             "h/l small H/L large j/k BW w log W new B details q quit"]
                 if rna_browser is not None:
                     help_rows.append("f freq m mode t/T steps c center +/- zoom a audio u auto : commands")
                     help_rows.append("Space mark * | RNA :rna store / forget / near HZ / range KM / power W / sort distance")
@@ -1087,11 +1120,14 @@ def run_fixture_shell(
                     help_rows = (["rna store / forget; near HZ; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
                                  if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
                                  else render_tui_hints(tui_input, tui_config, tui_controller).splitlines())
+                if quick_log is not None:
+                    help_rows = ['LOG: type note | Tab status | Enter save | Esc cancel | F2 details']
                 rows = main_panel_rows(columns=columns, height=layout.tui_rows + 1, radio=radio,
                     radio_title='RADIO / ' + transport_status,
                     station=station_rows, reception=reception_rows, filters=filters,
                     table=table, table_title=table_title,
                     help_rows=help_rows, message=message, prompt=prompt,
+                    log_line=None if quick_log is None else quick_log_line(quick_log.draft, columns - 5),
                     telemetry=f'{levels.status_text()} | RX {radio_frequency_khz:.4f} | {transport_status}')
                 for offset, text in enumerate(rows[:layout.tui_rows + 1]):
                     _safe_line(screen, layout.divider_row + offset, text, columns)
@@ -1120,7 +1156,7 @@ def run_fixture_shell(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fixture-first integrated Kitty waterfall and terminal UI")
     add_rna_arguments(parser)
-    parser.add_argument("--logbook", type=Path, help="SQLite reception log; w opens an explicit confirmation form")
+    parser.add_argument("--logbook", type=Path, help="SQLite reception log; w/W inline entry, B detailed editor")
     parser.add_argument("--log-event", choices=["CLE332"], help="tag new receptions for this event; omitted means general listening")
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--config", type=Path)

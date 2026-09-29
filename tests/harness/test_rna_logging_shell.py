@@ -20,7 +20,7 @@ def test_shell_logging_requires_explicit_decision_and_fixture_provenance(tmp_pat
     monkeypatch.setattr(shell.curses, 'has_colors', lambda: False)
 
     class Screen:
-        keys = iter(['y', 'w', '\n', decision, 'q'])
+        keys = iter(['y', 'B', '\n', decision, 'q'])
         def get_wch(self):
             return next(self.keys)
         def getmaxyx(self):
