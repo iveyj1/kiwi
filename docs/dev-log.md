@@ -1,5 +1,29 @@
 # Dev Log
 
+## 2026-10-21 — Receiver popup and capped-zoom blank waterfall
+
+Added a lower-text-area receiver popup, with stable dimensions independent of
+station-list length, current-receiver marker, selection, arrow/page scrolling,
+Enter/register selection and Esc cancellation. It delegates switching to the
+existing lifecycle handler; no graphical-image overlay or receiver reconnect is
+introduced by rendering/navigation. Harness covers empty through 36-entry lists,
+Unicode clipping, small windows, direct selection, navigation and cancellation.
+
+Investigated the reported blank waterfall after tuning offscreen. Added waiting
+geometry diagnostics, then reproduced on local receiver 1: requested z12 but the
+server returned z11. The freshness gate previously rejected all those frames.
+`zoom_cap` is now parsed separately from coordinate-system `zoom_max` and carried
+with mapped frames. The gate accepts the advertised capped acquisition zoom only
+at the correct center; local display z12 remains a crop, not improved resolution.
+A new observation fixture and regressions cover old-center rejection, advertised
+versus unadvertised zoom mismatch, coordinate mapping and raster rendering.
+
+Full offline suite: 773 passed. After the initial offline popup/diagnostic suite,
+a bounded local test reproduced the issue; regressions then failed before the
+fix, passed afterward, and a second short live test verified recovery. Receiver,
+UTC/local times, settings and outcomes are recorded in docs/kiwi-protocol.md.
+No public receivers, personal log/state modifications or merge into main.
+
 ## 2026-09-29 — Inline log entry and n/N waterfall centering
 
 Implemented the agreed main-page workflow: w opens the latest scoped entry or a

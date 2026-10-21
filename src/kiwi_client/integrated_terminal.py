@@ -18,7 +18,8 @@ from kiwi_client.gui_app import FixtureWaterfallTimeline, WaterfallGuiModel
 from kiwi_client.ndb_logbook import Logbook, reception_draft, utc_time
 from kiwi_client.reception_ui import ReceptionIndex, logging_panel_rows, quick_log_line, reception_panel_lines, station_spreadsheet
 from kiwi_client.quick_log import QuickLogEntry
-from kiwi_client.console_panels import main_panel_rows
+from kiwi_client.console_panels import main_panel_rows, cell_width
+from kiwi_client.receiver_popup import ReceiverPopup
 from kiwi_client.terminal_input import ConsoleInput, FocusEvent, next_refresh_deadline
 from kiwi_client.console_state import ConsoleSettingsCheckpoint, startup_waterfall_zoom, startup_waterfall_scale, normalize_console_cw_bandwidth
 from kiwi_client.rna_console import CallsignSearchPage, RnaBrowser, add_rna_arguments, browser_from_args
@@ -503,6 +504,7 @@ def run_fixture_shell(
     next_history_refresh = 0.0
     log_entry: str | None = None
     pending_preset = False
+    receiver_popup = None
     tui_input = TuiInputState() if tui_controller is not None and tui_config is not None else None
     last_response = None
     message = "live paired session starting" if live_source is not None else "fixture-only; no receiver connection"
@@ -517,7 +519,7 @@ def run_fixture_shell(
         return reception_index.status(station_key, receiver, log_event, "live" if live_source is not None else "fixture")
 
     def dispatch_tui_key(key) -> None:
-        nonlocal last_response, message
+        nonlocal last_response, message, receiver_popup
         if tui_input is None or tui_controller is None:
             return
         if isinstance(key, str):
@@ -543,6 +545,8 @@ def run_fixture_shell(
             presenter.invalidate()
             return
         response, new_message = handle_tui_key(ch, tui_input, tui_controller, tui_config)
+        if tui_input.pending_key_action != 'receiver':
+            receiver_popup = None
         if response is not None:
             last_response = response
         if new_message is not None:
@@ -767,7 +771,25 @@ def run_fixture_shell(
             elif tui_input is not None and (
                 tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
             ) and key is not None:
-                dispatch_tui_key(key)
+                if tui_input.pending_key_action == 'receiver':
+                    if receiver_popup is None:
+                        receiver_popup = ReceiverPopup.open(tui_config, tui_controller)
+                    if key == '\x1b':
+                        tui_input.pending_key_action = None
+                        receiver_popup = None
+                        message = 'receiver selection cancelled'
+                    elif key in (curses.KEY_UP, curses.KEY_DOWN, curses.KEY_PPAGE, curses.KEY_NPAGE):
+                        receiver_popup.move({curses.KEY_UP: -1, curses.KEY_DOWN: 1,
+                                             curses.KEY_PPAGE: -8, curses.KEY_NPAGE: 8}[key])
+                    elif key in ('\n', '\r', curses.KEY_ENTER):
+                        if receiver_popup.selected_register is not None:
+                            dispatch_tui_key(receiver_popup.selected_register)
+                    elif isinstance(key, str) and key in {item[0] for item in receiver_popup.entries}:
+                        dispatch_tui_key(key)
+                    else:
+                        message = 'Use arrows/Enter, a receiver register, or Esc'
+                else:
+                    dispatch_tui_key(key)
                 dirty = True
                 if tui_controller is not None and not tui_controller.running:
                     break
@@ -1115,7 +1137,8 @@ def run_fixture_shell(
                 # Generic TUI key hints describe different bindings; show only its
                 # contextual command/prefix hints in the integrated console.
                 if tui_input is not None and tui_config is not None and (
-                    tui_input.mode == InputMode.COMMAND or tui_input.pending_key_action is not None
+                    tui_input.mode == InputMode.COMMAND or (
+                        tui_input.pending_key_action is not None and tui_input.pending_key_action != 'receiver')
                 ):
                     help_rows = (["rna store / forget; near HZ; range KM|off; power W|off; sort distance|frequency; cle on|off; site LAT LON TIMEZONE"]
                                  if tui_input.mode == InputMode.COMMAND and tui_input.command.startswith("rna")
@@ -1126,11 +1149,22 @@ def run_fixture_shell(
                     radio_title='RADIO / ' + transport_status,
                     station=station_rows, reception=reception_rows, filters=filters,
                     table=table, table_title=table_title,
-                    help_rows=help_rows, message=message, prompt=prompt,
+                    help_rows=help_rows, message=model.publisher.waiting_detail or message, prompt=prompt,
                     log_line=None if quick_log is None else quick_log_line(quick_log.draft, columns - 5),
                     telemetry=f'{levels.status_text()} | RX {radio_frequency_khz:.4f} | {transport_status}')
                 for offset, text in enumerate(rows[:layout.tui_rows + 1]):
                     _safe_line(screen, layout.divider_row + offset, text, columns)
+                if tui_input is not None and tui_input.pending_key_action == 'receiver':
+                    if receiver_popup is None:
+                        receiver_popup = ReceiverPopup.open(tui_config, tui_controller)
+                    popup_rows = receiver_popup.lines(columns, layout.tui_rows + 1)
+                    top = layout.divider_row + max(0, (layout.tui_rows + 1 - len(popup_rows)) // 2)
+                    left = max(0, (columns - cell_width(popup_rows[0])) // 2)
+                    for i, text in enumerate(popup_rows):
+                        try:
+                            screen.addnstr(top + i, left, text, len(text))
+                        except curses.error:
+                            pass
                 screen.noutrefresh()
                 curses.doupdate()
                 if image is not None and snapshot is not None:

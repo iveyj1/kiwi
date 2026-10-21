@@ -202,6 +202,19 @@ validates event/source/time/channel/receiver constraints. Fixture receptions ret
 their provenance and cannot become live CLE evidence. There is no DSP, automatic
 station identification, database download, or email submission in this branch.
 
+The integrated console's receiver prefix opens `receiver_popup.ReceiverPopup`.
+It snapshots structured receiver-register entries, highlights current/selected
+receivers, and provides bounded scrolling geometry independent of station rows.
+The shell draws it after the main text but only below the waterfall image; no
+Kitty image layering is needed. Navigation is modal, selection delegates to the
+existing receiver-switch handler, and cancellation sends no command.
+
+Waterfall frames carry advertised `zoom_cap` separately from coordinate-system
+`zoom_max`. The snapshot freshness gate matches capped acquisition zoom plus
+actual mapped start, leaving software display cropping independent. Waiting
+transitions expose requested/received geometry and rejection counts, without
+a timeout that would silently admit stale rows.
+
 ## Suggested modules
 
 ```text

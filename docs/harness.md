@@ -4,6 +4,17 @@
 
 The harness allows development and regression testing without requiring live KiwiSDR hardware.
 
+## Receiver popup and capped acquisition zoom
+
+`test_receiver_popup.py` exercises stable bounded popup geometry for 0–36 entries,
+Unicode descriptions, current-receiver selection and real shell key routing through
+mocked receiver switching. Navigation/cancel do not connect or retune.
+`wf-capped-view.json` preserves mapped observations from the local z12→z11 failure;
+`test_capped_waterfall_view.py` synthesizes bins and checks advertised-cap handling,
+old-center rejection, unchanged coordinate mapping and local display cropping.
+`test_waiting_view_diagnostics.py` distinguishes missing frames from rejected views.
+Live reproduction and post-regression verification details are in kiwi-protocol.md.
+
 ## Inline reception entry / catalogue centering
 
 `tests/fixtures/terminal/quick-log.json` drives real shell input paths in

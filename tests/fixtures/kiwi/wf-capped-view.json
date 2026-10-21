@@ -1,0 +1,15 @@
+{
+  "description": "Local receiver 1 edge-tune reproduced: requested z12, received correct center at z11. Metadata zoom_cap=11 also occurs in local-wf-am-855-zoom7.jsonl; coordinate zoom_max remains 14.",
+  "receiver": "10.0.0.41:8073",
+  "reproduced_utc": "2026-10-21T05:01:52.239102+00:00",
+  "verified_utc": "2026-10-21T05:03:42.427797+00:00",
+  "local_timezone_offset": "-04:00",
+  "verification": "Old-center frame rejected after request; new center at z11 accepted within 0.501 seconds of tune; local z12 display range 227.127890625..234.452109375 kHz.",
+  "requested_center_khz": 230.79,
+  "requested_zoom": 12,
+  "metadata": {"bandwidth": "30000000", "wf_fft_size": "1024", "zoom_max": "14", "zoom_cap": "11"},
+  "received_start_khz": 223.46556186676025,
+  "received_center_khz": 230.78978061676025,
+  "received_zoom": 11,
+  "width": 1024
+}

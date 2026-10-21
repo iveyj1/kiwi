@@ -24,6 +24,7 @@ class WaterfallReceiverState:
     wf_fps: int | None = None
     wf_fps_max: int | None = None
     zoom_max: int | None = None
+    zoom_cap: int | None = None
     wf_cal_db: int | None = None
     zoom: int | None = None
     start_bin: int | None = None
@@ -37,6 +38,7 @@ class WaterfallReceiverState:
             "wf_fps": self.wf_fps,
             "wf_fps_max": self.wf_fps_max,
             "zoom_max": self.zoom_max,
+            "zoom_cap": self.zoom_cap,
             "wf_cal_db": self.wf_cal_db,
             "zoom": self.zoom,
             "start_bin": self.start_bin,
@@ -48,6 +50,7 @@ class WaterfallReceiverState:
             "wf_fps": "wf_fps",
             "wf_fps_max": "wf_fps_max",
             "zoom_max": "zoom_max",
+            "zoom_cap": "zoom_cap",
             "wf_cal": "wf_cal_db",
             "zoom": "zoom",
             "start": "start_bin",
@@ -194,6 +197,7 @@ class WaterfallFrame:
     x_bin_server: int | None = None
     flags_x_zoom_server: int | None = None
     raw_flags: int | None = None
+    zoom_cap: int | None = None
 
 
 class WaterfallSequenceTracker:
@@ -225,6 +229,8 @@ def contextualize_waterfall_frame(
     state: WaterfallReceiverState,
 ) -> WaterfallFrame:
     """Populate frame frequency fields from W/F metadata and server bin coordinates."""
+    # Hardware zoom capability is distinct from the coordinate system's zoom_max.
+    frame = replace(frame, zoom_cap=state.zoom_cap)
     required = (state.bandwidth_hz, state.wf_fft_size, state.zoom_max)
     if any(value is None for value in required):
         return frame

@@ -291,6 +291,35 @@ migration/recall to the 10 Hz minimum with RF-center and log association preserv
 Server rejection/clamping and actual filter response remain unverified; no new
 acknowledgment or bandwidth-capability message is assumed.
 
+## Acquisition zoom caps (local verification 2026-10-21)
+
+`MSG zoom_cap` is the maximum acquisition zoom, distinct from `zoom_max`, which
+still defines the server's start-bin coordinate scale. Preserve both. Frame
+contextualization carries the advertised cap; the view gate expects
+`min(requested_zoom, zoom_cap)` while still checking the requested center against
+the frame's actual span and band-edge clamping. Do not infer a cap from arbitrary
+queued frames. Local display cropping can retain a higher requested zoom without
+claiming additional FFT resolution.
+
+Reproduced on **10.0.0.41:8073**, 2026-10-21 **05:01:52 UTC / 01:01:52 -04:00**:
+muted paired CW, cuts 750–850 Hz, W/F speed 4/interp 13, z12,
+210.790 → 230.790 kHz. The server returned center 230.78978061676025 kHz at z11,
+span 14.6484375 kHz. The old gate rejected 43 frames over the bounded eight-second
+observation, leaving a blank display. Existing captured setup metadata also records
+`zoom_cap=11`, `zoom_max=14` in `local-wf-am-855-zoom7.jsonl`.
+
+After the harness fix, repeated at **05:03:42 UTC / 01:03:42 -04:00**, same receiver
+and settings: one queued old-center frame was rejected; the new z11 view was
+accepted about 0.50 seconds after tuning. Local z12 display range remained
+227.127890625–234.452109375 kHz and raster rendering succeeded. This is header/view
+verification, not proof of FFT-content settling. Both connections were stopped;
+no admin commands, personal log writes or public receivers were used.
+
+Recorded mapping observations: `tests/fixtures/kiwi/wf-capped-view.json`; numeric
+bins in its regression are synthetic. Tests: `test_capped_waterfall_view.py`,
+`test_waiting_view_diagnostics.py`. Full transient observations are in
+`/tmp/kiwi-edge-view-observation.json` and `/tmp/kiwi-edge-view-verified.json`.
+
 ## Display freshness after live W/F view changes
 
 No new protocol messages are assumed. On an attended recenter/zoom, the client

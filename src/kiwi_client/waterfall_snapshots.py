@@ -55,11 +55,15 @@ class WaterfallSnapshotPublisher:
         self._latest: WaterfallSnapshot | None = None
         self._closed = False
         self._expected_view: tuple[float, int] | None = None
+        self._last_rejected_view: tuple[float | None, int | None] | None = None
+        self._rejected_frames = 0
 
     def expect_view(self, center_khz: float, zoom: int) -> None:
         """Start fresh history and reject queued frames from the old live viewport."""
         with self._condition:
             self._expected_view = (center_khz, zoom)
+            self._last_rejected_view = None
+            self._rejected_frames = 0
             self._rows.clear()
             self._latest = None
             # Force incremental raster consumers to rebuild even for the same geometry.
@@ -71,6 +75,20 @@ class WaterfallSnapshotPublisher:
         with self._condition:
             return self._expected_view is not None and self._latest is None and not self._closed
 
+    @property
+    def waiting_detail(self) -> str:
+        """Describe a stalled transition without accepting stale data or reconnecting."""
+        with self._condition:
+            if self._expected_view is None or self._latest is not None or self._closed:
+                return ''
+            center, zoom = self._expected_view
+            wanted = f'W/F waiting: requested {center:.6f} kHz z{zoom}'
+            if self._last_rejected_view is None:
+                return wanted + '; no frames received since request'
+            actual_center, actual_zoom = self._last_rejected_view
+            actual = '?' if actual_center is None else f'{actual_center:.6f}'
+            return wanted + f'; received {actual} kHz z{actual_zoom} ({self._rejected_frames} rejected)'
+
     def _matches_view(self, frame: WaterfallFrame) -> bool:
         if self._expected_view is None:
             return True
@@ -79,7 +97,11 @@ class WaterfallSnapshotPublisher:
             return False
         center, zoom = self._expected_view
         actual_zoom = frame.flags_x_zoom_server & 0xFFFF
-        if actual_zoom != zoom:
+        # Some receivers cap acquisition zoom (e.g. 8-channel z11) while the
+        # frontend can still crop locally at z12+. Never infer a cap from an old
+        # frame: only honor the receiver's explicit setup metadata.
+        effective_zoom = min(zoom, frame.zoom_cap) if frame.zoom_cap is not None and frame.zoom_cap >= 0 else zoom
+        if actual_zoom != effective_zoom:
             return False
         bandwidth = frame.span_khz * 2 ** actual_zoom
         expected_start = max(0.0, min(center - frame.span_khz / 2, bandwidth - frame.span_khz))
@@ -95,6 +117,9 @@ class WaterfallSnapshotPublisher:
             if self._closed:
                 raise RuntimeError("waterfall snapshot publisher is closed")
             if not self._matches_view(frame):
+                self._last_rejected_view = (frame.center_khz, None if frame.flags_x_zoom_server is None
+                                           else frame.flags_x_zoom_server & 0xFFFF)
+                self._rejected_frames += 1
                 return None
             if self._width is None:
                 self._width = len(row)

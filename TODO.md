@@ -1,5 +1,17 @@
 # TODO
 
+## Current slice — receiver popup and blank-view diagnosis
+
+Goal: a lower-text-area receiver popup with stable geometry, scrolling, explicit
+selection/cancellation and unchanged receiver-switch lifecycle. Investigate blank
+waterfall after edge tuning without weakening stale-frame rejection. Done criteria:
+offline popup/input/layout regressions, actionable waiting-view diagnostics, full
+suite and docs. No personal log changes.
+Completed: lower-text popup and diagnostic regressions; reproduced and fixed the
+blank view caused by advertised acquisition zoom cap z11 versus requested z12.
+773 offline tests pass. Two short local receiver-1 tests (reproduction, then
+verification after regressions passed) are recorded in docs/kiwi-protocol.md.
+
 ## Current slice — inline reception entry and centered catalogue stepping
 
 Goal: w/W open a one-line main-page log editor (update latest / new hearing).

@@ -177,6 +177,15 @@ Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration)
   The supported minimum remains 40 columns by 12 rows.
 
 
+### Receiver picker
+
+Press **r** for a boxed popup over the lower text area. The waterfall remains
+visible; popup size does not depend on station count or receiver-site filtering.
+Use **Up/Down**, **Page Up/Down**, then **Enter** to switch, or type the receiver's
+register directly. **Esc** cancels without switching. `>` marks the selection and
+`*` the current receiver. Long lists scroll; the popup resizes with the terminal.
+It uses the same saved receiver registers and switch lifecycle as before.
+
 ### Consistent graphical-scale fonts
 
 Frequency labels are now drawn **after** resizing the waterfall, at the graphics
@@ -207,6 +216,14 @@ pane can omit source bins/rows from the displayed image. Use receiver zoom to in
 narrow signals rather than interpreting larger pixels as finer measurements.
 
 ### Fresh waterfall history after a live view change
+
+Some receivers advertise a hardware acquisition zoom cap, such as z11 in an
+8-channel configuration. Higher display zooms crop that acquired spectrum locally;
+they do not improve FFT frequency resolution. Recenter freshness checks honor the
+advertised cap rather than waiting forever for an unsupported acquisition zoom.
+If waiting persists, MESSAGE shows requested and received center/zoom plus rejected
+frame count (or says no frames have arrived). This distinguishes view mismatch
+from missing data without accepting stale frames or reconnecting automatically.
 
 A live recenter or zoom starts a fresh display history. Frames already queued with
 an old RF start/zoom are ignored, including late old-view rows after the first new

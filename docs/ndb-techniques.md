@@ -83,6 +83,16 @@ receiver has already attached new metadata. The synthetic transition fixture and
 regressions are in `tests/fixtures/kiwi/wf-view-transition.json` and
 `tests/harness/test_live_view_reset.py`; no receiver settling time has been measured.
 
+Acquisition zoom and display zoom are not necessarily equal. A receiver advertising
+`zoom_cap=11` can return a 30,000 / 2¹¹ = 14.6484375 kHz span with 1024 bins, about
+14.3 Hz per acquired bin. At display z12 we crop to 7.32421875 kHz, using roughly
+512 of those bins and enlarging them for display. This makes features larger but
+does not resolve signals closer together. Freshness validation must compare against
+the capped acquisition zoom and actual span, not reject valid frames merely because
+the requested display zoom is higher. The coordinate-system `zoom_max` remains
+unchanged. See [the local verification](kiwi-protocol.md#acquisition-zoom-caps-local-verification-2026-10-21)
+and `tests/harness/test_capped_waterfall_view.py`.
+
 ## Symmetric CW bandwidth adjustment
 
 The console's `j/k` steps request full widths of 10, 20, 30, 50, 100 or 500 Hz.
