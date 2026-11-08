@@ -1,5 +1,26 @@
 # Dev Log
 
+## 2026-11-08 — Subtle NDB tuning-bar search regions
+
+Added dark-gray (24/24/24) background regions to the eight-pixel tuning bar when
+RNA browsing is enabled: integer kHz ±100 Hz and integer kHz ±400 Hz ±50 Hz.
+Drawn at final native pixel coordinates before existing markers; history and other
+footer rows are unchanged. Suppress when spacing exceeds 100 Hz/pixel to avoid
+aliasing unresolved repeated bands. No new tuning behavior or receiver commands.
+
+These are practical search guides, not exhaustive catalogue limits. The prior
+read-only scan of rna-signals.csv (SHA256
+4328876b15a01a7a1c5f004ddc301abb4335cdf73e4548451f393f67a823a337)
+found these regions cover 723/724 nonnegative numeric sideband offsets for active
+USA/Canada NDBs at 190–530 kHz, and 1896/1936 for all active NDBs in that range.
+Approximate (~) values were excluded, missing values were not imputed, and each
+sideband counted separately. Half-kHz carriers and unusual offsets remain outside
+some guides; exact catalogue markers are unaffected.
+
+Synthetic fixture tests cover boundaries, unchanged history/footer, marker layering,
+resized native geometry and suppression at wide spans. Full offline suite: 776
+passed; compileall and diff checks clean. No live connections or personal data edits.
+
 ## 2026-10-21 — Receiver popup and capped-zoom blank waterfall
 
 Added a lower-text-area receiver popup, with stable dimensions independent of

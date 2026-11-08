@@ -1,5 +1,15 @@
 # TODO
 
+## Current slice — common NDB frequency-region shading
+
+Goal: slightly lighten only the tuning-bar background at integer-kHz ±100 Hz
+and integer-kHz ±400 Hz ±50 Hz, when RNA browsing is enabled. Keep markers on top,
+waterfall history unchanged, and suppress unresolved shading when zoomed out.
+Done: synthetic boundary/pixel regressions, full offline suite, user docs and commit.
+No receiver access or personal data changes.
+Completed: dark-gray background guides behind existing markers, RNA-only, with
+boundary/native-size/layering tests. Full offline suite: 776 passed.
+
 ## Current slice — receiver popup and blank-view diagnosis
 
 Goal: a lower-text-area receiver popup with stable geometry, scrolling, explicit

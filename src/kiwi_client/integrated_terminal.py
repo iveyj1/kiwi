@@ -1066,6 +1066,7 @@ def run_fixture_shell(
                                 else state.frequency_khz
                             ),
                             show_reference_marker=show_cw_offset_marker and state.mode == 'cw',
+                            shade_ndb_regions=rna_browser is not None,
                             low_cut_hz=state.low_cut_hz,
                             high_cut_hz=state.high_cut_hz,
                             presets=presets,

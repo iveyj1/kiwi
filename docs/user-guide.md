@@ -177,6 +177,16 @@ Use a UTF-8 terminal/font with box-drawing support (Kitty's usual configuration)
   The supported minimum remains 40 columns by 12 rows.
 
 
+### Common NDB frequency regions
+
+With RNA browsing enabled, the eight-pixel tuning bar has a slightly lighter
+background within **±100 Hz of each integer kHz**, and within **±50 Hz of its
+±400 Hz positions**. These are common search regions, not exhaustive emission
+limits or station detections; half-kHz channels and other offsets can fall outside.
+The shading stays behind passband/selection markers and never enters waterfall
+history. It disappears when pixels span more than 100 Hz, avoiding misleading
+aliased stripes at wide zooms. Non-RNA displays are unchanged.
+
 ### Receiver picker
 
 Press **r** for a boxed popup over the lower text area. The waterfall remains

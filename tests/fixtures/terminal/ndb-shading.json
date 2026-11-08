@@ -1,0 +1,8 @@
+{
+  "description": "Proposed common-region guides, not exhaustive NDB emission limits; relative Hz around each integer kHz",
+  "bands_hz": [[-450, -350], [-100, 100], [350, 450]],
+  "start_khz": 300.0,
+  "end_khz": 301.0,
+  "shaded_columns": [0, 100, 350, 400, 450, 550, 600, 650, 900, 1000],
+  "unshaded_columns": [101, 349, 451, 500, 549, 651, 899]
+}

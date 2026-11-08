@@ -93,6 +93,20 @@ the requested display zoom is higher. The coordinate-system `zoom_max` remains
 unchanged. See [the local verification](kiwi-protocol.md#acquisition-zoom-caps-local-verification-2026-10-21)
 and `tests/harness/test_capped_waterfall_view.py`.
 
+### Common NDB search regions on the frequency scale
+
+For an integer-kHz nominal carrier, a roughly 1 kHz modulation offset places its
+sidebands near neighboring integer-kHz ticks; roughly 400 Hz offsets place them
+near the ±400 Hz positions. For example, a 300 kHz carrier with a +1025 Hz USB
+entry places that component at 301.025 kHz, only 25 Hz above an integer tick.
+The subtle tuning-bar backgrounds highlight integer-kHz ±100 Hz and ±400 Hz ±50 Hz
+as practical search regions. They are not measured occupied bandwidths or exhaustive
+limits: half-kHz carriers and atypical recorded offsets can fall outside. Exact
+catalogue markers remain authoritative as catalogue predictions, not detections.
+Shading is suppressed if a display pixel spans more than the narrowest region's
+100 Hz width, rather than letting undersampling create misleading stripes.
+See `tests/fixtures/terminal/ndb-shading.json` and `test_ndb_region_shading.py`.
+
 ## Symmetric CW bandwidth adjustment
 
 The console's `j/k` steps request full widths of 10, 20, 30, 50, 100 or 500 Hz.

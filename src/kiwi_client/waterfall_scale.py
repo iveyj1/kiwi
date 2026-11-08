@@ -205,6 +205,7 @@ class GraphicalScaleResult:
 
 
 STATION_BAR_RGB = (145, 155, 170)
+NDB_REGION_BACKGROUND_RGB = (24, 24, 24)
 
 STATION_MARKER_COLORS = {
     'carrier': (255, 190, 80),
@@ -239,6 +240,7 @@ def compose_waterfall_scale(
     annotations: tuple[FrequencyAnnotation, ...] = (),
     passband_reference_khz: float | None = None,
     show_reference_marker: bool = False,
+    shade_ndb_regions: bool = False,
     label_target_pixels: int = 150,
     font_scale: int = 2,
     font_backend: str = "auto",
@@ -279,6 +281,18 @@ def compose_waterfall_scale(
     output_height = waterfall.height + footer_height
     rgb = bytearray(waterfall.rgb + b"\x00" * waterfall.width * footer_height * 3)
     tuning_top = waterfall.height
+
+    # Common search regions, not emission limits. Evaluate at the same RF pixel
+    # coordinates as markers, after native canvas resizing. Avoid aliased stripes
+    # when the narrowest (100 Hz) region is smaller than a display pixel.
+    hz_per_pixel = (end_khz - start_khz) * 1000 / max(1, waterfall.width - 1)
+    if shade_ndb_regions and waterfall.width > 1 and hz_per_pixel <= 100:
+        for x in range(waterfall.width):
+            frequency_hz = start_khz * 1000 + x * hz_per_pixel
+            phase = abs((frequency_hz + 500) % 1000 - 500)
+            if phase <= 100 + 1e-7 or abs(phase - 400) <= 50 + 1e-7:
+                for y in range(tuning_top, tuning_top + tuning_height):
+                    _set_pixel(rgb, waterfall.width, x, y, NDB_REGION_BACKGROUND_RGB)
 
     if passband_reference_khz is None:
         passband_reference_khz = tuned_khz
