@@ -28,7 +28,7 @@ def test_shading_boundaries_and_history_unchanged():
     assert image.rgb[1001 * 10 * 3:] == plain.rgb[1001 * 10 * 3:]
     for y in range(2, 10):
         for x in DATA['shaded_columns']:
-            assert pixel(image, x, y) == (24, 24, 24)
+            assert pixel(image, x, y) == (56, 56, 56)
         for x in DATA['unshaded_columns']:
             assert pixel(image, x, y) == (0, 0, 0)
 

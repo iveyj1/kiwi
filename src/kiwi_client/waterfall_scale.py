@@ -205,7 +205,7 @@ class GraphicalScaleResult:
 
 
 STATION_BAR_RGB = (145, 155, 170)
-NDB_REGION_BACKGROUND_RGB = (24, 24, 24)
+NDB_REGION_BACKGROUND_RGB = (56, 56, 56)
 
 STATION_MARKER_COLORS = {
     'carrier': (255, 190, 80),

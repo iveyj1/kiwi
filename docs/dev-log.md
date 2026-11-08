@@ -1,5 +1,11 @@
 # Dev Log
 
+## NDB shading visibility follow-up
+
+Operator reported RGB 24/24/24 was barely visible. Raised the tuning-bar guide
+background to RGB 56/56/56; boundaries, marker layering and history unchanged.
+Validation: 20 shading/scale tests passed; diff check clean. No receiver access.
+
 ## 2026-11-08 — Subtle NDB tuning-bar search regions
 
 Added dark-gray (24/24/24) background regions to the eight-pixel tuning bar when

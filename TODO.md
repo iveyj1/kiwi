@@ -1,5 +1,10 @@
 # TODO
 
+## Shading visibility follow-up
+
+Goal: raise guide background from RGB 24 to 56 after operator feedback that it
+was barely visible. Done: pixel/layering regressions pass; geometry unchanged.
+
 ## Current slice — common NDB frequency-region shading
 
 Goal: slightly lighten only the tuning-bar background at integer-kHz ±100 Hz
