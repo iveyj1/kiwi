@@ -8,6 +8,15 @@ state.json
 *.sqlite
 *.sqlite-*
 sites.toml
+# Private receiver locations, listening launchers and personal reports.
+/rna-sites.toml
+/cle-listen
+/rna-listen
+/cle-log-preview
+/cle332-log.txt*
+/prelim
+/cle/
+/kiwisdr-screenshot*.png
 rna-stations.json
 rna-stations.json.*
 rna-filters.json

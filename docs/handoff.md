@@ -1,54 +1,67 @@
-# Machine handoff
+# Machine handoff — live/RNA phase
 
-## Repository and merge preparation
+## Branches and release scope
 
-- Working branch: `feature/shared-radio-session`.
-- User direction: clean up and prepare for merge into `main`; do not execute the merge yet.
-- The former `wf1` workflow is superseded. At preparation time, local `main` is an ancestor of this feature branch (55 commits behind before cleanup commits).
-- Keep `kiwisdr-screenshot.png` untracked and unchanged. `state.json` is ignored local session state.
-- Do not commit forum credentials, session cookies, or downloaded authenticated pages.
+- Active preparation branch/worktree: `feature/rna-live-logging`, `/home/user/kiwi-rna`.
+- Target: local `main`. Preparation only; do not merge or switch ../kiwi without
+  explicit approval of the merge/migration.
+- `../kiwi` remains on `feature/ndb-analysis-plan`. Keep that branch's recorded
+  playback, DSP, practice/review and report-server workflows separate.
+- Only independent fixes were ported after auditing the 16 analysis-only commits.
+  Details, safety references and migration checklist: [merge review](live-phase-merge-review.md).
+- Personal logbooks, receiver sites, reports, scripts, preferences and historical
+  stages are local operational data, not Git content. Preserve them and screenshots.
 
 ## Current capabilities
 
-`kiwi-console` is the primary integrated Kitty waterfall/TUI. It uses controller-owned paired SND/W/F, bounded history, double-buffered presentation, runtime audio gating, mode/passband controls, preset/receiver registers, and saved state. The native GUI remains an optional prototype; standalone CLI tools remain available.
+`kiwi-console` is the primary Kitty/curses receiver interface with paired SND/W/F,
+audio, receiver presets/popup, saved radio state, RNA catalogue filtering and
+carrier/sideband markers. Inline w/W logging freezes reception evidence; the
+advanced editor handles hearing time, not-heard status and audited deletion.
 
-The headless paired path fetches `/VER` once, uses its timestamp in `/ws/kiwi/<ts>/<stream>`, and waits for SND `badp=0` before opening W/F. A stalled audio stop-fade no longer waits indefinitely for new samples; the primary task has a cooperative-stop cancellation fallback. This does not prove every possible transport or audio-device hang is resolved.
+`./logbook` / `kiwi-logbook` is a separate read-only desktop browser for native
+SQLite receptions and independently staged WWSU/Kiwi label history. Viewing sources
+together does not merge them. Identification and confirmation remain human actions.
 
-## Local receivers
+The graphical tuning bar preserves RF geometry, shows common NDB search regions,
+and leaves waterfall history untouched. The freshness gate honors advertised
+acquisition `zoom_cap` independently of coordinate-system `zoom_max`; higher
+local display zoom is cropping, not higher FFT resolution.
 
-| Register | Address | Role |
-|---|---|---|
-| `r1` | `10.0.0.41:8073` | General default |
-| `r2` | `10.0.0.42:8073` | Alternative |
-| `r3` | `10.0.0.43:8073` | Preferred NDB development target; user reports 4-channel mode |
+## Running
 
-Public receivers will commonly be in 8-channel mode according to the user. Reduced zoom and cadence must not prevent audio/signal analysis. Exact mode-dependent zoom limits remain to be verified from receiver metadata; do not hardcode the reported approximate 11/14 distinction.
+Use the installation and general-listening command in [README](../README.md).
+For general logging, omit `--log-event CLE332` and use `--no-rna-cle332` to override
+saved event filtering. Historical CLE hearings remain unchanged. Console Logged
+status is scoped to receiver/event/source; the desktop browser can show all scopes.
 
-Root `config.toml` intentionally has live operation enabled and receiver restriction disabled. Library/generated defaults remain guarded. Review that local configuration before using it on another machine. Public receiver testing still requires explicit user authorization.
+Current controls: h/l small steps, H/L large steps, j/k CW bandwidth, n/N station
+selection/tune/recenter, v component, y retune, r receiver popup, w update/new draft,
+W new hearing, Tab status and Enter save inside inline entry, B/F2 details, Esc
+cancel, q quit outside editors. See [user guide](user-guide.md) for full controls.
+`./sdr` is the older text TUI launcher, not the RNA-integrated console.
 
-## Setup and demo
+## Receivers and local configuration
 
-```bash
-./setup-python
-source .kiwi-venv/bin/activate
-python -m pytest -q
-```
+Local receivers are 10.0.0.41–43:8073. The operator confirmed all three are at the
+same site, but each retains an independent entry in private `rna-sites.toml`.
+Never infer other receivers' locations or silently relabel recorded evidence.
 
-Explicit local NDB-development target (restored frequency/mode still apply):
+Root config.toml enables live operation and disables receiver restriction; inspect
+it before deployment elsewhere. Library/generated defaults remain guarded. Do not
+connect to public receivers without explicit authorization. Fixtures/dry runs are
+the default validation path. No receiver connections were made during merge review.
 
-```bash
-kiwi-console --allow-live --receiver 10.0.0.43:8073 \
-    --config config.toml --rows 300 --refresh-hz 5 --auto-scale
-```
+## Known limitations and validation
 
-Console controls: `h/l` or Left/Right tune; `H/L` fine tune; Up/Page Up and Down/Page Down tune by one visible span; `f` enters frequency and recenters only when offscreen; `c` centers; `+/-` zoom; `a` toggles audio; `k/j` volume; `m` selects mode; `r` selects receiver; `q` exits.
+The live-phase suite passes 782 tests (776 baseline plus six new regressions).
+Compilation, source/installed CLI dry runs, offline terminal logging, logbook
+source reading and a clean wheel installation passed; see the merge review. The parked
+analysis branch was not merged or retested as part of this release.
 
-## Outstanding work
+Remaining work is in [TODO](../TODO.md): evidence capture, audited desktop editing,
+general RNA export, stream deadlines, switch stress, physical-terminal verification
+and waterfall cadence. The zoom-cap fix does not settle every 8-channel display
+report. Detailed prior live observations remain in [protocol notes](kiwi-protocol.md).
 
-- First-message/first-frame/stall diagnostics and rapid-switch stress coverage. One unreproduced hang remains reported after the teardown fix.
-- Audit bootstrap, guardrails, and cancellation across all frontends.
-- Audit `zoom_max`/`zoom_cap` propagation for mode-dependent receivers.
-- Optional presentation-cadence improvement and short bounded W/F buffer; not part of this merge preparation.
-- SND/IQ fan-out into recording/detection; fixture-first NDB detector and later long-term integration. W/F is an overview, not the analysis data source.
-
-Validation results are recorded in `docs/dev-log.md`; current work is tracked in `TODO.md`. Historical captures retain their original addresses.
+The superseded handoff is preserved in [archive](archive/shared-radio-handoff.md).

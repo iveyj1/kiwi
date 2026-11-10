@@ -1,5 +1,25 @@
 # Dev Log
 
+## 2026-11-10 — Live-phase merge preparation completed
+
+Kept analysis on feature/ndb-analysis-plan. Added an audit of all 16 excluded
+commits and a no-overwrite migration checklist in docs/live-phase-merge-review.md.
+Consolidated TODO/handoff and added a README; preserved superseded notes in
+archives and left editable mockups intact. Added specific ignores for private
+operational files without deleting them. Agent guidance now explicitly excludes
+a wholesale experimental-analysis merge.
+
+Validation: 782 tests, compileall and diff checks pass. A real-curses offline PTY
+searched/tuned RJ, saved one tentative fixture hearing with no event tag while
+Kitty graphics continued, and exited cleanly. The logbook launcher read that
+synthetic source from a different cwd. No personal database was used for smoke
+writes. A non-isolated wheel attempt exposed the shared venv's missing setuptools;
+added explicit build-backend metadata, then built in isolation and successfully
+ran installed console/logbook dry runs in a clean temporary venv with PYTHONPATH
+unset. Shared installed packages were not modified. No live receivers accessed.
+Main and ../kiwi remain unchanged; the local main ancestry permits fast-forward
+integration after approval. Remote refs were not refreshed and nothing was pushed.
+
 ## 2026-11-10 — Selective live-client fixes from the parked analysis branch
 
 User chose to keep experimental analysis/recorded workflows on their own branch,

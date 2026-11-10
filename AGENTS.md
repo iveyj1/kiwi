@@ -96,6 +96,7 @@ Current user direction: clean up and prepare the tested feature work for merge i
 - Use feature branches for implementation and merge preparation.
 - Commit tested milestones and other sensible checkpoints as work progresses; do not wait for a separate commit request each time.
 - `main` is the intended merge target; the prior `wf1` integration requirement is superseded.
+- Keep `feature/ndb-analysis-plan` separate. Do not merge its experimental recorded/analysis workflows into this phase; only independently tested live-client fixes may be ported.
 - Preparation is not execution: do not merge into or commit directly on `main` until the user requests the merge.
 - Keep untracked screenshots and local state out of commits.
 
