@@ -1,5 +1,9 @@
 # Live/RNA phase merge review — 2026-11-10
 
+**Update:** user-approved merge and migration completed later the same day; see
+[execution record](#approved-merge-and-migration). The preparation findings below
+are retained as the audit trail.
+
 ## Decision and scope
 
 Prepare `feature/rna-live-logging` for `main`; retain
@@ -124,7 +128,7 @@ WWSU backups. Those remain untouched in their original locations. The operationa
 backup is a point-in-time safety copy, not the source of truth for subsequent
 listening; take a fresh backup before actual migration.
 
-## Merge/migration checklist — not executed
+## Merge/migration checklist — executed after subsequent approval
 
 1. Obtain explicit merge approval; confirm no new tracked edits or branch divergence.
    Remote refs have not been refreshed; review them before any push.
@@ -151,6 +155,46 @@ listening; take a fresh backup before actual migration.
 8. Repeat offline smoke checks in ../kiwi; then user-authorized normal listening
    and logbook inspection. Keep ../kiwi-rna as fallback until operation is verified.
    Do not remove either worktree or delete the analysis branch as part of preparation.
+
+## Approved merge and migration
+
+On 2026-11-10 the user approved execution. No running receiver/browser processes
+were found. Local main was still at 1ab69bd and remained an ancestor of fac8a94.
+Switched /home/user/kiwi from the analysis branch to main and fast-forwarded to the
+prepared live phase, followed by a feature-branch documentation checkpoint. No
+analysis merge, force/reset, worktree deletion or remote push was performed.
+
+Fresh safety copy before migration:
+`~/.local/share/kiwi-client/backups/live-phase-20261110-bqhof4f5/`.
+The manifest records 25 backed-up files; migration.json records 16 reconciled
+operational files. Native SQLite copies passed quick_check and complete logical
+dump comparison. Config and presets were identical, so retained. The older
+../kiwi saved state was preserved in the backup before adopting current live
+state, including zoom/passbands/display levels. Historical stage/source bytes and
+frozen evidence were not rewritten or combined.
+
+The target copies of rna-listen, cle-listen and cle-log-preview now resolve paths
+relative to their own directory and forward command-line arguments. Existing
+receiver/event choices were preserved. Their final hashes are recorded in
+launcher-adjustments.json; original fallback scripts are unchanged. Added a
+specific ignore for the existing pskov/ archive exposed by leaving the analysis
+branch, without importing or deleting that archive.
+
+Refreshed editable installation in /home/user/kiwi/.kiwi-venv using the primary
+worktree. Confirmed imports resolve to /home/user/kiwi/src and installed metadata
+contains no recorded/analysis entry points. Validation in the primary worktree:
+**782 tests passed**, compileall/diff checks passed, migrated general-listening
+launcher dry run from /tmp passed with network=false, installed fixture CLI dry
+run passed with PYTHONPATH unset, and the logbook loaded all three migrated source
+families without errors. Shell syntax checks passed. Native databases were still
+logically identical afterward; fallback originals and unrelated target operational
+files matched the fresh backup hashes. No receiver connection was made.
+
+Use /home/user/kiwi for subsequent listening and logging. The retained
+/home/user/kiwi-rna data is a fallback snapshot, **not synchronized**. Keep it until
+normal operation is verified; do not alternate between the two native logbooks.
+The analysis branch remains at 9e1c96f with its safety ref intact. Remote refs were
+not refreshed and nothing was pushed.
 
 ## Remaining limitations
 

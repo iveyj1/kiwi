@@ -3,6 +3,8 @@ __pycache__/
 .kiwi-venv/
 kiwiclient/
 recordings/
+# Local third-party archives retained from the separate analysis branch.
+/pskov/
 artifacts/
 state.json
 *.sqlite

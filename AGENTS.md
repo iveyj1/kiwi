@@ -91,7 +91,9 @@ Do not bury protocol parsing inside UI code.
 
 ## Git workflow
 
-Current user direction: clean up and prepare the tested feature work for merge into `main`.
+The live/RNA phase was merged into `main` with user approval on 2026-11-10.
+Primary operational worktree: `/home/user/kiwi`. `/home/user/kiwi-rna` is retained
+as a fallback; its local log/state copies are not synchronized with the primary.
 
 - Use feature branches for implementation and merge preparation.
 - Commit tested milestones and other sensible checkpoints as work progresses; do not wait for a separate commit request each time.

@@ -2,11 +2,12 @@
 
 ## Branches and release scope
 
-- Active preparation branch/worktree: `feature/rna-live-logging`, `/home/user/kiwi-rna`.
-- Target: local `main`. Preparation only; do not merge or switch ../kiwi without
-  explicit approval of the merge/migration.
-- `../kiwi` remains on `feature/ndb-analysis-plan`. Keep that branch's recorded
-  playback, DSP, practice/review and report-server workflows separate.
+- Primary branch/worktree: `main`, `/home/user/kiwi`; user-approved fast-forward
+  merge and operational migration completed 2026-11-10. Nothing was pushed.
+- `/home/user/kiwi-rna` remains on `feature/rna-live-logging` as a fallback. Its
+  native log/state files are independent copies, not synchronized with main.
+- `feature/ndb-analysis-plan` remains preserved at `9e1c96f`, without an active
+  worktree. Keep its recorded playback, DSP, practice/review and reports separate.
 - Only independent fixes were ported after auditing the 16 analysis-only commits.
   Details, safety references and migration checklist: [merge review](live-phase-merge-review.md).
 - Personal logbooks, receiver sites, reports, scripts, preferences and historical
@@ -29,6 +30,11 @@ acquisition `zoom_cap` independently of coordinate-system `zoom_max`; higher
 local display zoom is cropping, not higher FFT resolution.
 
 ## Running
+
+Use `/home/user/kiwi` for listening and logging. The migrated private `./rna-listen`
+launcher resolves paths relative to itself; `./logbook` reads the migrated sources.
+Editable installation now points to this primary worktree. Fallback originals,
+external archives, cle material and screenshots were retained unchanged.
 
 Use the installation and general-listening command in [README](../README.md).
 For general logging, omit `--log-event CLE332` and use `--no-rna-cle332` to override

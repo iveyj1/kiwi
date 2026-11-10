@@ -1,6 +1,6 @@
 # TODO
 
-## Live/RNA phase merge preparation
+## Live/RNA phase — merged 2026-11-10
 
 Goal: deliver the tested live receiver, catalogue and logbook phase to `main`.
 Keep experimental recorded-receiver and analysis work on
@@ -13,12 +13,17 @@ Keep experimental recorded-receiver and analysis work on
 - [x] Finish full-suite, compile, CLI/browser and terminal smoke validation:
   782 tests passed; real-curses fixture logging and clean wheel installation checked.
 - [x] Record final readiness, remaining limitations and migration instructions.
-- [ ] After explicit approval: merge into main, then switch ../kiwi to main and
-  reconcile local files without overwriting that worktree's configuration/data.
+- [x] After explicit approval: fast-forward main in ../kiwi and reconcile local
+  files. Config/presets matched; the older saved state was backed up before adopting
+  the current live state. Native database copies were logically verified.
+- [x] Refresh editable installation and validate in ../kiwi: 782 tests passed,
+  launcher/browser/installed CLI dry runs and compilation passed. No radio access.
 
 Done criteria: tested feature commits, clean tracked worktree, documented audit and
 migration, no experimental analysis merge, no personal reception data in commits.
-Preparation does not itself authorize switching worktrees or merging main.
+The user explicitly approved this merge/migration. Use /home/user/kiwi for new
+listening/logging; /home/user/kiwi-rna remains a fallback with unsynchronized data.
+Analysis remains on its original branch. Nothing was pushed.
 
 See [merge review](docs/live-phase-merge-review.md),
 [current handoff](docs/handoff.md) and [user guide](docs/user-guide.md).

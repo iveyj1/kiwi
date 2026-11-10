@@ -1,5 +1,24 @@
 # Dev Log
 
+## 2026-11-10 — Approved merge and operational migration
+
+User approved execution after reviewing preparation. Fast-forwarded local main
+in /home/user/kiwi to the live/RNA phase; kept feature/ndb-analysis-plan at 9e1c96f
+and retained the RNA worktree as fallback. No remote push or receiver connection.
+Fresh operational backup: ~/.local/share/kiwi-client/backups/live-phase-20261110-bqhof4f5.
+Reconciled 16 operational files, with SQLite online backup/integrity/logical-dump
+checks and regular-file hashes. Identical config/presets retained; backed-up older
+radio state replaced with current live state. Target private launchers now resolve
+their own cwd and forward arguments, preserving event/receiver semantics. Original
+fallback files, cle material, screenshot and third-party archives remain unchanged.
+
+Refreshed the shared editable installation to /home/user/kiwi. Primary-worktree
+validation: 782 tests, compileall/diff checks, shell syntax, migrated launcher dry
+run, installed fixture CLI dry run, and all-source logbook read passed. None of
+these smoke checks opened a receiver or wrote a reception. Complete execution
+record is in docs/live-phase-merge-review.md. New listening should use ../kiwi;
+the fallback logbook is an independent snapshot and will not track future writes.
+
 ## 2026-11-10 — Live-phase merge preparation completed
 
 Kept analysis on feature/ndb-analysis-plan. Added an audit of all 16 excluded
