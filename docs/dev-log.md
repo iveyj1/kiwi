@@ -1,5 +1,26 @@
 # Dev Log
 
+## 2026-11-10 — Selective live-client fixes from the parked analysis branch
+
+User chose to keep experimental analysis/recorded workflows on their own branch,
+not merge them into the live/RNA phase. Audited the 16 commits unique to
+feature/ndb-analysis-plan and the complete diffs to shared runtime modules.
+Ported only independent changes from 78a13b5 and 2b50a81: bounded raster padding
+cache plus invalidation on geometry rebuild; auto-level cadence restart after a
+publisher generation reset; terminal cleanup even if source shutdown fails; and
+nonfatal direct tuning/view-key errors. Kept this branch's rendering, keymap,
+fresh-view gate and frozen reception evidence behavior. No recorded-source APIs,
+DSP workflows, audio pacing changes or analysis dependencies were imported.
+
+Six new regressions all failed before these ports and passed afterward. Full
+live-branch suite: 776 baseline, 782 after fixes. No live receiver connections.
+Safety refs preserve pre-preparation live, analysis and main tips. A separate
+operational backup contains 25 files under
+~/.local/share/kiwi-client/backups/live-phase-20261110-kevr7vhg (manifest included):
+SQLite online backups passed quick_check; ordinary copies passed source/destination
+SHA256 checks. It is not a full backup of recordings or external WWSU archives.
+Original personal files, main and the ../kiwi worktree were not modified.
+
 ## NDB shading visibility follow-up
 
 Operator reported RGB 24/24/24 was barely visible. Raised the tuning-bar guide

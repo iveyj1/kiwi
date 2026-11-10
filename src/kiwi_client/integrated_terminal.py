@@ -514,6 +514,14 @@ def run_fixture_shell(
         except (OSError, ValueError) as exc:
             message = f"RNA state NOT saved: {exc}"
 
+    def radio_action(function, *args, **kwargs):
+        nonlocal message
+        try:
+            return function(*args, **kwargs)
+        except (ValueError, RuntimeError) as exc:
+            message = str(exc)
+            return None
+
     def station_log_status(station_key):
         receiver = tui_controller.state.receiver if tui_controller is not None else "fixture"
         return reception_index.status(station_key, receiver, log_event, "live" if live_source is not None else "fixture")
@@ -750,7 +758,7 @@ def run_fixture_shell(
                         _tuned, recentered = set_console_frequency(model, float(entry))
                         suffix = "; waterfall recentered" if recentered is not None else ""
                         message = f"frequency {entry} kHz{suffix}"
-                    except ValueError as exc:
+                    except (ValueError, RuntimeError) as exc:
                         message = str(exc)
                     entry = None
                     try:
@@ -895,7 +903,7 @@ def run_fixture_shell(
                 try:
                     tune_console_one_screen(model, 1)
                     message = "frequency up one screen"
-                except ValueError as exc:
+                except (ValueError, RuntimeError) as exc:
                     message = str(exc)
                 presenter.invalidate()
                 dirty = True
@@ -903,7 +911,7 @@ def run_fixture_shell(
                 try:
                     tune_console_one_screen(model, -1)
                     message = "frequency down one screen"
-                except ValueError as exc:
+                except (ValueError, RuntimeError) as exc:
                     message = str(exc)
                 presenter.invalidate()
                 dirty = True
@@ -915,35 +923,35 @@ def run_fixture_shell(
                 presenter.invalidate()
                 dirty = True
             elif key in ("h", curses.KEY_LEFT):
-                tune_console_selection(model, -1, small=True)
+                radio_action(tune_console_selection, model, -1, small=True)
                 presenter.invalidate()
                 dirty = True
             elif key in ("l", curses.KEY_RIGHT):
-                tune_console_selection(model, 1, small=True)
+                radio_action(tune_console_selection, model, 1, small=True)
                 presenter.invalidate()
                 dirty = True
             elif key in ("H", curses.KEY_SLEFT):
-                tune_console_selection(model, -1)
+                radio_action(tune_console_selection, model, -1)
                 presenter.invalidate()
                 dirty = True
             elif key in ("L", curses.KEY_SRIGHT):
-                tune_console_selection(model, 1)
+                radio_action(tune_console_selection, model, 1)
                 presenter.invalidate()
                 dirty = True
             elif key in ("\n", "\r"):
-                model.tune_selected()
+                radio_action(model.tune_selected)
                 presenter.invalidate()
                 dirty = True
             elif key == "c":
-                model.recenter()
+                radio_action(model.recenter)
                 presenter.invalidate()
                 dirty = True
             elif key in ("+", "="):
-                model.zoom(1)
+                radio_action(model.zoom, 1)
                 presenter.invalidate()
                 dirty = True
             elif key == "-":
-                model.zoom(-1)
+                radio_action(model.zoom, -1)
                 presenter.invalidate()
                 dirty = True
             elif key == "u":
@@ -1181,11 +1189,13 @@ def run_fixture_shell(
                 curses.mousemask(0)
             except curses.error:
                 pass
-        if live_source is not None:
-            live_source.stop()
-        presenter.finish()
-        if settings_checkpoint is not None:
-            settings_checkpoint.save_if_changed(tui_controller, levels=levels, force=True)
+        try:
+            if live_source is not None:
+                live_source.stop()
+        finally:
+            presenter.finish()
+            if settings_checkpoint is not None:
+                settings_checkpoint.save_if_changed(tui_controller, levels=levels, force=True)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

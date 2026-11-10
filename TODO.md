@@ -1,5 +1,16 @@
 # TODO
 
+## Current slice — live-phase merge preparation (analysis retained separately)
+
+Goal: audit all 16 analysis-only commits for reusable fixes without merging
+recorded/analysis workflows. Port only independently useful fixes with regressions;
+validate this live/RNA phase, document launch/data migration and leave main and
+../kiwi unchanged pending merge approval. Safety refs created for all three tips.
+Baseline: 776 offline tests passed. Candidate ports: bounded raster padding cache,
+auto-level cadence reset, shutdown cleanup, and guarded interactive tuning errors.
+Done: audited commit dispositions, failing-then-passing regressions, full suite,
+portable CLI/browser smoke checks and a committed merge-readiness report.
+
 ## Shading visibility follow-up
 
 Goal: raise guide background from RGB 24 to 56 after operator feedback that it

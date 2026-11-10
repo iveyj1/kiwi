@@ -187,6 +187,13 @@ The shading stays behind passband/selection markers and never enters waterfall
 history. It disappears when pixels span more than 100 Hz, avoiding misleading
 aliased stripes at wide zooms. Non-RNA displays are unchanged.
 
+### Display recovery
+
+When changing receivers, automatic display scaling restarts its update cadence
+instead of waiting for the previous receiver's frame count. Tuning/view-key errors
+are reported in MESSAGE without closing the console. Terminal presentation cleanup
+still runs if receiver shutdown reports an error.
+
 ### Receiver picker
 
 Press **r** for a boxed popup over the lower text area. The waterfall remains

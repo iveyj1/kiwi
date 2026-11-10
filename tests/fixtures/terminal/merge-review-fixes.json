@@ -1,0 +1,9 @@
+{
+  "description": "Synthetic independent live-client regressions identified while auditing the excluded analysis branch",
+  "history_rows": 12,
+  "width": 16,
+  "old_source_generation": 1000,
+  "new_source_generation": 20,
+  "negative_tune_keys": ["h", "q"],
+  "stopped_view_keys": ["c", "q"]
+}

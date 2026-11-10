@@ -56,6 +56,8 @@ class WaterfallLevelController:
         return float(values[round((len(values) - 1) * fraction)])
 
     def observe(self, snapshot: WaterfallSnapshot) -> bool:
+        if snapshot.generation < self._last_generation:
+            self._last_generation = 0  # New receiver/publisher: restart cadence.
         if not self.automatic or snapshot.generation - self._last_generation < self.update_generations:
             return False
         values = sorted(value for row in snapshot.rows for value in row.dbm)

@@ -201,6 +201,7 @@ class SnapshotRasterizer:
                 or view_changed
             )
             if rebuild:
+                self._padding_rows.clear()
                 self._rgb_rows = deque(maxlen=snapshot.max_rows)
                 new_rows = snapshot.rows
             else:
@@ -227,6 +228,8 @@ class SnapshotRasterizer:
             raise ValueError("snapshot rasterizer has no rows")
         padding_count = self._max_rows - len(self._rgb_rows)
         if padding_count not in self._padding_rows:
+            # Keep only the current size, not a quadratic history-fill cache.
+            self._padding_rows.clear()
             padding = render_dbm_rows(
                 ((-255,) * self._width,),
                 min_dbm=self.min_dbm,
